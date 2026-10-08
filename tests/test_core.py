@@ -154,5 +154,48 @@ class CoreTests(unittest.TestCase):
         self.assertNotIn("HelloMod", source)
         with self.assertRaises(ValueError): core.create_mod(self.root, "MyTestMod")
 
+    def test_catalog_assigns_assemblies_by_typedef_ranges(self):
+        source = "// Image 0: Assembly-CSharp.dll - 0\n// Image 1: System.dll - 2\n// Namespace: \npublic class Foo // TypeDefIndex: 1\n{\n}\n// Namespace: System\npublic class Bar // TypeDefIndex: 2\n{\n}\n"
+        path = self.root / "dump.cs"
+        path.write_text(source)
+        catalog = core.index_dump(path, self.root / "catalog.json")
+        self.assertEqual([e["assembly"] for e in catalog["types"]], ["Assembly-CSharp.dll", "System.dll"])
+
+    def test_native_index_keeps_overload_addresses_and_honors_limit(self):
+        directory = self.root / "local/ghidra"
+        directory.mkdir(parents=True)
+        entries = [{"name": "HpBarController$$Hit", "address": address, "signature": "void Hit(int damage)"}
+                   for address in ("180000010", "180000020")]
+        (directory / "functions.jsonl").write_text("\n".join(json.dumps(e) for e in entries))
+        with patch.object(core, "ROOT", self.root):
+            count, matches = core.search_native_functions("hpbarcontroller", 1)
+            self.assertEqual(count, 2)
+            self.assertEqual(len(matches), 1)
+            self.assertIn("Body not exported", core.native_description(matches[0]))
+
+    def test_build_for_other_installation_is_rejected(self):
+        artifact = self.root / "artifact"
+        artifact.mkdir()
+        receipt = {"fingerprint": core.fingerprint(self.game)}
+        receipt["fingerprint"]["game"] = str(self.root / "other")
+        core.write_json(artifact / "build.json", receipt)
+        with patch.object(core, "game_running", return_value=False), self.assertRaises(ValueError):
+            core.deploy_plugin(self.game, artifact)
+
+    def test_cfg_controls_parse_bepinex_comments_and_validate_ranges(self):
+        text = "[Physics]\n## Acceleration strength.\n# Setting type: Single\n# Default value: 100\n# Acceptable value range: From 0 to 500\nAcceleration = 100\n\n[General]\n# Setting type: Boolean\nEnabled = false\n"
+        entries = core.parse_cfg_settings(text)
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(entries[0]["description"], "Acceleration strength.")
+        self.assertEqual(core.validate_cfg_value(entries[0], "42.5"), "42.5")
+        with self.assertRaises(ValueError): core.validate_cfg_value(entries[0], "501")
+        self.assertEqual(core.validate_cfg_value(entries[1], "TRUE"), "true")
+
+    def test_cfg_controls_validate_enum_and_integer_bounds(self):
+        entries = core.parse_cfg_settings("[Input]\n# Setting type: KeyCode\n# Acceptable values: None, A, B\nKey = None\n# Setting type: Int32\nCount = 3\n")
+        with self.assertRaises(ValueError): core.validate_cfg_value(entries[0], "C")
+        with self.assertRaises(ValueError): core.validate_cfg_value(entries[1], str(2**32))
+        self.assertEqual(core.validate_cfg_value(entries[0], "A"), "A")
+
 
 if __name__ == "__main__": unittest.main()

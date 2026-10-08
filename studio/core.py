@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import bisect
 import json
 import math
 import os
@@ -100,13 +101,15 @@ def diagnose(game: Path) -> dict:
 
 def index_dump(path: Path, output: Path) -> dict:
     """Index declaration byte spans; bodies in dump.cs are stubs, not implementations."""
-    types, namespace, pending_start, current = [], "", None, None
+    types, images, namespace, pending_start, current = [], [], "", None, None
     type_pattern = re.compile(r"^(?:public|private|internal|protected).*?\b(class|struct|enum|interface)\s+(.+?)\s*// TypeDefIndex: (\d+)")
     offset, line_number = 0, 0
     with path.open("rb") as stream:
         for raw in stream:
             line_number += 1
             line = raw.decode("utf-8", errors="replace").rstrip()
+            image = re.match(r"// Image \d+: (.+) - (\d+)$", line)
+            if image: images.append((int(image[2]), image[1]))
             if line.startswith("// Namespace:"):
                 if current:
                     current["end"] = offset
@@ -121,6 +124,7 @@ def index_dump(path: Path, output: Path) -> dict:
                 current = {"name": name, "namespace": namespace, "kind": kind, "index": int(index),
                            "start": pending_start if pending_start is not None else offset,
                            "line": line_number, "declaration": line, "members": 0}
+                current["assembly"] = images[bisect.bisect_right([i[0] for i in images], int(index)) - 1][1] if images else "unknown"
             elif current and line.startswith("\t") and (";" in line or " {" in line):
                 current["members"] += 1
             offset += len(raw)
@@ -241,6 +245,50 @@ SETTING_SCHEMA = {
     ("Physics", "FastFallAcceleration"): ("float", 100.0, 0.0, 500.0),
     ("Physics", "MinimumAirTime"): ("float", 0.4, 0.0, 3.0),
 }
+
+
+def parse_cfg_settings(text: str) -> list[dict]:
+    """Read BepInEx's self-describing comments without discarding raw config content."""
+    entries, section, metadata, descriptions = [], "", {}, []
+    for line in text.splitlines():
+        header = re.match(r"^\s*\[([^]]+)\]\s*$", line)
+        if header:
+            section, metadata, descriptions = header[1], {}, []
+            continue
+        comment = re.match(r"^# (Setting type|Default value|Acceptable values|Acceptable value range): (.*)$", line)
+        if comment: metadata[comment[1]] = comment[2]
+        elif line.startswith("## "): descriptions.append(line[3:])
+        else:
+            setting = re.match(r"^\s*([^#;=]+?)\s*=\s*(.*)$", line)
+            if setting and section:
+                entries.append({"section": section, "key": setting[1].strip(), "value": setting[2],
+                                "type": metadata.get("Setting type", "String"), "default": metadata.get("Default value", ""),
+                                "choices": [v.strip() for v in metadata.get("Acceptable values", "").split(",") if v.strip()],
+                                "range": metadata.get("Acceptable value range", ""), "description": "\n".join(descriptions)})
+                metadata, descriptions = {}, []
+    return entries
+
+
+def validate_cfg_value(entry: dict, value: str) -> str:
+    if any(ch in value for ch in "\r\n"):
+        raise ValueError("Use a single-line setting value")
+    kind = entry["type"]
+    if kind == "Boolean":
+        if value.lower() not in ("true", "false"): raise ValueError("Expected true or false")
+        value = value.lower()
+    elif kind in ("Single", "Double", "Decimal", "Int32", "Int64", "UInt32", "UInt64", "Int16", "UInt16", "Byte", "SByte"):
+        number = int(value) if kind not in ("Single", "Double", "Decimal") else float(value)
+        if not math.isfinite(number): raise ValueError("Expected a finite number")
+        integer_limits = {"Int32": (-2**31, 2**31-1), "Int64": (-2**63, 2**63-1), "UInt32": (0, 2**32-1),
+                          "UInt64": (0, 2**64-1), "Int16": (-2**15, 2**15-1), "UInt16": (0, 2**16-1), "Byte": (0, 255), "SByte": (-128, 127)}
+        if kind in integer_limits and not integer_limits[kind][0] <= number <= integer_limits[kind][1]:
+            raise ValueError(f"Value outside {kind} limits")
+        bounds = re.match(r"^From (.+) to (.+)$", entry["range"])
+        if bounds and not float(bounds[1]) <= number <= float(bounds[2]):
+            raise ValueError("Expected " + entry["range"])
+    if entry["choices"] and value not in entry["choices"]:
+        raise ValueError("Choose one of: " + ", ".join(entry["choices"]))
+    return value
 
 
 def validate_settings(values: dict) -> dict:
@@ -366,16 +414,24 @@ def create_mod(destination: Path, name: str) -> Path:
     return destination / f"{name}.csproj"
 
 
-def export_ghidra(home: Path, project: Path, log=lambda message: None) -> dict:
+def export_ghidra(home: Path, project: Path, log=lambda message: None, selected_name: str | None = None,
+                  selected_address: str | None = None) -> dict:
     launcher = home / "support/analyzeHeadless.bat"
     if not launcher.exists() or not project.is_file() or project.suffix != ".gpr":
         raise ValueError("Choose a Ghidra installation and an existing .gpr project")
     out = ROOT / "local/ghidra"
     out.mkdir(parents=True, exist_ok=True)
+    targets = ROOT / "tools/ghidra/targets.txt"
+    limit = "45"
+    if selected_name:
+        targets = ROOT / "local/selected-target.txt"
+        atomic_write(targets, (re.escape(selected_name) + "$\n").encode("utf-8"))
+        limit = "1"
     command = [str(launcher), str(project.parent), project.stem, "-process", "GameAssembly.dll",
                "-readOnly", "-noanalysis", "-scriptPath", str(ROOT / "tools/ghidra"),
-               "-postScript", "ExportTk2.java", str(out), "@" + str(ROOT / "tools/ghidra/targets.txt"), "45",
-               "-log", str(ROOT / "local/ghidra-targets.log")]
+               "-postScript", "ExportTk2.java", str(out), "@" + str(targets), limit]
+    if selected_address: command.append(selected_address)
+    command.extend(["-log", str(ROOT / "local/ghidra-targets.log")])
     env = os.environ.copy()
     env["GHIDRA_HEADLESS_MAXMEM"] = "4G"
     # Delete old success marker before starting; an export failure must not look successful.
@@ -402,3 +458,28 @@ def decompile_managed(executable: Path, dll: Path, game: Path, log=lambda messag
     if result.returncode:
         raise RuntimeError("Managed decompilation failed; see output")
     return out
+
+
+def search_native_functions(query: str, limit: int = 500) -> tuple[int, list[dict]]:
+    path = ROOT / "local/ghidra/functions.jsonl"
+    entries, count = [], 0
+    if not path.exists(): return 0, []
+    with path.open(encoding="utf-8") as stream:
+        for line in stream:
+            if query.lower() not in line.lower(): continue
+            count += 1
+            if len(entries) < limit:
+                entry = json.loads(line)
+                entry["native"] = True
+                entries.append(entry)
+    return count, entries
+
+
+def native_description(entry: dict) -> str:
+    name = re.sub(r"[^A-Za-z0-9_.-]", "_", entry["name"])
+    stem = (entry["address"] + "_" + name)[:150]
+    path = ROOT / "local/ghidra/pseudocode" / (stem + ".c")
+    heading = f"{entry['name']} @ {entry['address']}\n{entry['signature']}\n\n"
+    return heading + (path.read_text(encoding="utf-8") if path.exists() else
+        "Body not exported yet. Use Export selected method to produce readable Ghidra pseudocode.\n"
+        "The signature can be approximate, especially for aliased native functions.")

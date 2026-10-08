@@ -9,7 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from studio import core
 
 catalog = json.loads((core.ROOT / "local/catalog.json").read_text())
-declarations = {e["name"]: e for e in catalog["types"] if not e["namespace"]}
+declarations = collections.defaultdict(list)
+for entry in catalog["types"]: declarations[entry["name"]].append(entry)
 sources = [core.ROOT.parent / name for name in ("TKMA-New-Mod-Template", "The-Karters-Modding-Assistant-SDK", "TheKarters2Mods")]
 sources.append(core.ROOT / "local/managed")
 pattern = re.compile(r'\[HarmonyPatch\(typeof\(([^)]+)\),\s*(?:nameof\([^)]*\.([A-Za-z0-9_]+)\)|"([A-Za-z0-9_]+)")')
@@ -23,10 +24,12 @@ for source in sources:
         for match in pattern.finditer(text):
             name, from_nameof, literal = match.groups()
             method = from_nameof or literal
-            entry = declarations.get(name)
+            imports = set(re.findall(r"^using ([A-Za-z0-9_.]+);", text, re.MULTILINE))
+            candidates = [e for e in declarations.get(name, []) if not e["namespace"] or e["namespace"] in imports]
+            entry = candidates[0] if len(candidates) == 1 else None
             signatures = [] if entry is None else [l.strip() for l in core.read_declaration(catalog, entry).splitlines()
                 if re.search(r"\b" + re.escape(method) + r"\s*\(", l)]
-            status = "type absent" if entry is None else "method absent" if not signatures else "overload review" if len(signatures) > 1 else "named target present"
+            status = "ambiguous type" if len(candidates) > 1 else "type absent" if entry is None else "method absent" if not signatures else "overload review" if len(signatures) > 1 else "named target present"
             records.append({"file": str(path.relative_to(source)), "source": source.name, "line": text[:match.start()].count("\n") + 1,
                             "type": name, "method": method, "status": status, "signatures": signatures})
 counts = collections.Counter(r["status"] for r in records)

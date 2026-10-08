@@ -152,9 +152,10 @@ class Studio(tk.Tk):
         ttk.Button(toolbar, text="Index dump.cs", command=self.index).pack(side="left", padx=6)
         ttk.Button(toolbar, text="Export Ghidra", command=self.ghidra_export).pack(side="left")
         ttk.Button(toolbar, text="Recover mod C#", command=self.managed_export).pack(side="left", padx=6)
+        ttk.Button(toolbar, text="Export selected method", command=self.export_selected).pack(side="left")
         self.browser_mode = tk.StringVar(value="Game declarations")
         combo = ttk.Combobox(frame, textvariable=self.browser_mode, state="readonly",
-                             values=("Game declarations", "Native pseudocode", "Recovered mod C#", "SDK documentation"))
+                             values=("Game declarations", "Native function index", "Native pseudocode", "Recovered mod C#", "SDK documentation"))
         combo.pack(fill="x", pady=8)
         combo.bind("<<ComboboxSelected>>", lambda e: self.refresh_browser())
         self.browser_note = tk.StringVar(value="")
@@ -194,6 +195,10 @@ class Studio(tk.Tk):
             for entry in self.browser_items:
                 self.browser_list.insert("end", (entry["namespace"] + "." if entry["namespace"] else "") + entry["name"])
             self.browser_note.set(f"{len(entries):,} matches · showing first 500. Metadata declarations have stub bodies; they are not recovered game code.")
+        elif mode == "Native function index":
+            count, self.browser_items = core.search_native_functions(query)
+            for entry in self.browser_items: self.browser_list.insert("end", entry["name"] + " @ " + entry["address"])
+            self.browser_note.set(f"{count:,} native matches · showing first 500 · select a method to inspect or export its body.")
         else:
             base, extension = {"Native pseudocode": (core.ROOT / "local/ghidra/pseudocode", "*.c"),
                                "Recovered mod C#": (core.ROOT / "local/managed", "*.cs"),
@@ -208,7 +213,7 @@ class Studio(tk.Tk):
         if not selection: return
         item = self.browser_items[selection[0]]
         try:
-            text = core.read_declaration(self.catalog, item) if isinstance(item, dict) else item.read_text(encoding="utf-8", errors="replace")
+            text = core.native_description(item) if isinstance(item, dict) and item.get("native") else core.read_declaration(self.catalog, item) if isinstance(item, dict) else item.read_text(encoding="utf-8", errors="replace")
             self.set_text(self.browser_text, text)
         except Exception as error: messagebox.showerror("Read failed", str(error))
 
@@ -218,12 +223,20 @@ class Studio(tk.Tk):
         if path:
             self.run_task(lambda: core.index_dump(Path(path), core.ROOT / "local/catalog.json"), lambda result: self.load_catalog())
 
-    def ghidra_export(self):
+    def export_selected(self):
+        selection = self.browser_list.curselection()
+        if not selection or self.browser_mode.get() != "Native function index":
+            messagebox.showinfo("Select native method", "Choose Native function index and select a method first.")
+            return
+        item = self.browser_items[selection[0]]
+        self.ghidra_export(item["name"], item["address"])
+
+    def ghidra_export(self, selected_name=None, selected_address=None):
         home = filedialog.askdirectory(title="Select Ghidra home (contains support/analyzeHeadless.bat)", initialdir=core.ROOT.parent)
         if not home: return
         project = filedialog.askopenfilename(title="Select existing Ghidra project", initialdir=core.ROOT.parent / "ghidraOutput", filetypes=[("Ghidra project", "*.gpr")])
         if project:
-            self.run_task(lambda: core.export_ghidra(Path(home), Path(project), self.report),
+            self.run_task(lambda: core.export_ghidra(Path(home), Path(project), self.report, selected_name, selected_address),
                           lambda result: (self.report(json.dumps(result, indent=2)), self.refresh_browser()))
 
     def managed_export(self):
@@ -273,7 +286,8 @@ class Studio(tk.Tk):
 
     def load_source(self, path):
         self.editor_path = path
-        self.set_text(self.editor, path.read_text(encoding="utf-8-sig"), readonly=False)
+        self.editor_original = path.read_bytes()
+        self.set_text(self.editor, self.editor_original.decode("utf-8-sig"), readonly=False)
 
     def open_source(self):
         if not self.can_leave_editor():
@@ -287,7 +301,11 @@ class Studio(tk.Tk):
             return False
         if self.editor_path:
             try:
-                core.atomic_write(self.editor_path, self.editor.get("1.0", "end-1c").encode("utf-8"))
+                if not self.editor.edit_modified(): return True
+                if self.editor_path.read_bytes() != self.editor_original:
+                    raise ValueError("Source changed in an external editor. Reopen it before saving Studio edits.")
+                self.editor_original = self.editor.get("1.0", "end-1c").encode("utf-8")
+                core.atomic_write(self.editor_path, self.editor_original)
                 self.editor.edit_modified(False)
                 self.status.set("Source saved")
                 return True
@@ -440,7 +458,30 @@ class Studio(tk.Tk):
         self.cfg_combo.bind("<<ComboboxSelected>>", lambda e: self.open_config())
         ttk.Button(bar, text="Refresh", command=self.refresh_configs).pack(side="left", padx=6)
         ttk.Button(bar, text="Save config", command=self.save_config).pack(side="left")
-        self.cfg_text = ScrolledText(frame, wrap="none", undo=True, font=("Consolas", 11))
+        notebook = ttk.Notebook(frame)
+        notebook.pack(fill="both", expand=True)
+        fields, raw = ttk.Frame(notebook, padding=8), ttk.Frame(notebook)
+        notebook.add(fields, text="Setting controls")
+        notebook.add(raw, text="Raw config")
+        self.cfg_tree = ttk.Treeview(fields, columns=("value", "type"), height=12)
+        self.cfg_tree.heading("#0", text="Section / setting")
+        self.cfg_tree.heading("value", text="Current value")
+        self.cfg_tree.heading("type", text="Type")
+        self.cfg_tree.column("#0", width=420)
+        self.cfg_tree.column("value", width=300)
+        self.cfg_tree.column("type", width=150)
+        self.cfg_tree.pack(fill="both", expand=True)
+        self.cfg_tree.bind("<<TreeviewSelect>>", self.select_cfg_setting)
+        controls = ttk.Frame(fields)
+        controls.pack(fill="x", pady=10)
+        ttk.Label(controls, text="New value").pack(side="left")
+        self.cfg_value = ttk.Combobox(controls, width=38)
+        self.cfg_value.pack(side="left", padx=8)
+        ttk.Button(controls, text="Apply to editor", command=self.apply_cfg_setting).pack(side="left")
+        ttk.Button(controls, text="Refresh fields", command=self.refresh_cfg_fields).pack(side="left", padx=8)
+        self.cfg_help = tk.StringVar(value="Open a config to edit its boolean toggles, numeric options and choices.")
+        ttk.Label(fields, textvariable=self.cfg_help, wraplength=1000).pack(anchor="w", pady=8)
+        self.cfg_text = ScrolledText(raw, wrap="none", undo=True, font=("Consolas", 11))
         self.cfg_text.pack(fill="both", expand=True)
         ttk.Label(frame, text="Only mods with config reload support apply changes live. Other mods require restart.").pack(anchor="w", pady=8)
 
@@ -456,6 +497,34 @@ class Studio(tk.Tk):
         self.config_game = self.game()
         self.config_original = self.config_path.read_bytes()
         self.set_text(self.cfg_text, self.config_original.decode("utf-8-sig"), readonly=False)
+        self.refresh_cfg_fields()
+
+    def refresh_cfg_fields(self):
+        self.cfg_entries = core.parse_cfg_settings(self.cfg_text.get("1.0", "end-1c"))
+        self.cfg_tree.delete(*self.cfg_tree.get_children())
+        for index, entry in enumerate(self.cfg_entries):
+            self.cfg_tree.insert("", "end", iid=str(index), text=entry["section"] + " / " + entry["key"], values=(entry["value"], entry["type"]))
+
+    def select_cfg_setting(self, event=None):
+        selection = self.cfg_tree.selection()
+        if not selection: return
+        entry = self.cfg_entries[int(selection[0])]
+        self.cfg_value["values"] = ("true", "false") if entry["type"] == "Boolean" else entry["choices"]
+        self.cfg_value.set(entry["value"])
+        self.cfg_help.set(entry["description"] + "\nDefault: " + entry["default"] + (" · " + entry["range"] if entry["range"] else ""))
+
+    def apply_cfg_setting(self):
+        selection = self.cfg_tree.selection()
+        if not selection: return
+        try:
+            entry = self.cfg_entries[int(selection[0])]
+            value = core.validate_cfg_value(entry, self.cfg_value.get())
+            text = core.update_cfg(self.cfg_text.get("1.0", "end-1c"), {(entry["section"], entry["key"]): value})
+            self.set_text(self.cfg_text, text, readonly=False)
+            self.cfg_text.edit_modified(True)
+            self.refresh_cfg_fields()
+            self.status.set("Setting applied to editor · click Save config to write it to the game")
+        except Exception as error: messagebox.showerror("Invalid setting", str(error))
 
     def save_config(self):
         if not self.config_path or self.busy: return

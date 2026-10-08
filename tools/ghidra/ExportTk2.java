@@ -19,6 +19,7 @@ public class ExportTk2 extends GhidraScript {
         String filter = args.length > 1 ? args[1] : "PixelKartPhysics|Ant_MainGame|HpBarController|KartersLeaderboardsManager|PixelGameKartCamera|Ant_KartInput|Ant_BoostManager|PTK_Audio";
         if (filter.startsWith("@")) filter = String.join("|", Files.readAllLines(Paths.get(filter.substring(1))));
         int limit = args.length > 2 ? Integer.parseInt(args[2]) : 30;
+        String requiredAddress = args.length > 3 ? args[3] : "";
         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(filter);
         DecompInterface decompiler = new DecompInterface();
         decompiler.openProgram(currentProgram);
@@ -33,7 +34,8 @@ public class ExportTk2 extends GhidraScript {
                 String addr = f.getEntryPoint().toString();
                 index.write("{\"name\":" + quoted(name) + ",\"address\":" + quoted(addr)
                     + ",\"signature\":" + quoted(f.getSignature().toString()) + "}\n");
-                if (exported + failed < limit && pattern.matcher(name).find()) {
+                if (exported + failed < limit && pattern.matcher(name).find()
+                    && (requiredAddress.isEmpty() || addr.equalsIgnoreCase(requiredAddress))) {
                     DecompileResults r = decompiler.decompileFunction(f, 20, monitor);
                     String file = addr + "_" + name.replaceAll("[^A-Za-z0-9_.-]", "_");
                     if (file.length() > 150) file = file.substring(0, 150);

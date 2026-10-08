@@ -14,9 +14,8 @@ This is a static name/signature audit. A present target does not establish compa
 | Result | Patch declarations |
 |---|---:|
 | method absent | 1 |
-| named target present | 78 |
+| named target present | 79 |
 | overload review | 1 |
-| type absent | 1 |
 
 | Source file and line | Target | Static result |
 |---|---|---|
@@ -100,7 +99,7 @@ This is a static name/signature audit. A present target does not establish compa
 | managed/MKsKartersMods\Mods\SaveStatesMod\SaveStates.cs:216 | `Ant_MainGame.GetGameModeRequiredLapCount` | named target present |
 | managed/MKsKartersMods\Mods\SupraMayroKratt.cs:42 | `PixelEasyCharMoveKartController.FixedUpdate` | named target present |
 | managed/MKsKartersMods\Mods\TeleportersForTricks.cs:46 | `Ant_BoostManager.OnKartLandedAfterPlayerTriggeredJump` | named target present |
-| managed/MKsKartersMods\Mods\TeleportersForTricks.cs:61 | `PortalDash.StartEffect` | type absent |
+| managed/MKsKartersMods\Mods\TeleportersForTricks.cs:61 | `PortalDash.StartEffect` | named target present |
 
 ## Migration notes
 
