@@ -50,18 +50,44 @@ def methods():
         return result
 
 
-def search(query="", offset=0, recovered=False):
+TOPICS = {
+    "camera": ("Camera", r"^(PixelGameKartCamera|PixelSDK_Camera)$"),
+    "driving": ("Kart & driving", r"^(PixelKartPhysics|PixelKartController|Ant_Player)$"),
+    "boost": ("Boost & items", r"^(Ant_BoostManager|PixelWeaponObject|Ant_WeaponsManager)$"),
+    "health": ("Health", r"^(HpBarController|PlayerGlobalStats)$"),
+    "interface": ("Interface & audio", r"^(Ant_.*(?:Audio|Sound|Hud|HUD|UI).*|.*(?:AudioManager|SoundManager|Wwise|HUDController).*)$"),
+    "race": ("Race & input", r"^(Ant_CurrentGameConfiguration|Ant_Race.*|.*(?:RaceManager|InputManager|InputMapping).*)$"),
+}
+
+
+def presentation(record):
+    signature = record["signature"]
+    match = re.search(r'(\S+)\s*\((.*)\)', signature)
+    name = match[1] if match else signature
+    return {**record, "name": name, "label": re.sub(r'(?<=[a-z0-9])(?=[A-Z])', ' ', name).replace('_', ' '),
+            "topic": next((title for title, pattern in TOPICS.values() if re.match(pattern, record["type"])), "Other game functions"),
+            "access": "private" if signature.startswith("private ") else "internal" if signature.startswith("internal ") else "public" if signature.startswith("public ") else "unspecified"}
+
+
+def search(query="", offset=0, recovered=False, topic="all"):
+    if topic not in (*TOPICS, "important", "all"): raise ValueError("Choose a listed API category")
     entries = methods()
     tokens = query.lower().split()
-    selected = [m for m in entries if (not recovered or m["source"]) and all(t in (m["type"] + " " + m["namespace"] + " " + m["signature"]).lower() for t in tokens)]
+    def included(m):
+        if topic == "all": return True
+        if '<' in m["type"] or m["signature"].startswith("static ") and ".cctor" in m["signature"]: return False
+        patterns = [TOPICS[topic][1]] if topic in TOPICS else [pattern for _, pattern in TOPICS.values()]
+        return any(re.match(pattern, m["type"]) for pattern in patterns)
+    selected = [m for m in entries if included(m) and (not recovered or m["source"]) and all(t in (m["type"] + " " + m["namespace"] + " " + m["signature"]).lower() for t in tokens)]
+    if topic != "all": selected.sort(key=lambda m: (not bool(m["source"]), m["type"], m["signature"]))
     offset = max(0, offset)
     return {"total": len(selected), "indexed": len(entries), "reconstructed": sum(bool(m["source"]) for m in entries),
-        "methods": selected[offset:offset + 80], "offset": offset, "next": offset + 80 if offset + 80 < len(selected) else None,
+        "methods": [presentation(m) for m in selected[offset:offset + 80]], "offset": offset, "next": offset + 80 if offset + 80 < len(selected) else None,
         "message": "No local Il2CppDumper declarations indexed. Player controls still work; authors can import a dump with the analysis tools." if not entries else ""}
 
 
 def detail(identity):
     record = next((m for m in methods() if m["id"] == identity), None)
     if record is None: raise ValueError("Choose an indexed function")
-    return {**record, "declaration": f"// {record['type']}\n// Metadata declaration; implementation not recovered here.\n{record['signature']}",
+    return {**presentation(record), "declaration": record['signature'],
             "status": "Editable reconstructed C# available" if record["source"] else "Declaration indexed; native implementation not reconstructed"}

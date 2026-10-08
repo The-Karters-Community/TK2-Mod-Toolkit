@@ -84,6 +84,26 @@ class GarageTests(unittest.TestCase):
         with self.assertRaises(ValueError): pack.create_recipe("../outside")
         with self.assertRaises(ValueError): pack.create_recipe("MyCamera")
 
+    def test_module_navigation_exposes_only_existing_editable_files(self):
+        (self.sources / 'CameraFeature.cs').write_text('// camera behavior')
+        (self.sources / 'CameraSettings.cs').write_text('// camera settings')
+        files = pack.module_sources()['Camera']
+        self.assertEqual(files, ['plugins/TK2.Customization/CameraFeature.cs', 'plugins/TK2.Customization/CameraSettings.cs'])
+        self.assertTrue(all(pack.source_path(file).is_file() for file in files))
+        self.assertEqual(pack.module_sources()['Audio'], [])
+
+    def test_open_source_folder_validates_path_and_never_opens_a_binary(self):
+        with patch.object(webapp.os, 'startfile') as opened:
+            self.app.action('open-source-folder', {'file': 'plugins/TK2.Customization/Example.cs'})
+            opened.assert_called_once_with(self.sources)
+            for file in ('../../outside.cs', 'plugins/TK2.Customization/Example.dll'):
+                with self.assertRaises(ValueError): self.app.action('open-source-folder', {'file': file})
+
+    def test_failed_author_build_keeps_installed_plugin(self):
+        with patch.object(core, 'require_game_stopped'), patch.object(core, 'build_plugin', side_effect=RuntimeError('Build failed')), patch.object(core, 'deploy_plugin') as deploy:
+            with self.assertRaises(RuntimeError): self.app.action('build-install', {})
+            deploy.assert_not_called()
+
     def test_install_builds_before_deploy_and_keeps_defaults_off(self):
         with patch.object(core, "require_game_stopped"), patch.object(core, "build_plugin", return_value={"artifact": str(self.root / "artifact")}) as build, patch.object(core, "deploy_plugin", return_value=self.root / "backup") as deploy:
             result = self.app.action("build-install", {})

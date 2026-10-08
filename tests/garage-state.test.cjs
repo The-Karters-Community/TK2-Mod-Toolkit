@@ -16,6 +16,8 @@ class Node {
   click() {return this.onclick?.({preventDefault(){}});}
   setRangeText(text, start, end) {this.value = this.value.slice(0, start) + text + this.value.slice(end);}
   dispatchEvent() {this.oninput?.();}
+  focus() {document.activeElement = this;}
+  setSelectionRange(start, end) {this.selectionStart = start; this.selectionEnd = end;}
 }
 const html = fs.readFileSync(path.join(root, 'studio/web/index.html'), 'utf8');
 const ids = Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(match => [match[1], new Node()]));
@@ -38,12 +40,13 @@ const fixture = {installed: false, packCurrent: false, pluginCount: 0, game: 'te
   extraPacks: {'MK.BoostTrainer': 'mks'},
   settings: {'Audio/Enabled': false, 'Audio/MasterVolume': 1, 'Physics/Enabled': false, 'Camera/Enabled': false, 'Camera/FieldOfView': 65}, configHash: 'first-hash',
   packs: [{id:'garage', name:'Toolkit Essentials', features:['Audio','Camera']}, {id:'mks', name:"Community Mods", features:['Physics']}, {id:'community', name:'Community Pack', features:[]}],
-  files: ['src/Reconstructed/KartLogic.cs'], features: [
+  moduleSources: {Camera:['plugins/TK2.Customization/CameraFeature.cs','plugins/TK2.Customization/CameraSettings.cs'], Audio:['plugins/TK2.Customization/AudioFeature.cs'], 'Recipe.FrameLimiter':['plugins/TK2.Customization/Recipes/FrameLimiter.cs']},
+  files: ['src/Reconstructed/KartLogic.cs','plugins/TK2.Customization/CameraFeature.cs','plugins/TK2.Customization/CameraSettings.cs','plugins/TK2.Customization/AudioFeature.cs','plugins/TK2.Customization/Recipes/FrameLimiter.cs'], features: [
     {id:'Audio', name:'Audio mixer', category:'Audio', description:'Volume adjustment', origin:'New', settings:[['MasterVolume','Volume','float',1,0,1]]},
     {id:'Physics', name:'Fast fall', category:'Driving', description:'Physics description', origin:'Adapted', gameplay:true, settings:[]},
     {id:'Camera', name:'Camera', category:'Camera', description:'Keep your kart in view', origin:'New', settings:[['FieldOfView','Field of view','float',65,35,110]]}
   ]};
-const calls = []; let sourceConflict = false, settingsFailure, stateFailure = false, deferSave, pendingSave, hashCounter = 0;
+const calls = []; let sourceConflict = false, settingsFailure, stateFailure = false, deferSave, pendingSave, hashCounter = 0, deferFunctions, pendingFunctions, functionFailure;
 function saveResponse(body) {
   Object.assign(fixture.settings, body.values);
   [['recipes','recipes'],['extraSettings','extraSettings']].forEach(([field, payload]) => fixture[field].forEach(entry => {const key = entry.section + '/' + entry.key; if (Object.hasOwn(body[payload], key)) entry.value = body[payload][key];}));
@@ -57,7 +60,13 @@ const context = {document, console, location:{hash:'#mods'}, history:{replaceSta
   fetch: async (url, options) => {
     calls.push({url, options}); let data, ok = true;
     if (url === '/api/state') {ok = !stateFailure; data = stateFailure ? {error:'Temporary state refresh failure.'} : structuredClone(fixture);}
-    else if (url.startsWith('/api/source?')) data = {file:fixture.files[0],content:'// source',hash:'source-hash'};
+    else if (url.startsWith('/api/source?')) data = {file:decodeURIComponent(url.split('file=')[1]),content:'// source',hash:'source-hash'};
+    else if (url.startsWith('/api/functions?')) {
+      ok = !functionFailure;
+      data = functionFailure ? {error:'Catalog temporarily unavailable'} : {total:2,indexed:32350,reconstructed:12,methods:[{id:url.includes('offset=80')?'1:2':'1:1',type:'PixelKartPhysics',name:'AddVelocity',label:'Add Velocity',signature:'internal void AddVelocity(Vector3 velocity);',source:'src/Reconstructed/KartLogic.cs'}],next:url.includes('offset=80')?null:80};
+      if (deferFunctions) data = await new Promise(resolve => {pendingFunctions = () => resolve(data);});
+    }
+    else if (url.startsWith('/api/function?')) data = {type:'PixelKartPhysics',name:'AddVelocity',label:'Add Velocity',access:'internal',status:'Editable reconstructed C# available',source:'src/Reconstructed/KartLogic.cs',declaration:'internal void AddVelocity(Vector3 velocity);'};
     else if (url === '/api/save-source') {ok = !sourceConflict; data = sourceConflict ? {error:'Source changed outside the app'} : {hash:'saved-source-hash'};}
     else if (url === '/api/settings') {
       if (settingsFailure) {ok = false; data = settingsFailure;}
@@ -136,10 +145,44 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   ids['mod-search'].value = 'field of view'; ids['mod-search'].oninput();
   assert.equal(ids['feature-list'].children.length, 1, 'search settings as well as modules');
   ids['mod-search'].value = ''; ids['mod-search'].oninput();
-  nav[1].click(); await settle(); assert.equal(ids.code.value, '// source');
+  nav[1].click(); await settle(); assert.equal(ids.code.value, '', 'workshop opens an empty editor instead of an unrelated game implementation');
+  const cameraEdit = query('[data-edit-module]').find(node => node.dataset.editModule === 'Camera');
+  assert.equal(cameraEdit.disabled,false); cameraEdit.click(); await settle(); assert.equal(ids.code.value, '// source');
+  assert.equal(run('source.file'),'plugins/TK2.Customization/CameraFeature.cs');
+  assert.equal(ids['module-focus'].value,'Camera');
+  assert.equal(ids['pack-files'].children.length,2, 'module navigation shows its behavior and settings files');
+  assert.equal(ids['reconstructed-files'].children.length,0, 'module navigation does not mix unrelated recovered code');
   ids.code.value = '// edited'; ids.code.oninput(); sourceConflict = true; await ids['save-source'].click();
   assert.equal(ids.code.value, '// edited'); assert.equal(run('sourceDirty'), true); assert.match(ids.notice.textContent, /Source changed/);
   sourceConflict = false; await ids['save-source'].click(); assert.equal(run('sourceDirty'), false); assert.equal(run('source.hash'), 'saved-source-hash');
+  assert.match(ids['editor-state'].textContent,/File saved/);
+  ids['code-find'].value='edited'; ids['find-next'].click(); assert.equal(ids.code.selectionStart,3); assert.equal(ids.code.selectionEnd,9);
+  document.activeElement = undefined;
+  await ids['open-source-folder'].click(); assert.ok(calls.some(call => call.url === '/api/open-source-folder'));
+  ids['tab-api'].click(); await settle();
+  assert.equal(ids['panel-editor'].hidden,true); assert.equal(ids['panel-api'].hidden,false);
+  assert.ok(calls.some(call => call.url.includes('topic=important')), 'API opens with important game classes');
+  const firstFunction = ids['function-list'].children[0];
+  assert.equal(firstFunction.children[0].textContent,'Add Velocity');
+  assert.ok(firstFunction.children.every(node => node.tagName !== 'CODE'), 'API navigation contains names rather than code blocks');
+  await firstFunction.click(); assert.equal(ids['function-detail'].textContent,'internal void AddVelocity(Vector3 velocity);');
+  assert.equal(ids['function-example'].hidden,false); assert.match(ids['function-usage'].textContent,/ReadableGame.AddVelocity/);
+  const beforePages = calls.filter(call => call.url.startsWith('/api/functions?')).length;
+  ids['function-scroll'].scrollHeight=400; ids['function-scroll'].scrollTop=250; ids['function-scroll'].clientHeight=200;
+  deferFunctions=true; ids['function-scroll'].onscroll(); ids['function-scroll'].onscroll(); await settle();
+  assert.equal(calls.filter(call => call.url.startsWith('/api/functions?')).length,beforePages+1,'only one next-page request at a time');
+  assert.equal(ids['function-loading'].hidden,false,'scroll loading shows a skeleton');
+  pendingFunctions(); deferFunctions=false; await settle(); assert.equal(ids['function-loading'].hidden,true);
+  assert.equal(ids['function-list'].children.length,2); assert.equal(run('nextFunctions'),null);
+  ids['function-scroll'].onscroll(); await settle(); assert.equal(calls.filter(call => call.url.startsWith('/api/functions?')).length,beforePages+1,'end of results stops loading');
+  ids['function-topic'].value='camera'; ids['function-topic'].onchange(); await settle(); assert.equal(ids['function-list'].children.length,1, 'new category clears previous results');
+  functionFailure=true; await ids['function-search'].click(); assert.match(ids['function-end'].textContent,/Could not load/); assert.equal(run('functionLoading'),false);
+  functionFailure=false; await ids['function-search'].click(); assert.equal(ids['function-list'].children.length,1,'failed search can be retried');
+  await ids['function-list'].children[0].click(); ids['open-function-source'].click(); await settle();
+  assert.equal(run('source.file'),'src/Reconstructed/KartLogic.cs'); assert.equal(ids['panel-editor'].hidden,false);
+  ids['tab-tutorial'].click(); assert.equal(ids['panel-tutorial'].hidden,false); assert.equal(ids['panel-api'].hidden,true);
+  assert.equal(ids['functions-more'],undefined,'infinite scrolling replaces the Load more button');
+  assert.ok(html.includes('Your first mod: a kart hop') && html.includes('Recipes/MyKartHop.cs'));
   const parameterNames = ['Mass','JumpStrength','MaxAccelForward','GroundFrictionFactor','DrivingOnGroundSteerFactor','InstantBoostAddFullInSeconds','InAirAccelerationFactor','MaxVerticalVelocity'];
   const parameterSettings = parameterNames.flatMap(key => [
     ['Override' + key,'Override ' + key,'bool',false,null,null,'Choose a custom value'],

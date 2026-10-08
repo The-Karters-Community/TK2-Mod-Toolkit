@@ -56,7 +56,7 @@ class Application:
         return {"game": str(self.game) if self.game else "", "installed": installed.is_file(), "packCurrent": current, "features": pack.FEATURES,
                 "plugin": "TK2.Customization.dll", "pluginCount": len([p for p in core.plugins(self.game) if p["enabled"]]) if self.game else 0,
                 "setup": setup.readiness(self.game),
-                "runtimeValidated": False, "packs": pack.PACKS, "files": pack.source_files(), "logs": self.logs,
+                "runtimeValidated": False, "packs": pack.PACKS, "files": pack.source_files(), "moduleSources": pack.module_sources(), "sourceRoot": str(core.ROOT), "logs": self.logs,
                 "backups": backups[:30], "buildLog": self.latest_build(), **self.config_data()}
 
     def latest_build(self):
@@ -100,6 +100,10 @@ class Application:
                 os.startfile(self.game)
                 return {"message": "Game folder opened. Start the game yourself."}
             if action == "settings": return self.save_settings(body)
+            if action == "open-source-folder":
+                path = pack.source_path(body["file"])
+                os.startfile(path.parent)
+                return {"message": "Source folder opened. External changes can be loaded with Reload file."}
             if action == "save-source":
                 path = pack.source_path(body["file"])
                 if core.sha256(path) != body.get("hash"): raise ValueError("Source changed outside the app. Reload before saving.")
@@ -192,7 +196,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.authorized(): return self.reply(403, {"error": "Invalid session"})
                 app = self.server.app
                 with app.lock:
-                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Toolkit", "version": "0.4.0", "pid": os.getpid(), "game": str(app.game)})
+                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Toolkit", "version": "0.5.0", "pid": os.getpid(), "game": str(app.game)})
                     if parsed.path == "/api/state": return self.reply(200, app.state())
                     if parsed.path == "/api/source":
                         name = parse_qs(parsed.query).get("file", [""])[0]
@@ -204,7 +208,7 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200, {"count": count, "matches": matches})
                     if parsed.path == "/api/functions":
                         query = parse_qs(parsed.query)
-                        return self.reply(200, symbols.search(query.get("q", [""])[0], int(query.get("offset", ["0"])[0]), query.get("recovered", ["false"])[0] == "true"))
+                        return self.reply(200, symbols.search(query.get("q", [""])[0], int(query.get("offset", ["0"])[0]), query.get("recovered", ["false"])[0] == "true", query.get("topic", ["all"])[0]))
                     if parsed.path == "/api/function":
                         return self.reply(200, symbols.detail(parse_qs(parsed.query).get("id", [""])[0]))
                 return self.reply(404, {"error": "Unknown API"})
@@ -276,7 +280,7 @@ def main():
             if health.get("app") in ("TK2 Mod Toolkit", "TK2 Mod Garage"):
                 if args.game is not None and health.get("game") != str(core.validate_game(args.game)):
                     raise RuntimeError("Close the existing Toolkit before switching game installations")
-                if health.get("version") == "0.4.0":
+                if health.get("version") == "0.5.0":
                     if not args.no_browser: open_window(saved["origin"])
                     return
                 request = urllib.request.Request(saved["origin"] + "/api/shutdown", data=b"{}", headers={"X-TK2-Token": saved["token"], "Content-Type": "application/json"})
@@ -300,7 +304,7 @@ def main():
             if health.get("app") not in ("TK2 Mod Toolkit", "TK2 Mod Garage"): raise RuntimeError("Unexpected service on Toolkit port")
             if args.game is not None and health.get("game") != str(core.validate_game(args.game)):
                 raise RuntimeError("Close the existing Toolkit before switching game installations")
-        if health.get("version") == "0.4.0":
+        if health.get("version") == "0.5.0":
             if not args.no_browser: open_window(expected)
             return
         # Upgrade our old authenticated service so launching the new app cannot

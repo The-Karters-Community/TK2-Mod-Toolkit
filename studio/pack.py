@@ -137,6 +137,40 @@ def source_path(name):
     return core.contained(core.ROOT, core.ROOT / name)
 
 
+def module_sources():
+    """Logical modules share one project; expose their real source ownership."""
+    ownership = {
+        "UI": ["StudioBehaviour.cs", "Plugin.cs"],
+        "HudOpacity": ["StudioBehaviour.cs", "PackModules.cs"],
+        "Rendering": ["StudioBehaviour.cs", "PackModules.cs"],
+        "Audio": ["AudioFeature.cs", "Plugin.cs"],
+        "Camera": ["CameraFeature.cs", "CameraSettings.cs", "CameraPanel.cs"],
+        "Physics": ["FastFallFeature.cs", "Plugin.cs"],
+        "CommunityCommands": ["CommunityMods.cs", "CommunityCommandParser.cs"],
+        "NightmareAI": ["NightmareAI.cs"],
+        "CNKBoostMeter": ["LegacyMK.Meter.cs", "LegacyMK.cs"],
+        "KartParameters": ["LegacyMK.Parameters.cs", "LegacyMK.cs"],
+        "BoostParameters": ["LegacyMK.Parameters.cs", "LegacyMK.cs"],
+        "SaveStates": ["LegacyMK.Practice.cs", "LegacyMK.cs"],
+        "ReverseRace": ["LegacyMK.Practice.cs", "LegacyMK.cs"],
+    }
+    for name in ("Laps", "SimpleDriving", "AutoBoost", "Tuning"):
+        ownership[name] = ["PackModules.cs", "Plugin.cs"]
+    available = set(source_files())
+    result = {feature["id"]: ["plugins/TK2.Customization/" + file for file in
+              ownership.get(feature["id"], ["LegacyMK.cs"]) if "plugins/TK2.Customization/" + file in available]
+              for feature in FEATURES}
+    import re
+    for file in available:
+        if "/Recipes/" not in file: continue
+        text = source_path(file).read_text(encoding="utf-8")
+        match = re.search(r'public\s+string\s+Name\s*=>\s*"([^"\r\n]+)"', text)
+        name = match[1] if match else Path(file).stem
+        helper = "plugins/TK2.Customization/RecipeHost.cs"
+        result["Recipe." + name] = [file] + ([helper] if helper in available else [])
+    return result
+
+
 def create_recipe(name):
     import re
     if not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{2,39}", name):

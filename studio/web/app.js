@@ -1,5 +1,6 @@
 'use strict';
-let nextFunctions = null, functionSequence = 0;
+let nextFunctions = null, functionSequence = 0, functionLoading = false, detailSequence = 0, sourceSequence = 0;
+let workshopTab = 'editor', selectedModule = 'all', functionQueryTimer;
 const $ = id => document.getElementById(id);
 const token = document.querySelector('meta[name="tk2-session"]').content;
 let state, category = 'All', source, sourceDirty = false, settingsDirty = false, busy = false, actionInFlight;
@@ -168,6 +169,8 @@ function renderFeatures() {
       if (unavailable) panel.append(el('p', 'module-note', feature.reason || 'This module needs a compatibility update before it can be enabled.'));
       if (feature.status && feature.status !== 'verified') panel.append(el('p', 'module-note', feature.status));
       const moduleTools = el('div', 'module-tools'), reset = el('button', 'quiet', 'Reset module to defaults'); reset.onclick = () => resetFeatures([feature]); moduleTools.append(reset, el('small', '', 'Defaults switch this module off.')); panel.append(moduleTools);
+      const edit = el('button', 'secondary', 'Edit code'); edit.dataset.editModule = feature.id; edit.disabled = busy || !state.moduleSources?.[feature.id]?.length;
+      edit.onclick = () => editModule(feature.id); moduleTools.append(edit);
       panel.append(featureSettings(feature, search)); row.append(panel); section.append(row);
     });
     appendEntryGroups(section, extraGroups, true); list.append(section);
@@ -204,7 +207,10 @@ function appendEntryGroups(container, groups, extra = false) {
       controls.append(settingsControl(entry.section + '/' + entry.key, entry.key.replace(/([a-z])([A-Z])/g, '$1 $2'), kind, entry.value, bounds?.[1], bounds?.[2], entry.description, entry.type === 'Boolean' ? ['false', 'true'] : entry.choices, value => changeEntry(entry, String(value), extra), extra ? 'extra' : 'recipe', entry.hasDefault === false ? undefined : entry.default));
     });
     if (settings.length === 1 && enabled) controls.append(el('p', 'module-note', 'This module has no additional settings.'));
-    const reset = el('button', 'quiet', 'Reset module to defaults'); reset.onclick = () => {settings.forEach(entry => {if (entry.default !== undefined && entry.hasDefault !== false) changeEntry(entry, entry.default, extra);}); syncControls(); notice('Defaults restored. Save changes to apply.');}; panel.append(reset, controls); row.append(panel); container.append(row);
+    const reset = el('button', 'quiet', 'Reset module to defaults'); reset.onclick = () => {settings.forEach(entry => {if (entry.default !== undefined && entry.hasDefault !== false) changeEntry(entry, entry.default, extra);}); syncControls(); notice('Defaults restored. Save changes to apply.');};
+    const tools = el('div', 'module-tools'); tools.append(reset);
+    const edit = el('button', 'secondary', 'Edit code'); edit.dataset.editModule = name; edit.disabled = busy || !state.moduleSources?.[name]?.length;
+    edit.onclick = () => editModule(name); tools.append(edit); panel.append(tools, controls); row.append(panel); container.append(row);
   });
 }
 function renderRecipes() {
@@ -217,8 +223,18 @@ function renderRecipes() {
 }
 function renderFiles() {
   $('reconstructed-files').replaceChildren(); $('pack-files').replaceChildren();
+  const select = $('module-focus'); select.replaceChildren();
+  [['all', 'All project files'], ['reconstructed', 'Reconstructed game logic'], ...state.features.map(f => [f.id, f.name]),
+    ...Object.keys(state.moduleSources || {}).filter(id => id.startsWith('Recipe.')).map(id => [id, id.slice(7).replace(/([a-z])([A-Z])/g, '$1 $2') + ' (recipe)'])]
+    .forEach(([value, label]) => {const option = el('option', '', label); option.value = value; select.append(option);});
+  select.value = selectedModule;
+  const allowed = state.moduleSources?.[selectedModule], query = $('file-query').value.toLowerCase().trim();
+  $('module-source-note').textContent = selectedModule === 'reconstructed' ? 'Reviewed translations of selected native methods. Evidence and limits are in their comments.' : selectedModule === 'all' ? 'Select a module to show its behavior and settings files.' : 'These files implement this module. Shared files can affect other modules in the same pack.';
   state.files.forEach(file => {
+    if (allowed && !allowed.includes(file) || selectedModule === 'reconstructed' && !file.startsWith('src/Reconstructed/') || !file.toLowerCase().includes(query)) return;
     const button = el('button', 'file-button', file.split('/').at(-1)); button.dataset.file = file; button.title = file; button.disabled = busy;
+    const role = file.includes('/Recipes/') ? 'Your recipe' : /Settings|Plugin.cs|PackModules.cs/.test(file) ? 'Behavior & settings' : /Panel/.test(file) ? 'In-game panel' : file.startsWith('src/Reconstructed/') ? 'Reconstructed behavior' : 'C# implementation';
+    button.append(el('small', 'file-role', role));
     button.classList.toggle('selected', source?.file === file); button.onclick = () => loadSource(file);
     $(file.startsWith('src/Reconstructed/') ? 'reconstructed-files' : 'pack-files').append(button);
   });
@@ -246,6 +262,7 @@ function renderInstallation() {
   });
   if (!state.backups.length) list.append(el('p', 'empty-state', 'Changes create backups here.'));
   $('logs').textContent = state.buildLog || state.logs.join('\n') || 'No build run in this session. Player installation uses the bundled plugin.';
+  $('workshop-build-log').textContent = state.buildLog || 'No compiler run yet. Build pack validates your C#; Build & install also replaces the plugin with the game closed.';
 }
 function resetFeatures(features) {
   features.forEach(feature => {changeSetting(feature.id + '/Enabled', false); feature.settings.forEach(setting => changeSetting(feature.id + '/' + setting[0], setting[3]));});
@@ -288,16 +305,38 @@ async function saveSource() {
   if (!source || !sourceDirty) return;
   const content = $('code').value, result = await api('save-source', {file: source.file, hash: source.hash, content});
   source.hash = result.hash; source.content = content; sourceDirty = $('code').value !== content; $('save-source').disabled = !sourceDirty;
+  updateEditorState();
 }
 async function loadSource(file, discard = false) {
-  try {if (sourceDirty && !discard) {notice('Save the current C# before switching files, or use Reload to discard your edits.', true); return;}
-    source = await api('source?file=' + encodeURIComponent(file)); $('code').value = source.content; $('source-name').textContent = file;
-    sourceDirty = false; $('code').readOnly = false; $('save-source').disabled = true; $('reload-source').disabled = false; renderFiles();
-  } catch (error) {notice(error.message, true);}
+  if (sourceDirty && !discard) {notice('Save the current C# before switching files, or use Reload file to discard your edits.', true); return false;}
+  const sequence = ++sourceSequence; $('code').readOnly = true; $('editor-state').textContent = 'Loading file…';
+  try {
+    const loaded = await api('source?file=' + encodeURIComponent(file)); if (sequence !== sourceSequence) return false;
+    source = loaded; $('code').value = source.content; $('source-name').textContent = file;
+    sourceDirty = false; $('code').readOnly = busy; $('save-source').disabled = true; $('reload-source').disabled = busy;
+    $('open-source-folder').disabled = busy; $('code').scrollTop = 0; updateEditorState(); renderFiles(); return true;
+  } catch (error) {if (sequence === sourceSequence) {$('code').readOnly = busy || !source; updateEditorState(); notice(error.message, true);} return false;}
+}
+function updateEditorState() {
+  const lines = $('code').value.split('\n').length;
+  $('line-numbers').textContent = Array.from({length: lines}, (_, i) => i + 1).join('\n');
+  $('editor-state').textContent = !source ? 'Choose a file' : `${sourceDirty ? 'Unsaved edits' : 'File saved'} · ${lines} lines`;
+  $('line-numbers').scrollTop = $('code').scrollTop;
+}
+function editModule(id) {
+  if (sourceDirty) {notice('Save your current C# before opening another module.', true); return;}
+  const files = state.moduleSources?.[id]; if (!files?.length) {notice('Editable source is not included for this module.', true); return;}
+  selectedModule = id; showView('workshop'); showWorkshopTab('editor'); renderFiles(); loadSource(files[0]);
+}
+function showWorkshopTab(name) {
+  workshopTab = name;
+  ['editor', 'api', 'tutorial'].forEach(tab => {const active = tab === name; $('panel-' + tab).hidden = !active; const button = $('tab-' + tab); button.classList.toggle('selected', active); button.setAttribute('aria-selected', String(active)); button.tabIndex = active ? 0 : -1;});
+  if (name === 'api' && functionSequence === 0) searchFunctions().catch(error => notice(error.message, true));
 }
 function setBusy(value) {
   busy = value; ['workshop-install', 'build', 'create-recipe', 'diagnose', 'prepare-loader', 'installation-install', 'scan-games', 'select-game', 'browse-game'].forEach(id => {$(id).disabled = value;});
-  $('save-source').disabled = value || !sourceDirty; $('code').readOnly = value || !source; $('reload-source').disabled = value || !source; updateSaveState();
+  $('save-source').disabled = value || !sourceDirty; $('code').readOnly = value || !source; $('reload-source').disabled = value || !source; $('open-source-folder').disabled = value || !source; updateSaveState();
+  document.querySelectorAll('[data-edit-module]').forEach(button => {button.disabled = value || !state?.moduleSources?.[button.dataset.editModule]?.length;});
   // Keep controls mounted and editable during a settings save.
   document.querySelectorAll('[data-setting], [data-recipe], [data-extra]').forEach(input => {const feature = state?.features.find(item => item.id === input.dataset.setting?.split('/')[0]); input.disabled = value && actionInFlight !== 'settings' || feature?.available === false || !state?.game;});
   syncDependencies(); if (state) renderInstallation();
@@ -322,7 +361,7 @@ async function runAction(action, body = {}, snapshot) {
     }
     else if (action === 'diagnose') {await refresh(true, true); notice(result.message);}
     else {await refresh(true); notice(result.message || 'Done');}
-    if (action === 'create-recipe') await loadSource(result.file);
+    if (action === 'create-recipe') {selectedModule = 'Recipe.' + body.name; showWorkshopTab('editor'); await loadSource(result.file);}
   } catch (error) {if (action === 'settings') settingsError(error); else notice(error.message, true);}
   finally {actionInFlight = undefined; setBusy(false); if (action !== 'settings') await refresh(true, true).catch(() => {});}
 }
@@ -330,8 +369,7 @@ function showView(name) {
   document.querySelectorAll('.view').forEach(view => {view.hidden = view.id !== name;});
   document.querySelectorAll('.nav').forEach(button => {button.classList.toggle('active', button.dataset.view === name); button.setAttribute('aria-current', button.dataset.view === name ? 'page' : 'false');});
   $('breadcrumb').textContent = 'TOOLKIT / ' + ({mods: 'MOD PACKS', workshop: 'WORKSHOP', installation: 'INSTALLATION'}[name]); history.replaceState(null, '', '#' + name);
-  if (name === 'workshop' && state && !source) loadSource('src/Reconstructed/KartLogic.cs');
-  if (name === 'workshop') searchFunctions().catch(error => notice(error.message, true));
+  if (name === 'workshop') showWorkshopTab(workshopTab);
 }
 document.querySelectorAll('.nav').forEach(button => button.onclick = () => showView(button.dataset.view));
 document.querySelector('.brand').onclick = event => {event.preventDefault(); showView('mods');};
@@ -359,7 +397,22 @@ $('reload-settings').onclick = async () => {
   else {settingEdits.clear(); recipeEdits.clear(); extraEdits.clear();}
   try {await refresh(true); conflictKeys = []; $('settings-error').hidden = true; $('reload-settings').hidden = true;} catch (error) {settingsError(error);}
 };
-$('code').oninput = () => {sourceDirty = Boolean(source); $('save-source').disabled = !sourceDirty;};
+$('code').oninput = () => {sourceDirty = Boolean(source) && $('code').value !== source.content; $('save-source').disabled = busy || !sourceDirty; updateEditorState();};
+$('code').onscroll = () => {$('line-numbers').scrollTop = $('code').scrollTop;};
+$('file-query').oninput = renderFiles;
+$('module-focus').onchange = () => {if (sourceDirty) {$('module-focus').value = selectedModule; notice('Save your C# before switching modules.', true); return;} selectedModule = $('module-focus').value; renderFiles(); const files = state.moduleSources?.[selectedModule]; if (files?.length) loadSource(files[0]);};
+$('open-source-folder').onclick = () => {if (source) runAction('open-source-folder', {file: source.file});};
+$('find-next').onclick = () => {
+  const text = $('code').value, query = $('code-find').value; if (!query) return;
+  const start = $('code').selectionEnd || 0; let index = text.toLowerCase().indexOf(query.toLowerCase(), start); if (index < 0) index = text.toLowerCase().indexOf(query.toLowerCase());
+  if (index < 0) {notice('No matching text in this file.'); return;}
+  $('code').focus(); $('code').setSelectionRange(index, index + query.length);
+  $('code').scrollTop = Math.max(0, (text.slice(0, index).split('\n').length - 4) * 22.1); $('code').onscroll();
+};
+$('code-find').onkeydown = event => {if (event.key === 'Enter') $('find-next').click();};
+['editor', 'api', 'tutorial'].forEach((name, index, names) => {const button = $('tab-' + name); button.onclick = () => showWorkshopTab(name); button.onkeydown = event => {if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowRight' ? 1 : 2)) % 3; showWorkshopTab(names[next]); $('tab-' + names[next]).focus();}};});
+$('tutorial-create').onclick = () => {if (sourceDirty) {notice('Save your current C# first.', true); return;} $('recipe-name').value = 'MyKartHop'; return runAction('create-recipe', {name: 'MyKartHop'});};
+$('tutorial-frame').onclick = () => editModule('Recipe.FrameLimiter');
 $('save-source').onclick = async () => {try {await saveSource(); notice('C# saved. Build the plugin to apply your code.');} catch (error) {notice(error.message, true);}};
 $('reload-source').onclick = () => {if (sourceDirty && !confirm('Discard unsaved editor changes and reload this file?')) return; loadSource(source.file, true);};
 $('code').onkeydown = event => {if (event.key === 'Tab') {event.preventDefault(); const node = event.target; node.setRangeText('    ', node.selectionStart, node.selectionEnd, 'end'); node.dispatchEvent(new Event('input'));}};
@@ -367,29 +420,63 @@ document.addEventListener('keydown', event => {if ((event.ctrlKey || event.metaK
 window.addEventListener('beforeunload', event => {if (sourceDirty || settingsDirty || busy) {event.preventDefault(); event.returnValue = '';}});
 $('native-search').onclick = async () => {try {$('native-results').textContent = JSON.stringify(await api('native?q=' + encodeURIComponent($('native-query').value)), null, 2);} catch (error) {notice(error.message, true);}};
 showView(['mods', 'workshop', 'installation'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'mods');
-refresh().then(() => {if (!state.setup?.ready && !state.game) showView('installation'); if (location.hash === '#workshop' && !source) loadSource('src/Reconstructed/KartLogic.cs');}).catch(error => {notice('Toolkit could not load: ' + error.message, true);});
+refresh().then(() => {if (!state.setup?.ready && !state.game) showView('installation');}).catch(error => {notice('Toolkit could not load: ' + error.message, true);});
 setInterval(() => {if (state && !busy && !document.hidden) refresh(true, true).catch(() => {});}, 5000);
 
 async function searchFunctions(more = false) {
-  const sequence = ++functionSequence, offset = more ? nextFunctions || 0 : 0;
-  const result = await api('functions?q=' + encodeURIComponent($('function-query').value) + '&offset=' + offset + '&recovered=' + $('functions-recovered').checked);
-  if (sequence !== functionSequence) return;
-  if (!more) $('function-list').replaceChildren();
-  $('function-count').textContent = result.message || `${result.total} matching functions · ${result.indexed} indexed · ${result.reconstructed} with reconstructed C#`;
-  (result.methods || []).forEach(method => {
-    const button = el('button', 'function-row'); button.append(el('strong', '', method.type), el('code', '', method.signature), el('small', '', method.source ? 'Reconstructed C#' : 'Declaration'));
-    button.onclick = async () => {try {
-      const detail = await api('function?id=' + encodeURIComponent(method.id));
-      $('function-status').textContent = detail.status; $('function-detail').textContent = detail.declaration;
-      $('open-function-source').hidden = !detail.source; $('open-function-source').onclick = () => loadSource(detail.source);
-    } catch (error) {notice(error.message, true);}};
-    $('function-list').append(button);
-  });
-  nextFunctions = result.next; $('functions-more').hidden = nextFunctions === null || nextFunctions === undefined;
+  if (more && (functionLoading || nextFunctions == null)) return;
+  const sequence = ++functionSequence, offset = more ? nextFunctions : 0;
+  functionLoading = true; $('function-loading').hidden = false; $('function-end').hidden = true; $('function-scroll').setAttribute('aria-busy', 'true');
+  if (!more) {
+    nextFunctions = null; $('function-list').replaceChildren(); $('function-scroll').scrollTop = 0; $('function-count').textContent = 'Loading functions…';
+    ++detailSequence; $('function-name').textContent = 'Choose a function'; $('function-owner').textContent = '';
+    $('function-status').textContent = 'Select a method name to inspect its API.'; $('function-detail').textContent = 'The signature appears here.';
+    $('open-function-source').hidden = true; $('function-example').hidden = true; $('function-guidance').textContent = '';
+  }
+  try {
+    const result = await api('functions?q=' + encodeURIComponent($('function-query').value) + '&offset=' + offset + '&recovered=' + $('functions-recovered').checked + '&topic=' + $('function-topic').value);
+    if (sequence !== functionSequence) return;
+    $('function-count').textContent = result.message || `${result.total.toLocaleString()} results · ${result.indexed.toLocaleString()} indexed declarations · ${result.reconstructed} reconstructed implementations`;
+    (result.methods || []).forEach(method => {
+      const name = method.name || method.signature.split('(')[0].split(' ').at(-1);
+      const button = el('button', 'function-row'); button.dataset.function = method.id;
+      button.append(el('strong', '', method.label || name), el('small', '', method.type), el('span', 'api-badge', method.source ? 'Reconstructed C#' : 'API declaration'));
+      button.setAttribute('aria-pressed', 'false'); button.onclick = () => selectFunction(method); $('function-list').append(button);
+    });
+    nextFunctions = result.next;
+    $('function-end').hidden = nextFunctions != null; $('function-end').textContent = result.total ? 'End of results' : 'No functions match. Try another category or All indexed functions.';
+  } catch (error) {
+    if (sequence === functionSequence) {$('function-end').hidden = false; $('function-end').textContent = 'Could not load functions. Choose Search to retry.'; notice(error.message, true);}
+  } finally {
+    if (sequence === functionSequence) {functionLoading = false; $('function-loading').hidden = true; $('function-scroll').setAttribute('aria-busy', 'false');}
+  }
 }
+async function selectFunction(method) {
+  const sequence = ++detailSequence;
+  document.querySelectorAll('[data-function]').forEach(button => {const active = button.dataset.function === method.id; button.classList.toggle('selected', active); button.setAttribute('aria-pressed', String(active));});
+  $('function-name').textContent = method.label || method.name || method.type; $('function-owner').textContent = method.type;
+  $('function-status').textContent = 'Loading reference…'; $('open-function-source').hidden = true; $('function-example').hidden = true;
+  try {
+    const detail = await api('function?id=' + encodeURIComponent(method.id)); if (sequence !== detailSequence) return;
+    $('function-name').textContent = detail.label || method.name || method.type; $('function-owner').textContent = detail.type;
+    $('function-status').textContent = detail.status + (detail.confidence ? '. ' + detail.confidence : '.'); $('function-detail').textContent = detail.declaration;
+    $('function-guidance').textContent = detail.access === 'private' || detail.access === 'internal' ? `${detail.access} game method: inspect existing adapters or a complete-signature Harmony hook before using it. This declaration has no editable body.` : 'This signature lists the return type and parameters. A declaration alone does not prove runtime behavior.';
+    $('open-function-source').hidden = !detail.source; $('open-function-source').onclick = () => {if (sourceDirty) {notice('Save your current C# first.', true); return;} selectedModule = 'reconstructed'; showWorkshopTab('editor'); loadSource(detail.source);};
+    const usage = {
+      'PixelKartPhysics.AddVelocity': 'ReadableGame.AddVelocity(kart, Vector3.up * _hop.Value);',
+      'PixelKartPhysics.JumpInput': 'ReadableGame.JumpInput(kart, true);',
+      'PixelGameKartCamera.GetCamera': 'var gameCamera = ReadableGame.GetCamera(camera);',
+      'PixelGameKartCamera.IsCameraASpectatorCamera': 'bool spectator = ReadableGame.IsSpectator(camera);',
+    }[detail.type + '.' + detail.name];
+    $('function-example').hidden = !usage; $('function-usage').textContent = usage || '';
+  } catch (error) {if (sequence === detailSequence) {$('function-status').textContent = 'Reference unavailable. Select the function to retry.'; notice(error.message, true);}}
+}
+$('function-topic').value = 'important';
 $('function-search').onclick = () => searchFunctions().catch(error => notice(error.message, true));
 $('function-query').onkeydown = event => {if (event.key === 'Enter') $('function-search').click();};
+$('function-query').oninput = () => {clearTimeout(functionQueryTimer); functionQueryTimer = setTimeout(() => $('function-search').click(), 300);};
+$('function-topic').onchange = () => $('function-search').click();
 $('functions-recovered').onchange = () => $('function-search').click();
-$('functions-more').onclick = () => searchFunctions(true).catch(error => notice(error.message, true));
+$('function-scroll').onscroll = () => {const list = $('function-scroll'); if (list.scrollHeight - list.scrollTop - list.clientHeight < 180) searchFunctions(true).catch(error => notice(error.message, true));};
 
 $('browse-game').onclick = () => {if (settingsDirty || sourceDirty) {notice('Save your edits before switching game installations.',true); return;} runAction('browse-game');};

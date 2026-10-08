@@ -26,3 +26,42 @@ body{min-width:320px}main,.view,.setup-step,.function-browser{min-width:0}
 @media(max-width:520px){.setting{align-items:start;flex-direction:column;gap:9px}.setting input:not([type=checkbox]),.setting select{width:100%}.setting .parameter-controls{width:100%}.setting .parameter-controls input[type=number]{flex:1;width:0}.setting .switch input{width:40px}.module-tools{align-items:start;flex-direction:column}.topbar{flex-wrap:wrap;gap:3px;padding-block:8px}.section-heading{align-items:start;gap:10px;flex-wrap:wrap}.filters{flex-wrap:wrap;gap:5px}.pack-actions{width:100%;justify-content:space-between}.save-footer{gap:10px}.function-toolbar>label:first-child{flex-basis:100%}}
 
 @media(max-width:780px){.rail-bottom{display:flex;flex-wrap:wrap;gap:6px}.rail-bottom button{font-size:10px}.rail nav{flex-wrap:wrap}}
+
+/* Workshop: navigation, references and editable code have distinct roles. */
+:root{--editor:oklch(97% .006 255)}
+:root[data-theme=dark]{--editor:oklch(18.5% .014 255)}
+.workshop-tabs{display:flex;gap:24px;border-bottom:1px solid var(--line);margin-bottom:24px;overflow:auto}
+.workshop-tab{flex-shrink:0;padding:12px 0;background:transparent;border-radius:0;font-weight:600;color:var(--muted);border-bottom:2px solid transparent}
+.workshop-tab.selected{color:var(--text);border-bottom-color:var(--accent)}
+.workshop-panel{min-width:0}.workshop-toolbar{gap:10px;margin-bottom:12px}.workshop-toolbar label{flex:0 1 250px;font-size:12px}.build-actions{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
+.workflow-note{color:var(--muted);font-size:12px;margin:0 0 20px;max-width:90ch}
+.source-layout{grid-template-columns:minmax(185px,230px) minmax(0,1fr);min-height:0}
+.source-sidebar{display:block;padding:18px 12px;max-height:760px}.source-sidebar>label{display:block;font-size:12px;font-weight:650;margin:0 4px 7px}
+.source-sidebar>select,.source-sidebar>input{width:100%;font-size:12px;margin-bottom:10px}.source-sidebar>p{margin:2px 4px 20px;line-height:1.6}
+.source-sidebar>div{display:block;margin-bottom:22px}.source-sidebar h3{font-size:11px;color:var(--muted);margin:16px 5px 7px;font-weight:600}
+.file-button{display:block;line-height:1.5}.file-role{display:block;font-size:10px;color:var(--muted);font-weight:400;margin-top:3px}
+.file-button.selected{outline:1px solid var(--line)}.editor-toolbar{padding:12px 16px;min-height:55px}.editor-toolbar>span{font-family:Consolas,monospace;font-size:11px}
+.editor-search{display:flex;flex-wrap:wrap;gap:9px;align-items:center;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--line);font-size:11px}
+.editor-search input{flex:0 1 180px;font-size:11px;padding:5px 8px}.editor-search>span{margin-left:auto;color:var(--muted)}
+.code-surface{display:grid;grid-template-columns:48px minmax(0,1fr);height:clamp(340px,60vh,720px);background:var(--editor);min-width:0}
+#line-numbers{padding:18px 9px 18px 0;margin:0;overflow:hidden;text-align:right;border-right:1px solid var(--line);color:var(--muted);background:var(--editor);user-select:none;font:13px/1.7 Consolas,"Cascadia Code",monospace}
+#code{display:block;min-height:0;height:100%;width:100%;padding:18px 16px;resize:none;background:var(--editor);font:13px/1.7 Consolas,"Cascadia Code",monospace;overflow:auto;flex:none}
+.editor-caption{font-size:11px;line-height:1.6}.build-details{margin-top:18px;font-size:12px}.build-details pre{background:var(--editor);padding:16px;max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 Consolas,monospace}
+.function-browser{padding:0;border:0;border-radius:0;background:transparent}.function-toolbar{gap:12px}.function-toolbar>label:not(.inline-check){display:grid;gap:6px;font-size:12px}
+.function-toolbar>label:first-child{flex:1;min-width:200px}.function-toolbar select{max-width:240px}.function-layout{grid-template-columns:minmax(230px, .85fr) minmax(0,1.3fr);gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.function-scroll{background:var(--rail);height:clamp(340px,60vh,680px);overflow:auto;border-right:1px solid var(--line);padding:8px;scrollbar-gutter:stable}
+.function-list{height:auto;overflow:visible}.function-row{padding:12px;text-align:left;gap:5px;border:0;border-radius:6px;margin-bottom:3px;min-width:0}
+.function-row strong{font:600 13px/1.5 "Segoe UI",system-ui,sans-serif;overflow-wrap:anywhere}.function-row small{font:11px/1.5 "Segoe UI",system-ui,sans-serif;overflow-wrap:anywhere}
+.function-row.selected{background:var(--surface);outline:1px solid var(--line)}.api-badge{font-size:10px;color:var(--muted)}
+.api-detail{min-width:0;padding:24px;max-height:750px;overflow:auto}.eyebrow{display:block;font-size:10px;letter-spacing:1.4px;font-weight:650;color:var(--muted);margin-bottom:12px}
+.api-detail h2{font-size:22px;overflow-wrap:anywhere}.api-detail>p{font-size:12px;line-height:1.7;margin-top:10px}.api-detail h3{font-size:12px;margin-top:24px}.api-detail button{margin-top:18px}
+.reference-code{white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto;border:1px solid var(--line);background:var(--editor);color:var(--text);padding:16px;border-radius:6px;font:12px/1.8 Consolas,"Cascadia Code",monospace;margin:10px 0 0}
+#function-example p{font-size:12px;margin-top:10px}#function-end{font-size:11px;padding:12px}
+.function-loading{padding:12px;display:grid;gap:12px}.function-loading span{display:block;height:36px;border-radius:5px;background:var(--line);animation:loading-pulse 1.2s ease-in-out infinite}.function-loading span:nth-child(2){width:85%}.function-loading span:nth-child(3){width:70%}
+@keyframes loading-pulse{50%{opacity:.45}}@media(prefers-reduced-motion:reduce){.function-loading span{animation:none}}
+.tutorial{max-width:960px}.tutorial-heading{padding:4px 0 28px;border-bottom:1px solid var(--line)}.tutorial-heading h2{font-size:26px;margin-bottom:12px}.tutorial-heading p{color:var(--muted);font-size:14px;line-height:1.8;margin-bottom:20px}
+.tutorial-steps{list-style:decimal-leading-zero;padding-left:30px;max-width:80ch;margin:28px 0 40px}.tutorial-steps>li{padding:0 0 28px 12px}.tutorial-steps>li::marker{font-weight:650;color:var(--muted)}.tutorial-steps h3{font-size:17px;margin-bottom:8px}.tutorial-steps p{font-size:13px;color:var(--muted);line-height:1.8;margin-top:10px}
+.ideas-heading{margin:0 0 20px}.tutorial-ideas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px 36px;margin-bottom:30px}.tutorial-ideas article{border-top:1px solid var(--line);padding-top:16px}.tutorial-ideas h3{font-size:15px}.tutorial-ideas p{font-size:13px;color:var(--muted);line-height:1.8;margin-top:8px}.tutorial-ideas button{padding-left:0;margin-top:8px}
+@media(max-width:1080px){.source-layout{grid-template-columns:minmax(170px,200px) minmax(0,1fr)}.function-layout{grid-template-columns:minmax(200px,.8fr) minmax(0,1fr)}.api-detail{padding:20px}.editor-search>label{display:none}}
+@media(max-width:780px){.workshop-tabs{gap:20px;font-size:12px}.workshop-toolbar label{flex:1}.build-actions{margin-left:0}.source-layout{grid-template-columns:1fr}.source-sidebar{display:block;max-height:230px}.source-sidebar>div{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}.source-sidebar h3{display:block;margin:8px 0}.source-sidebar p{margin-bottom:12px}.file-button{width:auto}.editor-toolbar{flex-wrap:wrap}.editor-toolbar>span{flex-basis:100%}.function-layout{grid-template-columns:1fr}.function-scroll{height:300px;border-right:0;border-bottom:1px solid var(--line)}.api-detail{max-height:none}.function-toolbar>label:first-child{flex-basis:100%}.function-toolbar select{max-width:none}.tutorial-ideas{grid-template-columns:1fr}.code-surface{height:52vh;min-height:320px}}
+@media(max-width:480px){.workshop-tab{font-size:11px}.workshop-tabs{gap:15px}.workshop-toolbar label{flex-basis:100%}.build-actions{width:100%}.build-actions button{flex:1}.editor-search input{flex:1;min-width:100px}.editor-search>span{flex-basis:100%;margin:0}.function-toolbar>label{flex-basis:100%}.code-surface{grid-template-columns:35px minmax(0,1fr)}#code{padding-inline:10px}.api-detail{padding:18px}.tutorial-steps{padding-left:22px}.tutorial-steps>li{padding-left:6px}}
