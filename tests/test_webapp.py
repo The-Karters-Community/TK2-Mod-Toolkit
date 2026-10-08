@@ -1,0 +1,102 @@
+import hashlib
+from http.client import HTTPConnection
+import json
+from pathlib import Path
+import tempfile
+import threading
+import unittest
+from unittest.mock import patch
+from studio import core, pack, webapp
+
+
+class GarageTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.game = self.root / "game"
+        self.game.mkdir()
+        for name in ("TheKarters2.exe", "GameAssembly.dll"): (self.game / name).write_bytes(b"fixture")
+        self.sources = self.root / "plugins/TK2.Customization"
+        self.sources.mkdir(parents=True)
+        (self.sources / "Example.cs").write_text("// original source")
+        (self.root / "src/Reconstructed").mkdir(parents=True)
+        (self.root / "templates").mkdir()
+        (self.root / "templates/PackRecipe.cs.txt").write_text("public class RecipeName {}")
+        for target, value in (("ROOT", self.root),):
+            p = patch.object(core, target, value); p.start(); self.addCleanup(p.stop)
+        p = patch.object(pack, "SOURCE_ROOT", self.sources); p.start(); self.addCleanup(p.stop)
+        self.app = webapp.Application(self.game)
+
+    def test_pack_defaults_and_gameplay_gate(self):
+        self.assertEqual(len(pack.FEATURES), 10)
+        values = pack.defaults()
+        self.assertTrue(all(not v for k, v in values.items() if k.endswith("/Enabled")))
+        for feature in pack.FEATURES:
+            if feature.get("gameplay"):
+                with self.assertRaises(ValueError): pack.validate({feature["id"] + "/Enabled": True})
+        for value in (float('nan'), float('inf'), -1, 3):
+            with self.assertRaises(ValueError): pack.validate({"Audio/MasterVolume": value})
+        with self.assertRaises(ValueError): pack.validate({"Laps/Count": 1.5})
+
+    def test_config_save_preserves_unknown_and_detects_external_edit(self):
+        path = self.app.config_path
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"# preserve\r\n[Audio]\r\nEnabled = false\r\nUnknown = original\r\n")
+        digest = self.app.config_data()["configHash"]
+        self.app.save_settings({"hash": digest, "values": {"Audio/Enabled": True}})
+        self.assertIn(b"Unknown = original\r\n", path.read_bytes())
+        self.assertIn(b"Enabled = true", path.read_bytes())
+        with self.assertRaises(ValueError): self.app.save_settings({"hash": digest, "values": {"Audio/Enabled": False}})
+        self.assertEqual(len(list((self.root / "local/backups").glob("*/receipt.json"))), 1)
+
+    def test_source_edit_conflict_and_backup(self):
+        name = "plugins/TK2.Customization/Example.cs"
+        p = self.sources / "Example.cs"
+        original = core.sha256(p)
+        self.app.action("save-source", {"file": name, "hash": original, "content": "// new source"})
+        backup = next((self.root / "local/source-backups").glob("*"))
+        self.assertEqual(backup.read_text(), "// original source")
+        p.write_text("// external edit")
+        with self.assertRaises(ValueError): self.app.action("save-source", {"file": name, "hash": original, "content": "// overwrite"})
+        self.assertEqual(p.read_text(), "// external edit")
+        with self.assertRaises(ValueError): pack.source_path("../../external.cs")
+
+    def test_recipe_is_a_source_in_same_pack(self):
+        name = pack.create_recipe("MyCamera")
+        self.assertIn(name, pack.source_files())
+        self.assertEqual(pack.source_path(name).read_text(), "public class MyCamera {}")
+        with self.assertRaises(ValueError): pack.create_recipe("../outside")
+        with self.assertRaises(ValueError): pack.create_recipe("MyCamera")
+
+    def test_install_builds_before_deploy_and_keeps_defaults_off(self):
+        with patch.object(core, "require_game_stopped"), patch.object(core, "build_plugin", return_value={"artifact": str(self.root / "artifact")}) as build, patch.object(core, "deploy_plugin", return_value=self.root / "backup") as deploy:
+            result = self.app.action("install", {})
+        build.assert_called_once(); deploy.assert_called_once()
+        self.assertIn("One pack", result["message"])
+        self.assertTrue(all(not value for key, value in self.app.config_data()["settings"].items() if key.endswith("/Enabled")))
+
+    def test_http_api_rejects_cross_origin_missing_token_and_wrong_host(self):
+        server = webapp.Server(self.app, 0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        def request(method, path, headers=None, body=None):
+            connection = HTTPConnection("127.0.0.1", server.server_port)
+            connection.request(method, path, body, headers or {})
+            response = connection.getresponse(); result = response.status, response.read(); connection.close(); return result
+        self.assertEqual(request("GET", "/api/state")[0], 403)
+        auth = {"X-TK2-Token": self.app.token}
+        self.assertEqual(request("GET", "/api/state", auth)[0], 200)
+        self.assertEqual(request("GET", "/api/state", {**auth, "Origin": "https://example.com"})[0], 403)
+        self.assertEqual(request("GET", "/", {"Host": "example.com"})[0], 403)
+        status, html = request("GET", "/")
+        self.assertEqual(status, 200); self.assertIn(self.app.token.encode(), html); self.assertNotIn(b"__SESSION_TOKEN__", html)
+        bad = json.dumps({"values": {"Audio/Enabled": True}, "hash": "stale"})
+        self.assertEqual(request("POST", "/api/settings", {**auth, "Content-Type": "application/json"}, bad)[0], 400)
+        self.assertFalse(self.app.config_path.exists())
+        self.assertEqual(request("GET", "/api/source?file=../../outside.cs", auth)[0], 400)
+        self.assertEqual(request("GET", "/api/source?file=plugins/TK2.Customization/Example.cs", auth)[0], 200)
+
+
+if __name__ == "__main__": unittest.main()

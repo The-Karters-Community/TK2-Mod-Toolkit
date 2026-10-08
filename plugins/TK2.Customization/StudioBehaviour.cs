@@ -84,7 +84,7 @@ public sealed class StudioBehaviour : MonoBehaviour
         }
     }
 
-    private static bool Matches(Canvas canvas, string filter) => canvas.isRootCanvas &&
+    private static bool Matches(Canvas canvas, string filter) => canvas != null && canvas.isRootCanvas &&
         canvas.renderMode != RenderMode.WorldSpace && !string.IsNullOrWhiteSpace(filter) &&
         canvas.name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
 
