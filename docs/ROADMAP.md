@@ -14,7 +14,7 @@ Keep the installed BepInEx IL2CPP loader initially: its existing log proves usef
 2. **Authoring GUI:** search APIs, view declarations and pseudocode, edit C# project sources, generate a starter, compile, show diagnostics, stage a package, deploy/disable/restore.
 3. **Runtime C# plugin:** isolated feature modules, complete signature resolution, capability probes, per-feature failure reporting, main-thread configuration reload, restoration of touched state.
 4. **Compatibility layer:** game-hash-bound build receipt; reject deployment against changed references; version adapters rather than hardcoded native addresses.
-5. **Configuration layer:** standard BepInEx .cfg for interoperability; structured controls for supported starter settings and raw editor for existing mods. DLL lifecycle changes require restart. Reload only settings supported by the plugin.
+5. **Configuration layer:** standard BepInEx .cfg for interoperability; structured controls for supported starter settings; generic controls generated from existing mods' setting comments, plus raw editing. DLL lifecycle changes require restart. Reload only settings supported by the plugin.
 
 ## Milestones and acceptance gates
 
@@ -57,3 +57,21 @@ First boot with presentation features disabled; check startup log. Toggle UI/aud
 ## Next work priorities
 
 Finish local analysis and executable first slice before expanding. Then manual runtime verification, overload fix for NightmareAIs when its source is available/recovered, stable adapters, live bridge, and visual recipes. Full-game reconstruction is a separate long reverse-engineering effort; prioritize gameplay systems that unblock actual mods.
+
+## Current delivery status
+
+- M0 evidence and Git bootstrap: delivered.
+- M1 metadata/native index, targeted pseudocode, address-specific export and managed recovery: delivered; full-game semantic reconstruction remains ongoing research.
+- M2 initial GUI authoring, typed existing settings, build/deploy/toggle/backup workflows: delivered with core tests and off-screen smoke checks; visible interaction and distribution packaging remain.
+- M3 starter source and build: delivered; in-game acceptance remains unverified.
+- M4–M7 facades, migration UI, visual recipes, live bridge, richer assets, profiles and distribution: planned. They are not represented as working features in this release.
+
+## Loader options
+
+| Approach | Use in this project | Reason / tradeoff |
+|---|---|---|
+| Existing BepInEx IL2CPP | Initial runtime backend | Already loads useful mods; generated interop enables readable C#. Signature changes still need migration. |
+| Native game content / Workshop pipeline | Investigate as companion backend | Current metadata exposes mod loaders/config/trigger systems. Formats and supported customization boundaries still need validation. |
+| MelonLoader | Alternative only after a measured blocker | Similar managed/native bridge needs game compatibility work; switching does not fix obsolete class/method assumptions. Validate a separate installation and never combine loaders. |
+| Custom native injector or binary patching | Last-resort scoped adapter | More maintenance, ABI/lifetime hazards and rollback burden. Keep native implementation behind typed C# facades; ordinary authors should not need assembly. |
+| Complete reconstructed Unity project | Separate research effort | Original bodies, project structure and asset authoring metadata are not fully preserved. Not a prerequisite for the requested tool. |

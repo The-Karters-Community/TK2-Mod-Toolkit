@@ -15,7 +15,7 @@ This is a feasibility catalog, not a promise that every feature is implemented o
 | Tracks | Track rotation, practice checkpoints, custom objects, track editor enhancements | Game already exposes Workshop systems; inspect official formats before custom importers |
 | Training | Drift trainer, ghost comparisons, splits, replay tools, telemetry CSV, collision visualization, slow-motion offline practice | Current lap/time/player data evidence; replay serialization research |
 | Streaming | Twitch commands/events, challenge voting, local telemetry overlay | Existing Twitch SDK and managed overlay code evidence; secure handling of account credentials needed |
-| Developer tools | Scene browser, component inspector, method finder, hook diagnostics, signature diff, C# templates, compiler diagnostics, packaging | Authoring/analysis first slice; live bridge and recipe generator roadmap |
-| Mod management | Toggle DLLs, configs, build/deploy, backup/restore, fingerprints, logs, profiles, dependency/conflict reports | First slice plus later package/profile milestones |
+| Developer tools | Scene browser, component inspector, method finder, hook diagnostics, signature diff, C# templates, compiler diagnostics, packaging | Method index, exact-address pseudocode export, templates and build diagnostics delivered; live bridge and recipes planned |
+| Mod management | Toggle DLLs, typed configs, build/deploy, backup/restore, fingerprints, logs, profiles, dependency/conflict reports | Initial GUI delivered; existing MK config exposes 90 settings/15 toggles; package/profile milestones planned |
 
 Do not promise remote-server behavior changes, official online compatibility, arbitrary native hot reload, or reconstruction of removed source. Native IL2CPP methods do not have normal IL bodies for Harmony transpilers; use supported prefix/postfix hooks, field/property adapters, or carefully scoped native hooks when justified.

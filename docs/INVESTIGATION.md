@@ -8,7 +8,17 @@ Current `BepInEx/LogOutput.log` shows AutoReloadConfigModSDK, DisableLeaderboard
 
 Ghidra project `TK2_1_4_18.gpr` has a database directory `TK2_1_4_18.rep`; property file identifies `/GameAssembly.dll`. Database contains ~1 GB current program store and a previous ~565 MB store. The database is not plain source and must be queried with Ghidra APIs. Export should use `-process GameAssembly.dll -readOnly -noanalysis`.
 
-## Sources
+## Completed analysis
+
+Read-only Ghidra export confirms its executable hash matches the installed GameAssembly. The function index contains 184,138 functions (155,180 non-default names); 56 pseudocode bodies were exported across two successful selections. The metadata catalog contains 23,785 types. See [reconstruction notes](RECONSTRUCTION.md) for evidence quality and examples.
+
+dnSpy recovered the MKsKartersMods managed DLL to 37 local C# files. Its modules include alternate reserves, AutoBoosting, BobbyGang, BoringMode, BoostTrainer, custom lap counts, CNK-style boost meter, custom physics and boost parameters, DashAndStash, fast respawn, mirror/reverse modes, proximity voice lines, save states, SupraMayroKratt and teleport rewards. These are useful patterns; not all enabled features are currently runtime-verified.
+
+The static audit scanned 93 C# files across supplied source projects and recovered managed output. Of 81 named Harmony patch declarations, 79 have a current target by name; `HpBarController.Hit` needs overload selection and `JumpInputTheKarters` is absent. Namespaced types are resolved through the source's using statements. This explains why broad rewrites of every old mod are premature: migrate specific failed signatures/semantics first. See [the complete audit](LEGACY-AUDIT.md).
+
+The current metadata exposes a substantial content-mod system: loaders, runtime gameplay config generation, mod data synchronization, Wwise event commands, conditions and triggers, plus character/vehicle/track info classes. This suggests a hybrid tool: BepInEx for code hooks and the existing content pipeline for compatible assets/rules. That recommendation is an inference from declarations; exact file formats and runtime restrictions remain to be verified.
+
+## References
 
 - [User's reverse-engineering guide](https://gist.github.com/BadMagic100/47096cbcf64ec0509cf75d48cfbdaea5)
 - [BepInEx IL2CPP installation](https://docs.bepinex.dev/master/articles/user_guide/installation/unity_il2cpp.html)
