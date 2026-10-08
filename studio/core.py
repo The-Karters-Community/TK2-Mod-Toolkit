@@ -378,6 +378,8 @@ def build_plugin(game: Path, project: Path, log=lambda message: None) -> dict:
     receipt = {"fingerprint": stamp, "references": ref_hashes, "dll": output.name,
                "dllSha256": sha256(output), "project": str(project), "runtimeTested": False}
     write_json(artifact / "build.json", receipt)
+    from . import recipe_catalog
+    write_json(artifact / "recipe-catalog.json", recipe_catalog.source_features(project.parent))
     return {"artifact": str(artifact), "receipt": receipt}
 
 

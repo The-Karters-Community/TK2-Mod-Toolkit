@@ -1,7 +1,7 @@
 """The player-facing catalogue and settings for the single pack."""
 from pathlib import Path
 import json
-from . import core
+from . import core, recipe_catalog
 
 PROJECT = core.ROOT / "plugins/TK2.Customization/TK2.Customization.csproj"
 ARTIFACT = core.ROOT / "artifacts/TK2.Customization"
@@ -54,9 +54,9 @@ _CAMERA["settings"] = [
 _CAMERA["settingGroups"] = {"AimAtKart":"Aim & rotation", "TargetHeight":"Aim & rotation", "PitchOffset":"Aim & rotation", "YawOffset":"Aim & rotation", "RollOffset":"Aim & rotation", "SmoothingSeconds":"Transitions", "PanelEnabled":"In-race panel", "PanelHotkey":"In-race panel", "PanelScale":"In-race panel"}
 
 
-def schema():
+def schema(features=None):
     result = {}
-    for feature in FEATURES:
+    for feature in features if features is not None else catalog_features():
         result[(feature["id"], "Enabled")] = ("bool", False, None, None)
         for setting in feature["settings"]:
             key, _, kind, default, low, high = setting[:6]
@@ -66,12 +66,15 @@ def schema():
 
 def validate(values):
     import math
+    features = catalog_features()
+    definitions = schema(features)
+    options = {(f['id'],s[0]):s for f in features for s in f['settings']}
     result = {}
     for compound, value in values.items():
         section, separator, key = compound.partition("/")
-        if not separator or (section, key) not in schema():
+        if not separator or (section, key) not in definitions:
             raise ValueError("Unknown pack setting: " + compound)
-        kind, _, low, high = schema()[(section, key)]
+        kind, _, low, high = definitions[(section, key)]
         if kind == "bool":
             if not isinstance(value, bool): raise ValueError("Expected a boolean")
             result[(section, key)] = str(value).lower()
@@ -84,7 +87,7 @@ def validate(values):
         else:
             if not isinstance(value, str) or any(c in value for c in "\r\n") or len(value) > 4096:
                 raise ValueError("Expected a single-line setting")
-            definition = next(s for f in FEATURES if f["id"] == section for s in f["settings"] if s[0] == key)
+            definition = options[(section,key)]
             if len(definition) > 7 and definition[7] and value not in definition[7]:
                 raise ValueError(f"{compound}: choose one of the listed values")
             result[(section, key)] = value
@@ -101,22 +104,26 @@ PACKS = [
 ]
 
 
+def catalog_features():
+    return FEATURES + recipe_catalog.features()
+
+
+def catalog_packs():
+    recipes = recipe_catalog.features()
+    extra = []
+    for identity, name, description in (
+        ('mechanics','Race Lab','Seven new local racing mechanics. Tune one at a time, then combine favorites.'),
+        ('cosmetics','Custom models','Your imported static kart cosmetics.'),
+        ('recipes','Your recipes','Create, edit and share your own C# modules.')):
+        members = [f['id'] for f in recipes if f['pack'] == identity]
+        if members: extra.append({'id':identity,'name':name,'description':description,'features':members})
+    return PACKS + extra
+
+
 def initial_config():
     values = validate(defaults())
     text = core.update_cfg("# TK2 Mod Toolkit Pack\n", values)
-    return text + """
-[Recipe.FrameLimiter]
-## Target frame rate; VSync is disabled while this recipe is enabled.
-# Setting type: Int32
-# Default value: 120
-# Acceptable value range: From 30 to 360
-FramesPerSecond = 120
-
-## Enable the frame limiter recipe.
-# Setting type: Boolean
-# Default value: false
-Enabled = false
-"""
+    return text
 
 
 def seed_config(text):
@@ -162,12 +169,16 @@ def module_sources():
               for feature in FEATURES}
     import re
     for file in available:
-        if "/Recipes/" not in file: continue
+        if "/Recipes/" not in file and "/Models/" not in file: continue
         text = source_path(file).read_text(encoding="utf-8")
-        match = re.search(r'public\s+string\s+Name\s*=>\s*"([^"\r\n]+)"', text)
-        name = match[1] if match else Path(file).stem
+        match = re.search(r'public\s+(?:override\s+)?string\s+Name\s*=>\s*"([^"\r\n]+)"', text)
+        if not match: continue
+        name = match[1]
         helper = "plugins/TK2.Customization/RecipeHost.cs"
-        result["Recipe." + name] = [file] + ([helper] if helper in available else [])
+        dependencies = [helper]
+        if 'LocalKartMechanic' in text: dependencies.append('plugins/TK2.Customization/Recipes/MechanicsContext.cs')
+        if name == 'CosmeticModel': dependencies += ['plugins/TK2.Customization/Models/ObjModel.cs', 'plugins/TK2.Customization/Models/ModelPath.cs']
+        result["Recipe." + name] = [file] + [dep for dep in dependencies if dep in available]
     return result
 
 

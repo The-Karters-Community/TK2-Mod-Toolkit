@@ -1,0 +1,23 @@
+// Save as Assets/Editor/TK2ModelBundleExporter.cs in a Unity 6000.0.75f1 project.
+using System.IO;
+using UnityEditor;
+using UnityEngine;
+
+public static class TK2ModelBundleExporter
+{
+    [MenuItem("TK2/Export selected static model prefab")]
+    public static void Export()
+    {
+        string path = AssetDatabase.GetAssetPath(Selection.activeObject);
+        if (!path.EndsWith(".prefab")) { EditorUtility.DisplayDialog("TK2 model export", "Select a prefab asset in the Project window.", "OK"); return; }
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        if (prefab.GetComponentsInChildren<MeshFilter>(true).Length == 0) { EditorUtility.DisplayDialog("TK2 model export", "Prefab needs static MeshFilter + MeshRenderer geometry.", "OK"); return; }
+        string folder = EditorUtility.OpenFolderPanel("Export TK2 model bundle", "", "");
+        if (string.IsNullOrEmpty(folder)) return;
+        Directory.CreateDirectory(folder);
+        var build = new AssetBundleBuild { assetBundleName = "model.bundle", assetNames = new[] { path } };
+        var manifest = BuildPipeline.BuildAssetBundles(folder, new[] { build }, BuildAssetBundleOptions.ChunkBasedCompression, BuildTarget.StandaloneWindows64);
+        if (manifest == null) throw new System.Exception("Unity bundle build failed; see the Console.");
+        Debug.Log("Import " + Path.Combine(folder, "model.bundle") + " in TK2 Mod Toolkit. Prefab asset name: " + path);
+    }
+}
