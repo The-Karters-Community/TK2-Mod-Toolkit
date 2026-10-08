@@ -23,6 +23,7 @@ public sealed class MirrorRace : IModRecipe
     private bool _active;
     private int _lastLoggedCameraCount = -1;
     private bool _loggedProjection;
+    private bool _loggedWaitingForRace;
 
     private sealed class CameraRenderState
     {
@@ -43,6 +44,13 @@ public sealed class MirrorRace : IModRecipe
         PatchCameraEvent(harmony, "OnPreRender", nameof(AfterCameraPreRender));
         PatchCameraEvent(harmony, "OnPostRender", nameof(AfterCameraPostRender));
 
+        MethodInfo frameCamera = AccessTools.DeclaredMethod(typeof(PixelGameKartCamera), "GetRacingCamPositionAndRotation",
+            new[] { typeof(float), typeof(Vector3).MakeByRefType(), typeof(Quaternion).MakeByRefType(), typeof(float).MakeByRefType() })
+            ?? throw new MissingMethodException(typeof(PixelGameKartCamera).FullName, "GetRacingCamPositionAndRotation(float, ref Vector3, ref Quaternion, ref float)");
+        harmony.Patch(frameCamera,
+            prefix: new HarmonyMethod(typeof(MirrorRace), nameof(BeforeRacingCameraFraming)),
+            postfix: new HarmonyMethod(typeof(MirrorRace), nameof(AfterRacingCameraFraming)));
+
         MethodInfo steer = AccessTools.DeclaredMethod(typeof(PixelEasyCharMoveKartController), "SteerInput", new[] { typeof(float) })
             ?? throw new MissingMethodException(typeof(PixelEasyCharMoveKartController).FullName, "SteerInput(float)");
         harmony.Patch(steer, prefix: new HarmonyMethod(typeof(MirrorRace), nameof(BeforeSteerInput)));
@@ -61,6 +69,11 @@ public sealed class MirrorRace : IModRecipe
             Ant_CurrentGameConfiguration.eCurrentRaceState == Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING;
         if (!canRun)
         {
+            if (_enabled.Value && Plugin.OfflineLabAllowed && !_loggedWaitingForRace)
+            {
+                _loggedWaitingForRace = true;
+                Plugin.Instance?.Log.LogInfo("Mirror Race is armed; waiting for the local race to enter its running state.");
+            }
             _active = false;
             _localCameras.Clear();
             RestoreOutstanding();
@@ -68,6 +81,7 @@ public sealed class MirrorRace : IModRecipe
             _loggedProjection = false;
             return;
         }
+        _loggedWaitingForRace = false;
 
         if (Time.unscaledTime < _nextCameraScan) return;
         _nextCameraScan = Time.unscaledTime + .5f;
@@ -171,6 +185,26 @@ public sealed class MirrorRace : IModRecipe
         if (__instance.parentPlayer.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL) __0 = -__0;
     }
 
+    // The native chase camera adds a steering/drift orbit after following the kart's
+    // forward direction. That extra orbit makes reflected track details appear to swim
+    // across the view. Skip only that branch for the local player while Mirror Race runs.
+    private static void BeforeRacingCameraFraming(PixelGameKartCamera __instance, out bool __state)
+    {
+        __state = false;
+        var module = _instance;
+        var player = __instance == null ? null : __instance.antPlayer;
+        if (__instance == null || module == null || !module._active || !Plugin.OfflineLabAllowed || player == null ||
+            player.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL) return;
+
+        __state = __instance.bUseRotateTowardsNoLateralVelocity;
+        if (__state) __instance.bUseRotateTowardsNoLateralVelocity = false;
+    }
+
+    private static void AfterRacingCameraFraming(PixelGameKartCamera __instance, bool __state)
+    {
+        if (__state && __instance != null) __instance.bUseRotateTowardsNoLateralVelocity = true;
+    }
+
     public void Restore()
     {
         _active = false;
@@ -179,6 +213,7 @@ public sealed class MirrorRace : IModRecipe
         _nextCameraScan = 0;
         _lastLoggedCameraCount = -1;
         _loggedProjection = false;
+        _loggedWaitingForRace = false;
     }
 
     private static void RestoreOutstanding()

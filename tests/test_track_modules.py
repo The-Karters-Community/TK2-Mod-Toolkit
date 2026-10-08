@@ -23,6 +23,14 @@ class TrackModuleIntegrationTests(unittest.TestCase):
         source = (pack.PROJECT.parent / 'Recipes/TrackInspector.cs').read_text(encoding='utf-8')
         self.assertIn('bForceDebugShowTriggerCollisionMeshes', source)
         self.assertIn('mapPhysicsTriggerColliderList', source)
+        self.assertIn('PatchTriggerSetup(harmony, "Init")', source)
+        self.assertIn('PatchTriggerSetup(harmony, "Start")', source)
+        self.assertIn('ShouldShowNativeMeshes', source)
+        self.assertIn('module.CaptureDefault(map);', source)
+        self.assertIn('OriginalFlag', source)
+        self.assertIn('if (_map != null) RestoreMap();', source)
+        self.assertIn('_lastApplied = _mapDefault;', source)
+        self.assertIn('native debug flag, but the map currently exposes no trigger MeshRenderers', source)
         self.assertNotIn('FindObjectsOfType<Collider>', source)
         self.assertNotIn('Graphics.DrawMeshNow', source)
         self.assertNotIn('ClassInjector', source)
@@ -33,6 +41,8 @@ class TrackModuleIntegrationTests(unittest.TestCase):
         self.assertNotIn('state.Projection * flipX', source)
         self.assertIn('BeforeSteerInput', source)
         self.assertIn('E_HUMAN_LOCAL', source)
+        self.assertIn('BeforeRacingCameraFraming', source)
+        self.assertIn('bUseRotateTowardsNoLateralVelocity = false', source)
         self.assertIn('Mirror Race applied to local camera', source)
 
     def test_export_includes_only_active_recipe_helpers(self):

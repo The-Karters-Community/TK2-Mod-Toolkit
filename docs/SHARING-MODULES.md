@@ -8,7 +8,7 @@ Open **Workshop → Share modules**, name the package, tick the modules you want
 - Their readable C# files and required local helpers.
 - A versioned manifest with module identities, bounds, dependencies and file checksums.
 
-Save unsaved C# before exporting. The package is for another **TK2 Mod Toolkit 0.6.2+**, using the same supported game build. It is not a standalone DLL; the recipient's Toolkit supplies BepInEx, runtime host and compilation.
+Save unsaved C# before exporting. The package is for another **TK2 Mod Toolkit 0.6.3+**, using the same supported game build. It is not a standalone DLL; the recipient's Toolkit supplies BepInEx, runtime host and compilation.
 
 Built-in modules share implementation files. Their package may contain code for other built-in modules, but only selected config sections are exported. Game binaries, interop DLLs, the loader and unrelated custom recipes are excluded.
 
