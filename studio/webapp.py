@@ -7,45 +7,40 @@ import mimetypes
 import os
 from pathlib import Path
 import secrets
+import socket
 import subprocess
 import threading
 import webbrowser
 from urllib.parse import urlsplit, parse_qs
-from . import core, pack
+from . import core, pack, settings, setup, symbols
 
 WEB = core.ROOT / "studio/web"
 
 
 class Application:
-    def __init__(self, game=core.DEFAULT_GAME):
-        self.game = core.validate_game(Path(game))
+    def __init__(self, game=None):
+        found = setup.discover() if game is None else []
+        self.game = core.validate_game(Path(game)) if game is not None else (found[0] if found else None)
         self.token = secrets.token_urlsafe(32)
         self.lock = threading.RLock()
-        self.logs = []
+        previous_log = core.ROOT / "local/garage-build.log"
+        self.logs = previous_log.read_text(encoding="utf-8", errors="replace").splitlines()[-80:] if previous_log.is_file() else []
 
     def log(self, message):
         self.logs.append(str(message))
         self.logs = self.logs[-100:]
+        core.atomic_write(core.ROOT / "local/garage-build.log", "\n".join(self.logs).encode("utf-8"))
 
     @property
     def config_path(self):
+        if self.game is None: raise ValueError("Choose the game folder in Installation first.")
         return self.game / "BepInEx/config" / core.CONFIG_NAME
 
     def config_data(self):
-        data = self.config_path.read_bytes() if self.config_path.exists() else b""
-        text = data.decode("utf-8-sig")
-        settings = pack.defaults()
-        entries = core.parse_cfg_settings(text)
-        for entry in entries:
-            compound = entry["section"] + "/" + entry["key"]
-            if compound not in settings: continue
-            kind = pack.schema()[(entry["section"], entry["key"])][0]
-            try:
-                settings[compound] = entry["value"].lower() == "true" if kind == "bool" else (
-                    float(entry["value"]) if kind in ("float", "int") else entry["value"])
-            except ValueError: pass
-        return {"settings": settings, "configHash": hashlib.sha256(data).hexdigest(),
-                "recipes": [e for e in entries if e["section"].startswith("Recipe.")]}
+        data = self.config_path.read_bytes() if self.game is not None and self.config_path.exists() else b""
+        result = settings.read(data)
+        result.pop("entries")
+        return result
 
     def state(self):
         backups = []
@@ -55,32 +50,50 @@ class Application:
                 if receipt["game"] == str(self.game):
                     backups.append({"id": p.parent.name, "file": receipt["relative"], "existed": receipt["existed"]})
             except (OSError, ValueError, KeyError): pass
-        installed = self.game / "BepInEx/plugins/TK2-Mod-Studio/TK2.Customization.dll"
+        installed = self.game / "BepInEx/plugins/TK2-Mod-Studio/TK2.Customization.dll" if self.game else core.ROOT / "local/no-game"
         artifact = pack.ARTIFACT / "TK2.Customization.dll"
         current = installed.is_file() and artifact.is_file() and core.sha256(installed) == core.sha256(artifact)
-        return {"game": str(self.game), "installed": installed.is_file(), "packCurrent": current, "features": pack.FEATURES,
-                "plugin": "TK2.Customization.dll", "pluginCount": len([p for p in core.plugins(self.game) if p["enabled"]]),
-                "runtimeValidated": False, "files": pack.source_files(), "logs": self.logs,
+        return {"game": str(self.game) if self.game else "", "installed": installed.is_file(), "packCurrent": current, "features": pack.FEATURES,
+                "plugin": "TK2.Customization.dll", "pluginCount": len([p for p in core.plugins(self.game) if p["enabled"]]) if self.game else 0,
+                "setup": setup.readiness(self.game),
+                "runtimeValidated": False, "packs": pack.PACKS, "files": pack.source_files(), "logs": self.logs,
                 "backups": backups[:30], **self.config_data()}
 
     def save_settings(self, body):
-        current = self.config_data()
-        if body.get("hash") != current["configHash"]: raise ValueError("Settings changed outside the app. Reload before saving.")
-        values = pack.validate(body["values"])
-        raw = self.config_path.read_bytes().decode("utf-8-sig") if self.config_path.exists() else "# TK2 Mod Garage Pack\n"
-        entries = {e["section"] + "/" + e["key"]: e for e in current["recipes"]}
-        for compound, value in body.get("recipes", {}).items():
-            if compound not in entries: raise ValueError("Unknown recipe setting")
-            entry = entries[compound]
-            # Gameplay recipes remain runtime-gated by their declared ChangesGameplay property.
-            values[(entry["section"], entry["key"])] = core.validate_cfg_value(entry, str(value).lower() if isinstance(value, bool) else str(value))
-        changed = core.update_cfg(raw, values).encode("utf-8")
-        if self.config_path.exists() and self.config_path.read_bytes() == changed: return {"message": "Settings already saved"}
-        backup = core.backup_write(self.game, self.config_path, changed)
-        return {"message": "Settings saved. The pack reloads them while the game is running.", "backup": str(backup)}
+        for _ in range(4):
+            before = self.config_path.read_bytes() if self.config_path.exists() else b""
+            changed = settings.merge(before, body)
+            after = self.config_path.read_bytes() if self.config_path.exists() else b""
+            if after != before: continue
+            if changed == before: return {"message": "Settings already saved", **self.config_data()}
+            backup = core.backup_write(self.game, self.config_path, changed)
+            return {"message": "Settings saved", "backup": str(backup), **self.config_data()}
+        raise ValueError("The game is actively rewriting its config. Try saving again in a moment.")
 
     def action(self, action, body):
         with self.lock:
+            if action == "scan-games": return {"games": [str(p) for p in setup.discover()]}
+            if action == "browse-game":
+                from tkinter import Tk, filedialog
+                window = Tk(); window.withdraw()
+                try: chosen = filedialog.askdirectory(title="Choose the folder containing TheKarters2.exe", initialdir=str(self.game or Path.home()), parent=window)
+                finally: window.destroy()
+                if not chosen: return {"message": "Folder selection cancelled"}
+                self.game = core.validate_game(Path(chosen))
+                core.write_json(core.ROOT / "local/preferences.json", {"game": str(self.game)})
+                return {"message": "Game folder selected"}
+            if action == "select-game":
+                if body.get("discardEdits") is not True: raise ValueError("Save your pending settings before choosing another installation.")
+                self.game = core.validate_game(Path(body["path"]))
+                core.write_json(core.ROOT / "local/preferences.json", {"game": str(self.game)})
+                return {"message": "Game folder selected"}
+            if action == "install-loader":
+                if self.game is None: raise ValueError("Choose a game first")
+                return setup.install_loader(self.game)
+            if action == "open-game-folder":
+                if self.game is None: raise ValueError("Choose a game first")
+                os.startfile(self.game)
+                return {"message": "Game folder opened. Start the game yourself."}
             if action == "settings": return self.save_settings(body)
             if action == "save-source":
                 path = pack.source_path(body["file"])
@@ -93,26 +106,48 @@ class Application:
                 core.atomic_write(path, content.encode("utf-8"))
                 return {"message": "C# saved", "hash": core.sha256(path)}
             if action == "create-recipe": return {"file": pack.create_recipe(body["name"]), "message": "Recipe created. Edit, then build the pack."}
-            if action in ("build", "install"):
-                if action == "install": core.require_game_stopped()
-                built = core.build_plugin(self.game, pack.PROJECT, self.log)
+            if action in ("build", "install", "build-install"):
+                if self.game is None: raise ValueError("Choose a game folder first")
+                if action in ("install", "build-install"): core.require_game_stopped()
                 if action == "install":
+                    backup = setup.install_prebuilt(self.game)
+                    original = self.config_path.read_text(encoding="utf-8-sig") if self.config_path.exists() else pack.initial_config()
+                    seeded = pack.seed_config(original).encode("utf-8")
+                    if not self.config_path.exists() or self.config_path.read_bytes() != seeded:
+                        core.backup_write(self.game, self.config_path, seeded)
+                    return {"message": "Plugin installed. Your existing settings were preserved. Restart the game to load the updated plugin.", "backup": str(backup)}
+                built = core.build_plugin(self.game, pack.PROJECT, self.log)
+                if action == "build-install":
                     backup = core.deploy_plugin(self.game, Path(built["artifact"]))
-                    if not self.config_path.exists():
-                        core.backup_write(self.game, self.config_path, pack.initial_config().encode("utf-8"))
-                    return {"message": "One pack plugin installed. Features start disabled. Start the game yourself to test it.", "backup": str(backup)}
+                    original = self.config_path.read_text(encoding="utf-8-sig") if self.config_path.exists() else pack.initial_config()
+                    seeded = pack.seed_config(original).encode("utf-8")
+                    if not self.config_path.exists() or self.config_path.read_bytes() != seeded:
+                        core.backup_write(self.game, self.config_path, seeded)
+                    return {"message": "One pack plugin installed. Existing settings preserved; new modules start disabled. Start the game yourself to test it.", "backup": str(backup)}
                 return {"message": "Pack compiled successfully. Install it when the game is closed."}
             if action == "restore":
                 name = body["id"]
                 if not str(name).isdigit(): raise ValueError("Invalid backup")
                 restored = core.restore_backup(self.game, core.ROOT / "local/backups" / name)
                 return {"message": "Restored " + restored.name}
-            if action == "diagnose": return core.diagnose(self.game)
+            if action == "diagnose":
+                ready = setup.readiness(self.game)
+                self.log("Installation: " + ready["message"])
+                for error in ready.get("runtimeErrors", []) + ready.get("runtimeWarnings", []): self.log(error)
+                return ready
             raise ValueError("Unknown action")
 
 
 class Server(ThreadingHTTPServer):
     daemon_threads = True
+    # Windows SO_REUSEADDR permits multiple live listeners on one port; each
+    # listener has a different session token/config snapshot. Require one owner.
+    allow_reuse_address = False
+
+    def server_bind(self):
+        if os.name == "nt":
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
     def __init__(self, app, port=8765):
         super().__init__(("127.0.0.1", port), Handler)
@@ -152,7 +187,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.authorized(): return self.reply(403, {"error": "Invalid session"})
                 app = self.server.app
                 with app.lock:
-                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Garage", "pid": os.getpid(), "game": str(app.game)})
+                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Garage", "version": "0.3.0", "pid": os.getpid(), "game": str(app.game)})
                     if parsed.path == "/api/state": return self.reply(200, app.state())
                     if parsed.path == "/api/source":
                         name = parse_qs(parsed.query).get("file", [""])[0]
@@ -162,6 +197,11 @@ class Handler(BaseHTTPRequestHandler):
                         query = parse_qs(parsed.query).get("q", [""])[0]
                         count, matches = core.search_native_functions(query)
                         return self.reply(200, {"count": count, "matches": matches})
+                    if parsed.path == "/api/functions":
+                        query = parse_qs(parsed.query)
+                        return self.reply(200, symbols.search(query.get("q", [""])[0], int(query.get("offset", ["0"])[0]), query.get("recovered", ["false"])[0] == "true"))
+                    if parsed.path == "/api/function":
+                        return self.reply(200, symbols.detail(parse_qs(parsed.query).get("id", [""])[0]))
                 return self.reply(404, {"error": "Unknown API"})
             if parsed.path == "/":
                 source = (WEB / "index.html").read_text(encoding="utf-8").replace("__SESSION_TOKEN__", self.server.app.token)
@@ -192,8 +232,11 @@ class Handler(BaseHTTPRequestHandler):
             result = self.server.app.action(action, body)
             self.reply(200, result)
         except Exception as exc:
+            if isinstance(exc, PermissionError):
+                exc = ValueError("Windows denied access to the game folder. Close Garage, run the executable as administrator, then retry the installation.")
             self.server.app.log(str(exc))
-            self.reply(400, {"error": str(exc)})
+            self.reply(409 if isinstance(exc, settings.SettingsConflict) else 400,
+                       {"error": str(exc), **({"conflicts": exc.keys} if isinstance(exc, settings.SettingsConflict) else {})})
 
 
 def open_window(url):
@@ -211,7 +254,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument("--game", type=Path, default=core.DEFAULT_GAME)
+    parser.add_argument("--game", type=Path)
     args = parser.parse_args()
     session = core.ROOT / "local/garage-session.json"
     try:
@@ -219,17 +262,32 @@ def main():
     except OSError:
         # Reuse only our authenticated instance; never open an unrelated service occupying the port.
         import urllib.request
-        saved = json.loads(session.read_text())
+        if not session.is_file():
+            raise RuntimeError("Another Garage copy is already open on this port. Close it before launching this copy.")
+        saved = json.loads(session.read_text(encoding="utf-8"))
         expected = f"http://127.0.0.1:{args.port}"
         if saved["origin"] != expected: raise RuntimeError("Garage port is occupied by another service")
         request = urllib.request.Request(expected + "/api/health", headers={"X-TK2-Token": saved["token"]})
         with urllib.request.urlopen(request, timeout=3) as response:
             health = json.load(response)
             if health.get("app") != "TK2 Mod Garage": raise RuntimeError("Unexpected service on Garage port")
-            if health.get("game") != str(core.validate_game(args.game)):
+            if args.game is not None and health.get("game") != str(core.validate_game(args.game)):
                 raise RuntimeError("Close the existing Garage before switching game installations")
-        if not args.no_browser: open_window(expected)
-        return
+        if health.get("version") == "0.3.0":
+            if not args.no_browser: open_window(expected)
+            return
+        # Upgrade our old authenticated service so launching the new app cannot
+        # silently reuse the obsolete backend with its old save/gating behavior.
+        request = urllib.request.Request(expected + "/api/shutdown", data=b"{}", headers={"X-TK2-Token": saved["token"], "Content-Type": "application/json"})
+        with urllib.request.urlopen(request, timeout=3) as response: response.read()
+        import time
+        for attempt in range(40):
+            try:
+                server = Server(Application(args.game), args.port)
+                break
+            except OSError:
+                if attempt == 39: raise RuntimeError("The old Garage is still closing. Try launching again.")
+                time.sleep(.1)
     core.write_json(session, {"origin": server.origin, "token": server.app.token})
     if not args.no_browser: open_window(server.origin)
     try: server.serve_forever()

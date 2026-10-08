@@ -1,0 +1,1609 @@
+{
+  "features": [
+    {
+      "id": "FastRespawn",
+      "name": "Fast respawn",
+      "description": "Speed up Otto recovery while preserving the current respawn phases.",
+      "category": "Driving",
+      "origin": "MK legacy port",
+      "gameplay": true,
+      "settings": [
+        {
+          "key": "SpeedMultiplier",
+          "label": "Speed Multiplier",
+          "kind": "float",
+          "default": 10.0,
+          "low": 1.0,
+          "high": 30.0,
+          "description": "Multiplier of captured drone movement speed; live changes are reversible."
+        }
+      ]
+    },
+    {
+      "id": "BoostTrainer",
+      "name": "Boost trainer",
+      "description": "Vibrate the local controller when a boost reaches the selected threshold.",
+      "category": "Training",
+      "origin": "MK legacy port",
+      "gameplay": false,
+      "settings": [
+        {
+          "key": "ThresholdPercent",
+          "label": "Threshold Percent",
+          "kind": "float",
+          "default": 85.0,
+          "low": 1.0,
+          "high": 100.0,
+          "description": "Percent of the current best-boost fill time."
+        },
+        {
+          "key": "VibrationStrength",
+          "label": "Vibration Strength",
+          "kind": "float",
+          "default": 0.7,
+          "low": 0.0,
+          "high": 1.0,
+          "description": "Controller rumble strength."
+        }
+      ]
+    },
+    {
+      "id": "AlternateReserves",
+      "name": "Alternate reserves",
+      "description": "Build reserves while accelerating instead of from drift boosts.",
+      "category": "Driving",
+      "origin": "MK legacy port",
+      "gameplay": true,
+      "settings": [
+        {
+          "key": "RateMultiplier",
+          "label": "Rate Multiplier",
+          "kind": "float",
+          "default": 1.0,
+          "low": 0.0,
+          "high": 10.0,
+          "description": "Multiplier of the legacy reserve growth curve."
+        }
+      ]
+    },
+    {
+      "id": "DashAndStash",
+      "name": "Dash and stash",
+      "description": "Practice with configurable reserves and items, awarded using keyboard shortcuts.",
+      "category": "Training",
+      "origin": "MK legacy port",
+      "gameplay": true,
+      "settings": [
+        {
+          "key": "Reserves",
+          "label": "Reserves",
+          "kind": "float",
+          "default": 10.0,
+          "low": 0.0,
+          "high": 300.0,
+          "description": "Raw game reserve units; not the Prologue speed-display approximation."
+        },
+        {
+          "key": "SetReservesKey",
+          "label": "Set Reserves Key",
+          "kind": "text",
+          "default": "F7",
+          "low": null,
+          "high": null,
+          "description": "Press to assign reserves to each local player.",
+          "choices": [
+            "None",
+            "F1",
+            "F2",
+            "F3",
+            "F4",
+            "F5",
+            "F6",
+            "F7",
+            "F8",
+            "F9",
+            "F10",
+            "F11",
+            "F12",
+            "Space",
+            "LeftShift",
+            "RightShift",
+            "KeypadPlus",
+            "KeypadMinus",
+            "KeypadMultiply",
+            "KeypadDivide",
+            "Insert",
+            "Home",
+            "End",
+            "PageUp",
+            "PageDown"
+          ]
+        },
+        {
+          "key": "GiveItemKey",
+          "label": "Give Item Key",
+          "kind": "text",
+          "default": "F8",
+          "low": null,
+          "high": null,
+          "description": "Press to award the chosen item to each local player.",
+          "choices": [
+            "None",
+            "F1",
+            "F2",
+            "F3",
+            "F4",
+            "F5",
+            "F6",
+            "F7",
+            "F8",
+            "F9",
+            "F10",
+            "F11",
+            "F12",
+            "Space",
+            "LeftShift",
+            "RightShift",
+            "KeypadPlus",
+            "KeypadMinus",
+            "KeypadMultiply",
+            "KeypadDivide",
+            "Insert",
+            "Home",
+            "End",
+            "PageUp",
+            "PageDown"
+          ]
+        },
+        {
+          "key": "Item",
+          "label": "Item",
+          "kind": "text",
+          "default": "TELEPORT_DASH_12",
+          "low": null,
+          "high": null,
+          "description": "Item to award. Choose an actual weapon, not __WEAPONS_COUNT.",
+          "choices": [
+            "BAZOOKA_00",
+            "BOOST_01",
+            "HOMING_MISSLE_02",
+            "MLOT_03",
+            "PORTALGUN_04",
+            "SHOTGUN_05",
+            "TARCZA_06",
+            "TESLAGUN_07",
+            "TESLASHIELD_08",
+            "MINA_09",
+            "STAR_10",
+            "HEAL_AURA_11",
+            "TELEPORT_DASH_12",
+            "MINIGUN_13",
+            "POISONGUN_14"
+          ]
+        },
+        {
+          "key": "Ammo",
+          "label": "Ammo",
+          "kind": "int",
+          "default": 1,
+          "low": 1,
+          "high": 99,
+          "description": "Item quantity."
+        }
+      ]
+    },
+    {
+      "id": "TeleportersForTricks",
+      "name": "Teleporters for tricks",
+      "description": "Award a teleport item after landing a trick; portal use blocks the next award.",
+      "category": "Race rules",
+      "origin": "MK legacy port",
+      "gameplay": true,
+      "settings": []
+    },
+    {
+      "id": "MirrorMode",
+      "name": "Mirror mode",
+      "description": "Mirror gameplay cameras and local steering. Particle effects may still need visual adjustment.",
+      "category": "Race rules",
+      "origin": "MK legacy port",
+      "gameplay": true,
+      "settings": []
+    },
+    {
+      "id": "BobbyGang",
+      "name": "Character names",
+      "description": "Replace character-name text in the visible UI.",
+      "category": "Interface",
+      "origin": "MK legacy port",
+      "gameplay": false,
+      "settings": [
+        {
+          "key": "OriginalName",
+          "label": "Original Name",
+          "kind": "text",
+          "default": "Bubble",
+          "low": null,
+          "high": null,
+          "description": "Case-sensitive text to replace; blank does nothing."
+        },
+        {
+          "key": "ReplacementName",
+          "label": "Replacement Name",
+          "kind": "text",
+          "default": "Bobby",
+          "low": null,
+          "high": null,
+          "description": "Replacement text."
+        }
+      ]
+    },
+    {
+      "id": "ProximityVoiceLines",
+      "name": "Proximity voice lines",
+      "description": "Allow nearby offline AI racers to play their normal character voice lines.",
+      "category": "Audio",
+      "origin": "MK legacy port",
+      "gameplay": false,
+      "settings": [
+        {
+          "key": "MaximumDistance",
+          "label": "Maximum Distance",
+          "kind": "float",
+          "default": 200.0,
+          "low": 1.0,
+          "high": 1000.0,
+          "description": "Maximum world-space distance to the nearest local player."
+        }
+      ]
+    },
+    {
+      "id": "AirBrake",
+      "name": "Air brake",
+      "description": "Cancel local kart velocity while braking in the air, based on the hidden SupraMayroKratt experiment.",
+      "category": "Driving",
+      "origin": "MK legacy port",
+      "gameplay": true,
+      "settings": []
+    },
+    {
+      "id": "CNKBoostMeter",
+      "name": "CNK boost meter",
+      "description": "Show three boost-fill bars beside each local kart, inspired by the legacy CNK meter. Uses in-game Unity UI rather than an external overlay.",
+      "category": "Interface",
+      "origin": "MK legacy port",
+      "gameplay": false,
+      "settings": [
+        {
+          "key": "Scale",
+          "label": "Scale",
+          "kind": "float",
+          "default": 1.0,
+          "low": 0.25,
+          "high": 3.0,
+          "description": "Meter size multiplier at 1080p."
+        },
+        {
+          "key": "HorizontalOffset",
+          "label": "Horizontal Offset",
+          "kind": "float",
+          "default": 100.0,
+          "low": -600.0,
+          "high": 600.0,
+          "description": "Screen-pixel offset to the right of the projected kart."
+        },
+        {
+          "key": "VerticalOffset",
+          "label": "Vertical Offset",
+          "kind": "float",
+          "default": 100.0,
+          "low": -600.0,
+          "high": 600.0,
+          "description": "Screen-pixel offset above the projected kart."
+        },
+        {
+          "key": "OrangeThreshold",
+          "label": "Orange Threshold",
+          "kind": "float",
+          "default": 0.8,
+          "low": 0.0,
+          "high": 1.0,
+          "description": "Fill fraction for the third color."
+        },
+        {
+          "key": "RedThreshold",
+          "label": "Red Threshold",
+          "kind": "float",
+          "default": 0.95,
+          "low": 0.0,
+          "high": 1.0,
+          "description": "Fill fraction for the fourth color."
+        },
+        {
+          "key": "BelowMinimumColor",
+          "label": "Below Minimum Color",
+          "kind": "text",
+          "default": "00FF00",
+          "low": null,
+          "high": null,
+          "description": "RGB hex color before minimum boost fill."
+        },
+        {
+          "key": "ValidColor",
+          "label": "Valid Color",
+          "kind": "text",
+          "default": "FFD800",
+          "low": null,
+          "high": null,
+          "description": "RGB hex color inside the valid boost window."
+        },
+        {
+          "key": "HighColor",
+          "label": "High Color",
+          "kind": "text",
+          "default": "FF6A00",
+          "low": null,
+          "high": null,
+          "description": "RGB hex color after OrangeThreshold."
+        },
+        {
+          "key": "PerfectColor",
+          "label": "Perfect Color",
+          "kind": "text",
+          "default": "FF0000",
+          "low": null,
+          "high": null,
+          "description": "RGB hex color after RedThreshold."
+        }
+      ]
+    },
+    {
+      "id": "KartParameters",
+      "name": "Physics parameters",
+      "description": "Override selected kart physics fields. Each individual field has its own override switch.",
+      "category": "Driving",
+      "origin": "MK legacy port",
+      "gameplay": true,
+      "settings": [
+        {
+          "key": "OverrideMass",
+          "label": "Override Mass",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Mass. Turn off to restore the captured game value."
+        },
+        {
+          "key": "Mass",
+          "label": "Mass",
+          "kind": "float",
+          "default": 15.0,
+          "low": 0.01,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMass"
+        },
+        {
+          "key": "OverrideJumpStrength",
+          "label": "Override Jump Strength",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Jump Strength. Turn off to restore the captured game value."
+        },
+        {
+          "key": "JumpStrength",
+          "label": "Jump Strength",
+          "kind": "float",
+          "default": 21.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideJumpStrength"
+        },
+        {
+          "key": "OverrideMaxAccelForward",
+          "label": "Override Max Accel Forward",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Max Accel Forward. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MaxAccelForward",
+          "label": "Max Accel Forward",
+          "kind": "float",
+          "default": 81.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMaxAccelForward"
+        },
+        {
+          "key": "OverrideMaxAccelReverse",
+          "label": "Override Max Accel Reverse",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Max Accel Reverse. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MaxAccelReverse",
+          "label": "Max Accel Reverse",
+          "kind": "float",
+          "default": 25.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMaxAccelReverse"
+        },
+        {
+          "key": "OverrideMaxSpeedAdditionFromSlopes",
+          "label": "Override Max Speed Addition From Slopes",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Max Speed Addition From Slopes. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MaxSpeedAdditionFromSlopes",
+          "label": "Max Speed Addition From Slopes",
+          "kind": "float",
+          "default": 30.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMaxSpeedAdditionFromSlopes"
+        },
+        {
+          "key": "OverrideMaxSpeedToSlopeNoInputAccel",
+          "label": "Override Max Speed To Slope No Input Accel",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Max Speed To Slope No Input Accel. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MaxSpeedToSlopeNoInputAccel",
+          "label": "Max Speed To Slope No Input Accel",
+          "kind": "float",
+          "default": 20.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMaxSpeedToSlopeNoInputAccel"
+        },
+        {
+          "key": "OverrideMaxSpeedFromSlopeNoInputAccel",
+          "label": "Override Max Speed From Slope No Input Accel",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Max Speed From Slope No Input Accel. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MaxSpeedFromSlopeNoInputAccel",
+          "label": "Max Speed From Slope No Input Accel",
+          "kind": "float",
+          "default": 45.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMaxSpeedFromSlopeNoInputAccel"
+        },
+        {
+          "key": "OverrideMaxVerticalVelocity",
+          "label": "Override Max Vertical Velocity",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Max Vertical Velocity. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MaxVerticalVelocity",
+          "label": "Max Vertical Velocity",
+          "kind": "float",
+          "default": 60.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMaxVerticalVelocity"
+        },
+        {
+          "key": "OverrideOnGroundAccelerationFactor",
+          "label": "Override On Ground Acceleration Factor",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for On Ground Acceleration Factor. Turn off to restore the captured game value."
+        },
+        {
+          "key": "OnGroundAccelerationFactor",
+          "label": "On Ground Acceleration Factor",
+          "kind": "float",
+          "default": 91.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideOnGroundAccelerationFactor"
+        },
+        {
+          "key": "OverrideInAirAccelerationFactor",
+          "label": "Override In Air Acceleration Factor",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for In Air Acceleration Factor. Turn off to restore the captured game value."
+        },
+        {
+          "key": "InAirAccelerationFactor",
+          "label": "In Air Acceleration Factor",
+          "kind": "float",
+          "default": 100.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideInAirAccelerationFactor"
+        },
+        {
+          "key": "OverrideAccelerationBackPercent",
+          "label": "Override Acceleration Back Percent",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Acceleration Back Percent. Turn off to restore the captured game value."
+        },
+        {
+          "key": "AccelerationBackPercent",
+          "label": "Acceleration Back Percent",
+          "kind": "float",
+          "default": 0.7,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideAccelerationBackPercent"
+        },
+        {
+          "key": "OverrideFromSlopeAccelerationForceFactor",
+          "label": "Override From Slope Acceleration Force Factor",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for From Slope Acceleration Force Factor. Turn off to restore the captured game value."
+        },
+        {
+          "key": "FromSlopeAccelerationForceFactor",
+          "label": "From Slope Acceleration Force Factor",
+          "kind": "float",
+          "default": 80.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideFromSlopeAccelerationForceFactor"
+        },
+        {
+          "key": "OverrideToSlopeBackForceFactor",
+          "label": "Override To Slope Back Force Factor",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for To Slope Back Force Factor. Turn off to restore the captured game value."
+        },
+        {
+          "key": "ToSlopeBackForceFactor",
+          "label": "To Slope Back Force Factor",
+          "kind": "float",
+          "default": 80.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideToSlopeBackForceFactor"
+        },
+        {
+          "key": "OverrideGroundFrictionFactor",
+          "label": "Override Ground Friction Factor",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Ground Friction Factor. Turn off to restore the captured game value."
+        },
+        {
+          "key": "GroundFrictionFactor",
+          "label": "Ground Friction Factor",
+          "kind": "float",
+          "default": 0.008,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideGroundFrictionFactor"
+        },
+        {
+          "key": "OverrideMinimumDragVelocity",
+          "label": "Override Minimum Drag Velocity",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Minimum Drag Velocity. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MinimumDragVelocity",
+          "label": "Minimum Drag Velocity",
+          "kind": "float",
+          "default": 15.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMinimumDragVelocity"
+        },
+        {
+          "key": "OverrideDrivingOnGroundSteerFactor",
+          "label": "Override Driving On Ground Steer Factor",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Driving On Ground Steer Factor. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DrivingOnGroundSteerFactor",
+          "label": "Driving On Ground Steer Factor",
+          "kind": "float",
+          "default": 90.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDrivingOnGroundSteerFactor"
+        },
+        {
+          "key": "OverrideDrivingInAirSteerFactor",
+          "label": "Override Driving In Air Steer Factor",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Driving In Air Steer Factor. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DrivingInAirSteerFactor",
+          "label": "Driving In Air Steer Factor",
+          "kind": "float",
+          "default": 90.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDrivingInAirSteerFactor"
+        },
+        {
+          "key": "OverrideDriftingNeutralSteerFactor",
+          "label": "Override Drifting Neutral Steer Factor",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Drifting Neutral Steer Factor. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DriftingNeutralSteerFactor",
+          "label": "Drifting Neutral Steer Factor",
+          "kind": "float",
+          "default": -90.0,
+          "low": -1000,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDriftingNeutralSteerFactor"
+        },
+        {
+          "key": "OverrideDriftingMaxSteerAddFactor",
+          "label": "Override Drifting Max Steer Add Factor",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Drifting Max Steer Add Factor. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DriftingMaxSteerAddFactor",
+          "label": "Drifting Max Steer Add Factor",
+          "kind": "float",
+          "default": -90.0,
+          "low": -1000,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDriftingMaxSteerAddFactor"
+        },
+        {
+          "key": "OverrideDriftingMinCounterSteerFactor",
+          "label": "Override Drifting Min Counter Steer Factor",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Drifting Min Counter Steer Factor. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DriftingMinCounterSteerFactor",
+          "label": "Drifting Min Counter Steer Factor",
+          "kind": "float",
+          "default": -90.0,
+          "low": -1000,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDriftingMinCounterSteerFactor"
+        },
+        {
+          "key": "OverrideDrivingSteerSideVelocityMin",
+          "label": "Override Driving Steer Side Velocity Min",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Driving Steer Side Velocity Min. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DrivingSteerSideVelocityMin",
+          "label": "Driving Steer Side Velocity Min",
+          "kind": "float",
+          "default": 2.2,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDrivingSteerSideVelocityMin"
+        },
+        {
+          "key": "OverrideDrivingSteerSideVelocityMax",
+          "label": "Override Driving Steer Side Velocity Max",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Driving Steer Side Velocity Max. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DrivingSteerSideVelocityMax",
+          "label": "Driving Steer Side Velocity Max",
+          "kind": "float",
+          "default": 2.2,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDrivingSteerSideVelocityMax"
+        },
+        {
+          "key": "OverrideReachMaxSteerInXSeconds",
+          "label": "Override Reach Max Steer In XSeconds",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Reach Max Steer In XSeconds. Turn off to restore the captured game value."
+        },
+        {
+          "key": "ReachMaxSteerInXSeconds",
+          "label": "Reach Max Steer In XSeconds",
+          "kind": "float",
+          "default": 1.0,
+          "low": 0.01,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideReachMaxSteerInXSeconds"
+        },
+        {
+          "key": "OverrideSteerMinMaxTimePow",
+          "label": "Override Steer Min Max Time Pow",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Steer Min Max Time Pow. Turn off to restore the captured game value."
+        },
+        {
+          "key": "SteerMinMaxTimePow",
+          "label": "Steer Min Max Time Pow",
+          "kind": "float",
+          "default": 1.25,
+          "low": 0.01,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideSteerMinMaxTimePow"
+        },
+        {
+          "key": "OverrideDrivingSteerSideVelocityInDriftOrAir",
+          "label": "Override Driving Steer Side Velocity In Drift Or Air",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Driving Steer Side Velocity In Drift Or Air. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DrivingSteerSideVelocityInDriftOrAir",
+          "label": "Driving Steer Side Velocity In Drift Or Air",
+          "kind": "float",
+          "default": 3.3,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDrivingSteerSideVelocityInDriftOrAir"
+        },
+        {
+          "key": "OverrideDriftingNeutralSideVelocity",
+          "label": "Override Drifting Neutral Side Velocity",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Drifting Neutral Side Velocity. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DriftingNeutralSideVelocity",
+          "label": "Drifting Neutral Side Velocity",
+          "kind": "float",
+          "default": 3.3,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDriftingNeutralSideVelocity"
+        },
+        {
+          "key": "OverrideDriftingMaxSteerSideVelocity",
+          "label": "Override Drifting Max Steer Side Velocity",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Drifting Max Steer Side Velocity. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DriftingMaxSteerSideVelocity",
+          "label": "Drifting Max Steer Side Velocity",
+          "kind": "float",
+          "default": 3.7,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDriftingMaxSteerSideVelocity"
+        },
+        {
+          "key": "OverrideDriftingMinCounterSideVelocity",
+          "label": "Override Drifting Min Counter Side Velocity",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Drifting Min Counter Side Velocity. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DriftingMinCounterSideVelocity",
+          "label": "Drifting Min Counter Side Velocity",
+          "kind": "float",
+          "default": 4.3,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDriftingMinCounterSideVelocity"
+        },
+        {
+          "key": "OverrideInAirMinToMaxSideVelocityInXSeconds",
+          "label": "Override In Air Min To Max Side Velocity In XSeconds",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for In Air Min To Max Side Velocity In XSeconds. Turn off to restore the captured game value."
+        },
+        {
+          "key": "InAirMinToMaxSideVelocityInXSeconds",
+          "label": "In Air Min To Max Side Velocity In XSeconds",
+          "kind": "float",
+          "default": 0.8,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideInAirMinToMaxSideVelocityInXSeconds"
+        },
+        {
+          "key": "OverrideAirBreakingSteerVelocity",
+          "label": "Override Air Breaking Steer Velocity",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Air Breaking Steer Velocity. Turn off to restore the captured game value."
+        },
+        {
+          "key": "AirBreakingSteerVelocity",
+          "label": "Air Breaking Steer Velocity",
+          "kind": "float",
+          "default": 5.5,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideAirBreakingSteerVelocity"
+        },
+        {
+          "key": "OverrideBreakingDriftingSteerVelocity",
+          "label": "Override Breaking Drifting Steer Velocity",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Breaking Drifting Steer Velocity. Turn off to restore the captured game value."
+        },
+        {
+          "key": "BreakingDriftingSteerVelocity",
+          "label": "Breaking Drifting Steer Velocity",
+          "kind": "float",
+          "default": 6.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideBreakingDriftingSteerVelocity"
+        },
+        {
+          "key": "OverrideBreakingInputZeroVelocityLerpSpeed",
+          "label": "Override Breaking Input Zero Velocity Lerp Speed",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Breaking Input Zero Velocity Lerp Speed. Turn off to restore the captured game value."
+        },
+        {
+          "key": "BreakingInputZeroVelocityLerpSpeed",
+          "label": "Breaking Input Zero Velocity Lerp Speed",
+          "kind": "float",
+          "default": 3.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideBreakingInputZeroVelocityLerpSpeed"
+        },
+        {
+          "key": "OverrideMinSpeedForDrifting",
+          "label": "Override Min Speed For Drifting",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Min Speed For Drifting. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MinSpeedForDrifting",
+          "label": "Min Speed For Drifting",
+          "kind": "float",
+          "default": 15.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMinSpeedForDrifting"
+        },
+        {
+          "key": "OverrideInstantBoostAddFullInSeconds",
+          "label": "Override Instant Boost Add Full In Seconds",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Instant Boost Add Full In Seconds. Turn off to restore the captured game value."
+        },
+        {
+          "key": "InstantBoostAddFullInSeconds",
+          "label": "Instant Boost Add Full In Seconds",
+          "kind": "float",
+          "default": 0.25,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideInstantBoostAddFullInSeconds"
+        },
+        {
+          "key": "OverrideInstantBoostAddFullInSecondsRemoveMultiplier",
+          "label": "Override Instant Boost Add Full In Seconds Remove Multiplier",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Instant Boost Add Full In Seconds Remove Multiplier. Turn off to restore the captured game value."
+        },
+        {
+          "key": "InstantBoostAddFullInSecondsRemoveMultiplier",
+          "label": "Instant Boost Add Full In Seconds Remove Multiplier",
+          "kind": "float",
+          "default": 1.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideInstantBoostAddFullInSecondsRemoveMultiplier"
+        }
+      ]
+    },
+    {
+      "id": "BoostParameters",
+      "name": "Boost parameters",
+      "description": "Override selected boost physics fields. Each individual field has its own override switch.",
+      "category": "Driving",
+      "origin": "MK legacy port",
+      "gameplay": true,
+      "settings": [
+        {
+          "key": "OverrideMaxTimeForBestBoostXSeconds",
+          "label": "Override Max Time For Best Boost XSeconds",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Max Time For Best Boost XSeconds. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MaxTimeForBestBoostXSeconds",
+          "label": "Max Time For Best Boost XSeconds",
+          "kind": "float",
+          "default": 1.0,
+          "low": 0.01,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMaxTimeForBestBoostXSeconds"
+        },
+        {
+          "key": "OverrideMinTimeForBoostXSeconds",
+          "label": "Override Min Time For Boost XSeconds",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Min Time For Boost XSeconds. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MinTimeForBoostXSeconds",
+          "label": "Min Time For Boost XSeconds",
+          "kind": "float",
+          "default": 0.5,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMinTimeForBoostXSeconds"
+        },
+        {
+          "key": "OverrideReservesValueForMaxExtraSpeed",
+          "label": "Override Reserves Value For Max Extra Speed",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Reserves Value For Max Extra Speed. Turn off to restore the captured game value."
+        },
+        {
+          "key": "ReservesValueForMaxExtraSpeed",
+          "label": "Reserves Value For Max Extra Speed",
+          "kind": "float",
+          "default": 5.0,
+          "low": 0.01,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideReservesValueForMaxExtraSpeed"
+        },
+        {
+          "key": "OverrideMaxSpeedIncreaseForBoostPad",
+          "label": "Override Max Speed Increase For Boost Pad",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Max Speed Increase For Boost Pad. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MaxSpeedIncreaseForBoostPad",
+          "label": "Max Speed Increase For Boost Pad",
+          "kind": "float",
+          "default": 20.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMaxSpeedIncreaseForBoostPad"
+        },
+        {
+          "key": "OverrideBoostLengthFor1",
+          "label": "Override Boost Length For1",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Boost Length For1. Turn off to restore the captured game value."
+        },
+        {
+          "key": "BoostLengthFor1",
+          "label": "Boost Length For1",
+          "kind": "float",
+          "default": 1.45,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideBoostLengthFor1"
+        },
+        {
+          "key": "OverrideBoostLengthFor2",
+          "label": "Override Boost Length For2",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Boost Length For2. Turn off to restore the captured game value."
+        },
+        {
+          "key": "BoostLengthFor2",
+          "label": "Boost Length For2",
+          "kind": "float",
+          "default": 1.45,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideBoostLengthFor2"
+        },
+        {
+          "key": "OverrideBoostLengthFor3",
+          "label": "Override Boost Length For3",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Boost Length For3. Turn off to restore the captured game value."
+        },
+        {
+          "key": "BoostLengthFor3",
+          "label": "Boost Length For3",
+          "kind": "float",
+          "default": 1.45,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideBoostLengthFor3"
+        },
+        {
+          "key": "OverrideBoostInstantVelocityFor1",
+          "label": "Override Boost Instant Velocity For1",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Boost Instant Velocity For1. Turn off to restore the captured game value."
+        },
+        {
+          "key": "BoostInstantVelocityFor1",
+          "label": "Boost Instant Velocity For1",
+          "kind": "float",
+          "default": 15.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideBoostInstantVelocityFor1"
+        },
+        {
+          "key": "OverrideBoostInstantVelocityFor2",
+          "label": "Override Boost Instant Velocity For2",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Boost Instant Velocity For2. Turn off to restore the captured game value."
+        },
+        {
+          "key": "BoostInstantVelocityFor2",
+          "label": "Boost Instant Velocity For2",
+          "kind": "float",
+          "default": 25.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideBoostInstantVelocityFor2"
+        },
+        {
+          "key": "OverrideBoostInstantVelocityFor3",
+          "label": "Override Boost Instant Velocity For3",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Boost Instant Velocity For3. Turn off to restore the captured game value."
+        },
+        {
+          "key": "BoostInstantVelocityFor3",
+          "label": "Boost Instant Velocity For3",
+          "kind": "float",
+          "default": 35.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideBoostInstantVelocityFor3"
+        },
+        {
+          "key": "OverrideTripleBoostSpeedReservesLoweringSpeed",
+          "label": "Override Triple Boost Speed Reserves Lowering Speed",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Triple Boost Speed Reserves Lowering Speed. Turn off to restore the captured game value."
+        },
+        {
+          "key": "TripleBoostSpeedReservesLoweringSpeed",
+          "label": "Triple Boost Speed Reserves Lowering Speed",
+          "kind": "float",
+          "default": 0.1,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideTripleBoostSpeedReservesLoweringSpeed"
+        },
+        {
+          "key": "OverrideMaxSpeedIncreaseForTripleBoostReserves",
+          "label": "Override Max Speed Increase For Triple Boost Reserves",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Max Speed Increase For Triple Boost Reserves. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MaxSpeedIncreaseForTripleBoostReserves",
+          "label": "Max Speed Increase For Triple Boost Reserves",
+          "kind": "float",
+          "default": 11.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMaxSpeedIncreaseForTripleBoostReserves"
+        },
+        {
+          "key": "OverrideTripleBoostSpeedIncrease1",
+          "label": "Override Triple Boost Speed Increase1",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Triple Boost Speed Increase1. Turn off to restore the captured game value."
+        },
+        {
+          "key": "TripleBoostSpeedIncrease1",
+          "label": "Triple Boost Speed Increase1",
+          "kind": "float",
+          "default": 0.4,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideTripleBoostSpeedIncrease1"
+        },
+        {
+          "key": "OverrideTripleBoostSpeedIncrease2",
+          "label": "Override Triple Boost Speed Increase2",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Triple Boost Speed Increase2. Turn off to restore the captured game value."
+        },
+        {
+          "key": "TripleBoostSpeedIncrease2",
+          "label": "Triple Boost Speed Increase2",
+          "kind": "float",
+          "default": 0.4,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideTripleBoostSpeedIncrease2"
+        },
+        {
+          "key": "OverrideTripleBoostSpeedIncrease3",
+          "label": "Override Triple Boost Speed Increase3",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Triple Boost Speed Increase3. Turn off to restore the captured game value."
+        },
+        {
+          "key": "TripleBoostSpeedIncrease3",
+          "label": "Triple Boost Speed Increase3",
+          "kind": "float",
+          "default": 0.4,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideTripleBoostSpeedIncrease3"
+        },
+        {
+          "key": "OverrideDefaultBoostPadInstantVelocity",
+          "label": "Override Default Boost Pad Instant Velocity",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Default Boost Pad Instant Velocity. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DefaultBoostPadInstantVelocity",
+          "label": "Default Boost Pad Instant Velocity",
+          "kind": "float",
+          "default": 50.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDefaultBoostPadInstantVelocity"
+        },
+        {
+          "key": "OverrideDefaultBoostPadLengthXSeconds",
+          "label": "Override Default Boost Pad Length XSeconds",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Default Boost Pad Length XSeconds. Turn off to restore the captured game value."
+        },
+        {
+          "key": "DefaultBoostPadLengthXSeconds",
+          "label": "Default Boost Pad Length XSeconds",
+          "kind": "float",
+          "default": 2.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideDefaultBoostPadLengthXSeconds"
+        },
+        {
+          "key": "OverrideBoostPadAccelerationMultiplier",
+          "label": "Override Boost Pad Acceleration Multiplier",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Boost Pad Acceleration Multiplier. Turn off to restore the captured game value."
+        },
+        {
+          "key": "BoostPadAccelerationMultiplier",
+          "label": "Boost Pad Acceleration Multiplier",
+          "kind": "float",
+          "default": 1.25,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideBoostPadAccelerationMultiplier"
+        },
+        {
+          "key": "OverrideBoostPadForcedMinimumSpeed",
+          "label": "Override Boost Pad Forced Minimum Speed",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Boost Pad Forced Minimum Speed. Turn off to restore the captured game value."
+        },
+        {
+          "key": "BoostPadForcedMinimumSpeed",
+          "label": "Boost Pad Forced Minimum Speed",
+          "kind": "float",
+          "default": 100.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideBoostPadForcedMinimumSpeed"
+        },
+        {
+          "key": "OverrideBoostInstantVelocityOnLanding",
+          "label": "Override Boost Instant Velocity On Landing",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Boost Instant Velocity On Landing. Turn off to restore the captured game value."
+        },
+        {
+          "key": "BoostInstantVelocityOnLanding",
+          "label": "Boost Instant Velocity On Landing",
+          "kind": "float",
+          "default": 1.2,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideBoostInstantVelocityOnLanding"
+        },
+        {
+          "key": "OverrideMaxTimeInAirForMaxBoost",
+          "label": "Override Max Time In Air For Max Boost",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Max Time In Air For Max Boost. Turn off to restore the captured game value."
+        },
+        {
+          "key": "MaxTimeInAirForMaxBoost",
+          "label": "Max Time In Air For Max Boost",
+          "kind": "float",
+          "default": 4.0,
+          "low": 0.01,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideMaxTimeInAirForMaxBoost"
+        },
+        {
+          "key": "OverrideContinuousBoostMaxSpeedAdd",
+          "label": "Override Continuous Boost Max Speed Add",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Use the custom value for Continuous Boost Max Speed Add. Turn off to restore the captured game value."
+        },
+        {
+          "key": "ContinuousBoostMaxSpeedAdd",
+          "label": "Continuous Boost Max Speed Add",
+          "kind": "float",
+          "default": 5.0,
+          "low": 0,
+          "high": 1000,
+          "description": "Legacy preset; applied only when its override switch is on.",
+          "requires": "OverrideContinuousBoostMaxSpeedAdd"
+        }
+      ]
+    },
+    {
+      "id": "SaveStates",
+      "name": "Practice snapshots",
+      "description": "Save and reload local kart practice snapshots within the same scene. Does not rewind AI racers or running item-effect coroutines.",
+      "category": "Training",
+      "origin": "MK legacy port",
+      "gameplay": true,
+      "settings": [
+        {
+          "key": "SaveKey",
+          "label": "Save Key",
+          "kind": "text",
+          "default": "F5",
+          "low": null,
+          "high": null,
+          "description": "Keyboard shortcut to capture local player state.",
+          "choices": [
+            "None",
+            "F1",
+            "F2",
+            "F3",
+            "F4",
+            "F5",
+            "F6",
+            "F7",
+            "F8",
+            "F9",
+            "F10",
+            "F11",
+            "F12",
+            "Space",
+            "LeftShift",
+            "RightShift",
+            "KeypadPlus",
+            "KeypadMinus",
+            "KeypadMultiply",
+            "KeypadDivide",
+            "Insert",
+            "Home",
+            "End",
+            "PageUp",
+            "PageDown"
+          ]
+        },
+        {
+          "key": "LoadKey",
+          "label": "Load Key",
+          "kind": "text",
+          "default": "F6",
+          "low": null,
+          "high": null,
+          "description": "Keyboard shortcut to restore the last snapshot.",
+          "choices": [
+            "None",
+            "F1",
+            "F2",
+            "F3",
+            "F4",
+            "F5",
+            "F6",
+            "F7",
+            "F8",
+            "F9",
+            "F10",
+            "F11",
+            "F12",
+            "Space",
+            "LeftShift",
+            "RightShift",
+            "KeypadPlus",
+            "KeypadMinus",
+            "KeypadMultiply",
+            "KeypadDivide",
+            "Insert",
+            "Home",
+            "End",
+            "PageUp",
+            "PageDown"
+          ]
+        },
+        {
+          "key": "ControllerShortcuts",
+          "label": "Controller Shortcuts",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Also use named Rewired controller actions."
+        },
+        {
+          "key": "SaveAction",
+          "label": "Save Action",
+          "kind": "text",
+          "default": "InGamePlayersList",
+          "low": null,
+          "high": null,
+          "description": "Rewired action name for saving."
+        },
+        {
+          "key": "LoadAction",
+          "label": "Load Action",
+          "kind": "text",
+          "default": "MenuTriangle",
+          "low": null,
+          "high": null,
+          "description": "Rewired action name for loading."
+        },
+        {
+          "key": "HoldToLoad",
+          "label": "Hold To Load",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Continuously restore while the load shortcut is held."
+        },
+        {
+          "key": "RestoreRaceProgress",
+          "label": "Restore Race Progress",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Experimental: also restore lap count, partial times and checkpoint flags. Respawn route history is not rewound."
+        },
+        {
+          "key": "RestoreRaceTime",
+          "label": "Restore Race Time",
+          "kind": "bool",
+          "default": false,
+          "low": null,
+          "high": null,
+          "description": "Experimental: rewind the shared race clock; other racers are not rewound."
+        }
+      ]
+    },
+    {
+      "id": "ReverseRace",
+      "name": "Reverse race",
+      "description": "Experimental reverse finish-line counting and reversed local starting direction. Current checkpoint/respawn route behavior needs in-game validation.",
+      "category": "Race rules",
+      "origin": "MK legacy port",
+      "gameplay": true,
+      "settings": []
+    }
+  ]
+}

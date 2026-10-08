@@ -1,0 +1,75 @@
+"""Merge edited settings by value, preserving BepInEx metadata and unrelated edits."""
+import hashlib
+import math
+from . import core, pack
+
+
+class SettingsConflict(ValueError):
+    def __init__(self, keys):
+        self.keys = keys
+        super().__init__("These settings were also changed elsewhere: " + ", ".join(keys) + ". Reload those values before saving.")
+
+
+def normalized(value, kind):
+    if kind in ("bool", "Boolean"):
+        return str(value).strip().lower() in ("true", "1")
+    if kind in ("float", "int", "Single", "Double", "Decimal", "Int32", "Int64", "UInt32", "UInt64", "Int16", "UInt16", "Byte", "SByte"):
+        try:
+            number = float(value)
+            return number if math.isfinite(number) else str(value)
+        except (ValueError, TypeError): return str(value)
+    return str(value)
+
+
+def read(data):
+    text = data.decode("utf-8-sig")
+    entries = core.parse_cfg_settings(text)
+    values = pack.defaults()
+    known = pack.schema()
+    for entry in entries:
+        compound = entry["section"] + "/" + entry["key"]
+        schema = known.get((entry["section"], entry["key"]))
+        if schema:
+            values[compound] = normalized(entry["value"], schema[0])
+    return {"settings": values, "configHash": hashlib.sha256(data).hexdigest(),
+            "recipes": [e for e in entries if e["section"].startswith("Recipe.")],
+            "extraSettings": [e for e in entries if (e["section"], e["key"]) not in known and not e["section"].startswith("Recipe.")],
+            "entries": entries}
+
+
+def merge(data, body):
+    current = read(data)
+    dirty = body.get("values", {})
+    recipe_dirty = body.get("recipes", {})
+    extra_dirty = body.get("extraSettings", {})
+    if not all(isinstance(v, dict) for v in (dirty, recipe_dirty, extra_dirty)):
+        raise ValueError("Expected edited setting objects")
+    # Older clients without value baselines may only save against identical bytes.
+    if body.get("hash") != current["configHash"] and not any(k in body for k in ("baseValues", "baseRecipes", "baseExtraSettings")):
+        raise SettingsConflict(list(dirty) + list(recipe_dirty) + list(extra_dirty))
+    updates = pack.validate(dirty)
+    definitions = {e["section"] + "/" + e["key"]: e for e in current["entries"]}
+    kinds = {s + "/" + k: definition[0] for (s, k), definition in pack.schema().items()}
+    current_values = dict(current["settings"])
+    for compound, entry in definitions.items():
+        kinds.setdefault(compound, entry["type"])
+        current_values.setdefault(compound, normalized(entry["value"], entry["type"]))
+    for collection in (recipe_dirty, extra_dirty):
+        for compound, value in collection.items():
+            if compound not in definitions or compound in current["settings"]:
+                raise ValueError("Unknown additional setting: " + compound)
+            entry = definitions[compound]
+            updates[(entry["section"], entry["key"])] = core.validate_cfg_value(entry, str(value).lower() if isinstance(value, bool) else str(value))
+    baselines = {**body.get("baseValues", {}), **body.get("baseRecipes", {}), **body.get("baseExtraSettings", {})}
+    conflicts = []
+    for (section, key), requested in updates.items():
+        compound = section + "/" + key
+        actual = normalized(current_values.get(compound), kinds[compound])
+        desired = normalized(requested, kinds[compound])
+        if compound in baselines:
+            baseline = normalized(baselines[compound], kinds[compound])
+            if actual != baseline and actual != desired: conflicts.append(compound)
+        elif body.get("hash") != current["configHash"]:
+            conflicts.append(compound)
+    if conflicts: raise SettingsConflict(conflicts)
+    return core.update_cfg(data.decode("utf-8-sig") or "# TK2 Mod Garage Pack\n", updates).encode("utf-8")

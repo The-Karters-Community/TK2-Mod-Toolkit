@@ -28,11 +28,11 @@ Create dump.cs catalog (assembly, namespace, class, members, RVA), selected Ghid
 
 ### M2 — Usable authoring and management GUI
 
-Provide game path selection, installation diagnostics, plugin inventory, enable/disable with dependency caveat, backup/restore of overwritten files, C# editing, build and managed deployment, existing config editing, structured starter controls, and log viewer. Gate: test path containment, config round trips, deployment receipt/hash checks, rollback and no accidental game execution. The default GUI is now a modern loopback web app in an Edge app window with browser fallback, light/dark themes, game artwork and a player-first layout. The earlier tkinter analysis interface remains explicitly accessible. Packaged Windows distribution and richer code completion remain later milestones.
+Provide game path selection, installation diagnostics, plugin inventory, enable/disable with dependency caveat, backup/restore of overwritten files, C# editing, build and managed deployment, existing config editing, structured starter controls, and log viewer. Gate: test path containment, config round trips, deployment receipt/hash checks, rollback and no accidental game execution. The default GUI is now a modern loopback web app in an Edge app window with browser fallback, light/dark themes, game artwork and a player-first layout. The earlier tkinter analysis interface remains explicitly accessible. A bundled Windows player executable is built; richer code completion remains planned.
 
 ### M3 — Starter customization plugin
 
-Independent toggles for HUD scale, master volume, camera field of view, and an offline fast-fall experiment. Defaults preserve game behavior. Probe game signatures; use leaderboard and online-mode guards for physics. Reload config on Unity main thread; restore captured presentation values when disabled. Gate: compile against current local .NET 6 runtime and interop, then manual game validation for every feature and transition. Compilation alone is not runtime verification.
+Independent toggles for HUD scale, master volume, camera field of view, and an offline fast-fall experiment. Defaults preserve game behavior. Probe game signatures; use online-mode and supported-build guards for physics; the requested test build retains normal leaderboard uploads. Reload config on Unity main thread; restore captured presentation values when disabled. Gate: compile against current local .NET 6 runtime and interop, then manual game validation for every feature and transition. Compilation alone is not runtime verification.
 
 ### M4 — Stable SDK facade and update migration
 
@@ -52,28 +52,28 @@ Named profiles, mod dependency DAG, loader compatibility, package import/export,
 
 ## Manual test sequence
 
-First boot with presentation features disabled; check startup log. Toggle UI/audio/FOV individually in menu and race; verify disable and scene transition restoration. For physics use an offline test race with leaderboard upload protection established; verify local-player-only behavior, controller input and pause state, then online transitions (feature must stop). Test invalid configs, updated hashes, failed target probes and competing mods. Do not label a mod working until these observations are recorded.
+First boot with presentation features disabled; check startup log. Toggle UI/audio/FOV individually in menu and race; verify disable and scene transition restoration. For physics use an offline test race under the requested no-upload-blocker policy; verify local-player-only behavior, controller input and pause state, then online transitions (feature must stop). Test invalid configs, updated hashes, failed target probes and competing mods. Do not label a mod working until these observations are recorded.
 
 ## Next work priorities
 
-Finish local analysis and executable first slice before expanding. Then manual runtime verification, overload fix for NightmareAIs when its source is available/recovered, stable adapters, live bridge, and visual recipes. Full-game reconstruction is a separate long reverse-engineering effort; prioritize gameplay systems that unblock actual mods.
+Finish local analysis and executable first slice before expanding. Then manual runtime verification, runtime validation of the recovered Nightmare AI port and its exact damage overloads, stable adapters, live bridge, and visual recipes. Full-game reconstruction is a separate long reverse-engineering effort; prioritize gameplay systems that unblock actual mods.
 
 ## Current delivery status
 
 - M0 evidence and Git bootstrap: delivered.
 - M1 metadata/native index, targeted pseudocode, address-specific export and managed recovery: delivered; full-game semantic reconstruction remains ongoing research.
-- M2 modern player GUI, light/dark themes, artwork, authoring, single-pack installation and backup workflows: implemented; API and offline frontend-state tests pass. Browser permission rejection prevented visible layout verification. Distribution packaging remains.
-- M3 ten built-in modules and FrameLimiter recipe: compiled and installed as one DLL, with all toggles off. Five gameplay modules remain runtime-locked pending leaderboard acceptance. No in-game compatibility certification is claimed.
-- M4 begun: seven native methods have editable semantic C# implementations, adapters, provenance and behavior tests. Broad facade coverage and update migration UI remain planned.
+- M2 modern player GUI, light/dark themes, artwork, authoring, single-pack installation and backup workflows: implemented; API and offline frontend-state tests pass. Browser permission rejection prevented visible layout verification. A self-contained Windows player package is built; another-machine/runtime acceptance remains.
+- M3 26 modules plus FrameLimiter: compiled as one DLL. Existing user settings are preserved, new modules start off. Gameplay controls can be enabled for supported local/offline testing with no leaderboard blocker. No in-game compatibility certification is claimed.
+- M4 begun: twelve native methods have editable semantic C# implementations, adapters, provenance and behavior tests. Broad facade coverage and update migration UI remain planned.
 - M5 begun: recipe creation and editing compile into the same pack; typed runtime recipe config controls are supported. Visual recipe generation, completion and compiler navigation remain planned.
-- M6–M7 live bridge, richer assets, profiles and distribution: planned.
+- M6–M7: a portable Windows package is built and passes relocated-folder smoke checks. Live inspection, richer assets, profiles and clean-PC release acceptance remain planned.
 
 ## Immediate next acceptance work
 
 1. Inspect the new Garage in light and dark modes at desktop and narrow-window sizes. Confirm controls remain readable and keyboard reachable.
 2. Start the game manually with all features off. Record pack load, registration and patch-probe outcomes from the fresh log.
 3. Test each presentation module and FrameLimiter in menu, race, pause, scene change and disable transitions. Record the actual HUD canvas names and Wwise behavior.
-4. Audit every leaderboard/upload route, including callback behavior. Gameplay stays locked until full offline/online transition and upload-suppression tests pass.
+4. Test local/offline-to-online transitions. Gameplay features must stop online; this requested test build retains normal uploads and has no Disable Leaderboards requirement.
 5. Reconstruct full jump motion and boost/reserve state machines with the same provenance and branch-testing procedure. Use those adapters to port remaining legacy features from MOD-PACK.md.
 6. Add no-code recipe controls, diagnostics linked to editor lines, source completion and an authenticated main-thread inspector.
 
@@ -86,3 +86,7 @@ Finish local analysis and executable first slice before expanding. Then manual r
 | MelonLoader | Alternative only after a measured blocker | Similar managed/native bridge needs game compatibility work; switching does not fix obsolete class/method assumptions. Validate a separate installation and never combine loaders. |
 | Custom native injector or binary patching | Last-resort scoped adapter | More maintenance, ABI/lifetime hazards and rollback burden. Keep native implementation behind typed C# facades; ordinary authors should not need assembly. |
 | Complete reconstructed Unity project | Separate research effort | Original bodies, project structure and asset authoring metadata are not fully preserved. Not a prerequisite for the requested tool. |
+
+## 0.3 acceptance still required
+
+Verify cold installation on another Windows PC, Steam secondary library discovery with its actual ACLs, BepInEx first-start generation, a manual plugin boot, each migrated feature independently, disable/restore transitions, and resize/zoom in the browser app window. Local HTTP and structural UI tests do not replace rendered visual testing. Remaining reconstruction priorities are the full boost/jump state machines, race checkpoint/respawn routes and UI scene controllers; native signatures alone are not recovered implementations.

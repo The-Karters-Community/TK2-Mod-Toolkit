@@ -1,27 +1,17 @@
 # TK2 Mod Garage
 
-A local mod-control app and readable C# workshop for **The Karters 2 Turbo Charged 0.1.4.18**. Uses the installed BepInEx IL2CPP loader and builds **one pack DLL**, including custom recipes.
+A Windows mod-control app and readable C# workshop for **The Karters 2 Turbo Charged 0.1.4.18**. One BepInEx plugin contains the Garage, MK and community packs, including custom recipes.
 
-Double-click **Launch Studio.cmd**, or run `python launch.py`. The modern interface opens in an Edge app window, with a default-browser fallback. It has the supplied logo/artwork, persistent light/dark modes, searchable player controls, a C# editor, build/install, diagnostics, and restorable backups. Python and a .NET SDK are needed; no additional Python packages are required on this machine.
+For players, use **TK2 Mod Garage.exe** from the portable distribution in `artifacts/portable`. Keep its accompanying folder intact. Python is included and installing the bundled plugin does not require a .NET SDK. The app discovers Steam libraries, accepts a game folder, checks the loader and its initialization, and includes the supplied BepInEx distribution. The source checkout also runs with **Launch Studio.cmd** or `python launch.py`.
 
-The pack is installed at `BepInEx/plugins/TK2-Mod-Studio/TK2.Customization.dll`. The plugin directory contains exactly one DLL after this delivery. Its single configuration file is `BepInEx/config/local.tk2.customization.cfg`. All modules start disabled.
+Choose **Game setup**: select the installation, prepare BepInEx if needed, start the game yourself once and wait for its menu, close it, then check again and install the plugin. A closed game is required to replace DLLs. Your existing settings are preserved. If Windows denies writes to Program Files, run the Garage executable as administrator for installation.
 
-Available for manual runtime testing: HUD scale/opacity, audio multiplier, camera FOV, shadow distance, and a reversible frame-limiter recipe. Fresh legacy-inspired ports include custom laps, driving challenge, automatic drift boost, kart tuning, and fast fall. **Gameplay execution remains locked until runtime leaderboard protection is validated.** No module has yet been certified working in the running game.
+**26 configurable modules** are grouped into packs. Expand a module to see its options, defaults and allowed values. Advanced physics and boost parameters use individual override switches; their presets are mod defaults, not asserted current-game defaults. Reset module or pack stages its defaults; Save changes applies them. Saves merge only edited values and report conflicts only when that same value changed elsewhere.
 
-The workshop opens editable reconstructed C# with actual behavior. Seven native methods now have compiled semantic reconstructions, including jump handling, camera selection, and velocity accumulation. This is partial source reconstruction; the original complete source and Unity project have not been recovered.
+The camera changes the game's racing-camera position/FOV together, with optional kart-size compensation, distance and height. Legacy ports include fast fall and dodge, custom laps, driving challenge, automatic boosts, respawn, boost training, alternate reserves, dash/items, portal tricks, mirror, reverse races, practice snapshots, names, nearby voice lines, CNK-style meter, all 57 advanced parameters, Nightmare AI and chat commands. New modules start off. Gameplay ports run locally/offline; **no Disable Leaderboards dependency or upload-blocking hook is installed**, following the requested test policy.
 
-Read [usage](docs/USAGE.md), [readable source and provenance](docs/READABLE-SOURCE.md), [pack modules and migration](docs/MOD-PACK.md), [validation](docs/VALIDATION.md), and the [detailed roadmap](docs/ROADMAP.md). The original [investigation](docs/INVESTIGATION.md), [legacy audit](docs/LEGACY-AUDIT.md), and [mod possibilities](docs/CAPABILITIES.md) remain available.
+Workshop edits ordinary C# and builds the same DLL. Author builds need a .NET SDK and initialized game interop. The function browser lists **32,350 game-method declarations** and distinguishes them from **12 reviewed reconstructed native methods**. Recovered implementations and new mod code have actual editable bodies. This remains partial reconstruction, not the complete original C# project.
 
-```text
-studio/web/                Modern player controls and workshop
-studio/webapp.py           Loopback server and managed authoring/install operations
-plugins/TK2.Customization/  One pack, isolated modules, recipe lifecycle
-src/Reconstructed/         Editable C# behavior and native provenance
-templates/PackRecipe.cs.txt New recipe added to the same pack
-tools/ghidra/              Read-only Ghidra export tools
-tests/                     Core/API/frontend state/native behavior tests
-docs/                      Evidence, plan, usage, validation
-local/, artifacts/         Ignored exports, recovered third-party code, backups and DLLs
-```
+The plugin is `BepInEx/plugins/TK2-Mod-Studio/TK2.Customization.dll`; settings are `BepInEx/config/local.tk2.customization.cfg`. Read [usage](docs/USAGE.md), [migration](docs/MOD-PACK.md), [native evidence](docs/REA-MIGRATION.md), [reconstructed source](docs/READABLE-SOURCE.md), [validation](docs/VALIDATION.md), and the [roadmap](docs/ROADMAP.md).
 
-The app does not start the game. Start it yourself for manual testing. Use Close Garage to stop the local service before closing its window. The old analysis interface remains available for advanced investigation; it is no longer the default player GUI.
+Compilation and offline tests are recorded separately from game observations. Current ports still need manual in-game testing; reverse races, full snapshot rewind and visual mirror corrections have explicit limitations. The app does not automatically start the game. Use Close Garage to stop its loopback service.

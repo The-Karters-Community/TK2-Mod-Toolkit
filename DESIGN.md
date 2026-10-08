@@ -1,5 +1,7 @@
 # Mod Garage design
 
-A player customizes a kart before a race on a home PC, sometimes in daylight and sometimes in a dim gaming room: both light and dark themes are first-class.
+A compact racing garage for everyday players. Both light and dark themes use the supplied logo, orange actions and restrained cool surfaces. Packs contain expandable modules; advanced parameters use paired override switches and custom values under collapsible groups. Every setting shows its mod default and allowed values. Reset actions stage defaults and require Save to apply.
 
-Use restrained cool tinted surfaces, warm orange primary actions, the supplied logo, and a cropped game-art panel. Segoe UI carries labels and prose; large heavy headings and small uppercase tracking provide racing flavor. Flat feature rows replace the old tabbed forms. A 220px navigation rail collapses on narrow windows; content uses a bounded width and generous spacing. Inputs and buttons have predictable hover, focus, disabled, and busy states. Theme choice persists locally. Motion only communicates interaction and respects reduced motion.
+A responsive navigation rail becomes a wrapping top bar. Controls stack on small windows; grids use zero minimum widths, long labels wrap, and hidden components cannot override the HTML hidden attribute. Focus states, keyboard controls and reduced motion remain available.
+
+Installation uses three steps: game discovery, loader readiness and a bundled plugin install. Building C# belongs in Workshop. The searchable function catalog distinguishes readable signatures from reconstructed implementations and opens editable source when it exists. Evidence, logs and backups are secondary details.

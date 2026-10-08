@@ -1,0 +1,294 @@
+[
+  {
+    "id": "CommunityCommands",
+    "name": "Chat commands",
+    "description": "Cathret's health, reserve and elimination commands for local races. Twitch connection is optional and starts off; reserve amounts use current-game seconds.",
+    "category": "Community tools",
+    "origin": "Cathret legacy port",
+    "gameplay": true,
+    "settings": [
+      [
+        "ConnectToTwitch",
+        "Connect to Twitch",
+        "bool",
+        false,
+        null,
+        null
+      ],
+      [
+        "Channel",
+        "Channel login",
+        "text",
+        "",
+        null,
+        null
+      ],
+      [
+        "UserName",
+        "Token owner's login",
+        "text",
+        "",
+        null,
+        null
+      ],
+      [
+        "TokenEnvironmentVariable",
+        "Token environment variable",
+        "text",
+        "TK2_TWITCH_TOKEN",
+        null,
+        null
+      ],
+      [
+        "AllowedUsers",
+        "Allowed viewers (empty: channel owner; *: everyone)",
+        "text",
+        "",
+        null,
+        null
+      ],
+      [
+        "CommandPrefix",
+        "Command prefix",
+        "text",
+        "#tk2",
+        null,
+        null
+      ],
+      [
+        "CooldownSeconds",
+        "Seconds between commands",
+        "float",
+        5,
+        0,
+        300
+      ],
+      [
+        "HealthAmountLimit",
+        "Maximum HP per command",
+        "int",
+        999,
+        0,
+        10000
+      ],
+      [
+        "ReserveSecondsLimit",
+        "Maximum reserve seconds",
+        "float",
+        120,
+        0,
+        1000
+      ],
+      [
+        "HealthGain",
+        "Allow hp gain",
+        "bool",
+        false,
+        null,
+        null
+      ],
+      [
+        "HealthLose",
+        "Allow hp lose",
+        "bool",
+        false,
+        null,
+        null
+      ],
+      [
+        "ReserveGain",
+        "Allow reserve gain",
+        "bool",
+        false,
+        null,
+        null
+      ],
+      [
+        "ReserveLose",
+        "Allow reserve lose",
+        "bool",
+        false,
+        null,
+        null
+      ],
+      [
+        "ReserveSet",
+        "Allow reserve set",
+        "bool",
+        false,
+        null,
+        null
+      ],
+      [
+        "Kill",
+        "Allow elimination commands",
+        "bool",
+        false,
+        null,
+        null
+      ]
+    ]
+  },
+  {
+    "id": "NightmareAI",
+    "name": "Nightmare AI",
+    "description": "Tune computer opponents and local players, champion behavior, catch-up speed, damage and reserves.",
+    "category": "Race rules",
+    "origin": "MK companion legacy port",
+    "gameplay": true,
+    "settings": [
+      [
+        "DebugLogging",
+        "Debug Logging",
+        "bool",
+        false,
+        null,
+        null
+      ],
+      [
+        "AISpeedMultiplier",
+        "AI Speed Multiplier",
+        "float",
+        1.2,
+        0.1,
+        20.0
+      ],
+      [
+        "AIReserveGainMultiplier",
+        "AI Reserve Gain Multiplier",
+        "float",
+        5.0,
+        0.0,
+        20.0
+      ],
+      [
+        "AIDamageMultiplier",
+        "AI Damage Multiplier",
+        "float",
+        0.5,
+        0.0,
+        20.0
+      ],
+      [
+        "AIMaxHealth",
+        "AI Max Health",
+        "int",
+        300,
+        1.0,
+        10000.0
+      ],
+      [
+        "AIMaxExtraHealth",
+        "AI Max Extra Health",
+        "int",
+        500,
+        1.0,
+        10000.0
+      ],
+      [
+        "AIReserveLossMultiplierOnCollision",
+        "AI Reserve Loss Multiplier On Collision",
+        "float",
+        0.9,
+        0.0,
+        1.0
+      ],
+      [
+        "AIIsRubberbandingEnabled",
+        "AI Is Rubberbanding Enabled",
+        "bool",
+        true,
+        null,
+        null
+      ],
+      [
+        "AIRubberbandingMinimumDistance",
+        "AI Rubberbanding Minimum Distance",
+        "float",
+        200.0,
+        0.0,
+        5000.0
+      ],
+      [
+        "AIRubberbandingSpeedMultiplier",
+        "AI Rubberbanding Speed Multiplier",
+        "float",
+        10.0,
+        1.0,
+        20.0
+      ],
+      [
+        "AIUseCustomNames",
+        "AI Use Custom Names",
+        "bool",
+        false,
+        null,
+        null
+      ],
+      [
+        "Names",
+        "Names",
+        "text",
+        "CPU3,Mia,Bobby,Bubble,Sir Ronald,Pablo,Zig,Zag,Zoom,Otto,sboczek,Edward,Mortus,Basia,Tazua,Delecto,VyZiXeN,Arca,Silver Nargacuga,Justin,gub,NinjaMonkey,Tasmaniac,DarkSlayer,M.K.,Cathret,Tobi,Kolfo,rudolph,Matt,Nimo,Ugo,Goatse,KingKingTTV,Makys,SuperChris,HighLanderPony,Seren",
+        null,
+        null
+      ],
+      [
+        "ForceChampionAndChase",
+        "Force Champion And Chase",
+        "bool",
+        true,
+        null,
+        null
+      ],
+      [
+        "PlayerSpeedMultiplier",
+        "Player Speed Multiplier",
+        "float",
+        1.0,
+        0.1,
+        20.0
+      ],
+      [
+        "PlayerReserveGainMultiplier",
+        "Player Reserve Gain Multiplier",
+        "float",
+        1.0,
+        0.0,
+        20.0
+      ],
+      [
+        "PlayerDamageMultiplier",
+        "Player Damage Multiplier",
+        "float",
+        1.0,
+        0.0,
+        20.0
+      ],
+      [
+        "PlayerMaxHealth",
+        "Player Max Health",
+        "int",
+        300,
+        1.0,
+        10000.0
+      ],
+      [
+        "PlayerMaxExtraHealth",
+        "Player Max Extra Health",
+        "int",
+        500,
+        1.0,
+        10000.0
+      ],
+      [
+        "PlayerReserveLossMultiplierOnCollision",
+        "Player Reserve Loss Multiplier On Collision",
+        "float",
+        0.7,
+        0.0,
+        1.0
+      ]
+    ]
+  }
+]

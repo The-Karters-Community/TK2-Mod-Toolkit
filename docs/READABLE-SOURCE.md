@@ -4,7 +4,7 @@ The workshop now opens **C# with executable method bodies**, not dump declaratio
 
 | Native method | Virtual address | Readable implementation | Evidence / assumptions |
 |---|---|---|---|
-| PixelKartPhysics.AddVelocity | 0x1805dd8a0 | KartLogic.AddVelocity | Three component sums; used by fast fall when its validation gate is eventually opened |
+| PixelKartPhysics.AddVelocity | 0x1805dd8a0 | KartLogic.AddVelocity | Three component sums; used by fast fall used by the local offline fast-fall module |
 | PixelKartPhysics.JumpInput(bool) | 0x1805e0270 | KartLogic.JumpInput and ReadableGame.JumpInput | False input, extra trick, history reset, replay grounding, airborne buffer, inclusive grace boundary; initialized objects and stable grounding assumed |
 | PixelGameKartCamera.GetCamera | 0x1804ee5b0 | CameraLogic.GetCameraIndex and ReadableGame.GetCamera | Ghost returns null, normal/local-spectator player slot, nonlocal spectator slot zero |
 | PixelGameKartCamera.IsCameraASpectatorCamera | 0x1804f05a0 | CameraLogic.IsSpectator | Boolean field read |
@@ -18,16 +18,22 @@ Native IL2CPP metadata initialization and error-helper assembly are omitted from
 
 ## Editing and authoring
 
-1. Open Create a mod. Select readable game logic or create a named recipe.
+1. Open Workshop. Select readable game logic or create a named recipe.
 2. Edit the C# in the app, or use an external editor on the same files.
 3. Save C#, then Build pack. Build & install also saves an edited file first.
 4. The DLL always remains `TK2.Customization.dll`. Recipe classes are discovered inside that assembly.
-5. Start the game manually once to create recipe-specific settings. Enable/configure those recipes under My mods. Settings reload without rebuilding; C# changes require a rebuild and game restart.
+5. Start the game manually once to create recipe-specific settings. Enable/configure those recipes under Your recipes. Settings reload without rebuilding; C# changes require a rebuild and game restart.
 
-Recipes implement `IModRecipe`: Configure, Tick, Restore, and a gameplay declaration. The starter recipe demonstrates a reversible camera FOV change. Keep the built-in FOV module off if that recipe controls the same camera. Source edits have local backups and reject an external edit conflict. This interface is intentionally a small C# editor; it does not yet provide IntelliSense or a debugger.
+Recipes implement `IModRecipe`: Configure, Tick, Restore, and a gameplay declaration. The starter recipe demonstrates a configurable kart-hop shortcut using reconstructed velocity accumulation. Source edits have local backups and reject an external edit conflict. This interface is intentionally a small C# editor; it does not yet provide IntelliSense or a debugger.
 
 ## What remains to reconstruct
 
-Seven methods are reconstructed from the 56 exported bodies. There are 184,138 native function entries in the local index, including engine and library code. Fully recovering the original C# source, comments, variable names, stripped code, and original Unity editor project from optimized IL2CPP binaries is not achievable by simply translating all Ghidra listings.
+Twelve native methods have reviewed normal-state translations. The function browser indexes 32,350 Assembly-CSharp method declarations; selected native bodies are exported separately. There are 184,138 native function entries in the local index, including engine and library code. Fully recovering the original C# source, comments, variable names, stripped code, and original Unity editor project from optimized IL2CPP binaries is not achievable by simply translating all Ghidra listings.
 
 Continue subsystem by subsystem: boost state machine, complete jump motion, input dispatch, damage overloads, race rules, replay/save states, UI controller lifecycle, and native mod-content formats. For each method, record exact signature and aliases, resolve constants/call targets, reconstruct state transitions, test pure behavior, then compare against runtime observations. Do not substitute generated wrappers or fabricated stubs for a completed reconstruction.
+
+## Additional reviewed native translations
+
+NativeAdapters.cs adds Camera.InitOriginalProperties (0x1804eff80), BoostManager.GetCurrentBoostReservesTime (0x180667ce0), HpBarController.GetCurrentHP (0x18056d2b0, shared symbol with PlayerGlobalStats), ActivateImmunityNow (0x18056c150) and RefreshImmunityState (0x18056ee90). Camera settings capture the actual original offsets, pitch, yaw and FOV. Immunity preserves individual source flags and reconstructs native visual/collider synchronization; HealthLogic.cs tests the decision truth tables. These adapters assume normally initialized game objects; native exception/runtime initialization helpers are not recreated.
+
+CameraFraming.cs is new mod geometry, not recovered original source. It is deliberately separated and tests preservation of projected kart size. Editing a reconstructed function affects callers in the mod DLL; it does not automatically replace every original game method.

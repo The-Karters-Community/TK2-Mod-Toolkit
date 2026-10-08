@@ -13,9 +13,10 @@ import struct
 import subprocess
 import tempfile
 import time
+import sys
 import xml.etree.ElementTree as ET
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
 DEFAULT_GAME = Path(r"C:\Program Files (x86)\Steam\steamapps\common\The Karters 2 Turbo Charged")
 PLUGIN_NAME = "TK2.Customization"
 CONFIG_NAME = "local.tk2.customization.cfg"
@@ -263,6 +264,7 @@ def parse_cfg_settings(text: str) -> list[dict]:
             if setting and section:
                 entries.append({"section": section, "key": setting[1].strip(), "value": setting[2],
                                 "type": metadata.get("Setting type", "String"), "default": metadata.get("Default value", ""),
+                                "hasDefault": "Default value" in metadata,
                                 "choices": [v.strip() for v in metadata.get("Acceptable values", "").split(",") if v.strip()],
                                 "range": metadata.get("Acceptable value range", ""), "description": "\n".join(descriptions)})
                 metadata, descriptions = {}, []
@@ -333,6 +335,7 @@ def is_managed_dll(path: Path) -> bool:
 def build_plugin(game: Path, project: Path, log=lambda message: None) -> dict:
     """Compile against local managed runtime DLLs; avoid NuGet and accidental wrapper redistribution."""
     game = validate_game(game)
+    if not shutil.which("dotnet"): raise ValueError("C# author builds require a .NET SDK. Player installation uses the bundled plugin and does not need it.")
     if not (game / "BepInEx/interop/Assembly-CSharp.dll").exists():
         raise ValueError("Generate BepInEx interop by running the game first")
     core_names = ("BepInEx.Core", "BepInEx.Unity.IL2CPP", "BepInEx.Unity.Common", "0Harmony", "Il2CppInterop.Runtime")

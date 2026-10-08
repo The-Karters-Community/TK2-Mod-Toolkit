@@ -1,30 +1,32 @@
-# Validation and remaining acceptance work
+# Validation, 0.3.0
 
-Verified in this workspace on 2026-10-08. Compilation and source/signature audits do not certify runtime compatibility.
+## Automated evidence
 
-| Check | Result |
-|---|---|
-| Pack build | .NET 6 library against current installed runtime/interop, zero warnings/errors |
-| Pack installation | Exactly one active DLL in BepInEx/plugins: TK2-Mod-Studio/TK2.Customization.dll, 30,208 bytes |
-| Installed integrity | Installed DLL matches latest staged artifact; SHA256 6d551bb916d2a64df6959d51f0801679697f60e4b5a8f32f6438b7764eff1f63 |
-| Initial config | All ten built-in enable settings and FrameLimiter recipe enable setting false |
-| Python core/API tests | 26 passed: containment, artifacts, rollback, settings, source conflicts, recipe creation, gameplay lock, host/origin/session checks |
-| Reconstructed C# tests | 31 assertions passed: jump state/grounding/grace/trick branches, camera slots/threshold/NaN, velocity accumulation and camera flags |
-| Offline frontend state | 16 assertions passed using an in-memory DOM stub: themes, lock display, preserved unsaved values/hash, readable editor loading and source conflict handling; no browser/network |
-| Modern UI wiring smoke | 34 unique control IDs, three views, assets and theme/reduced-motion tokens present, JavaScript syntax passed |
-| Reconstruction provenance | Seven local native evidence hashes and matching GameAssembly hash verified; camera threshold bytes verified directly |
-| Python compilation | studio, tools and launch.py pass compileall |
-| Visual browser inspection | Blocked: browser tool reported declined permission for http://127.0.0.1:8765; no alternate browser or workaround used |
-| In-game test | Not run; game was not launched automatically |
+The plugin compiles against this installation's current .NET 6, BepInEx and IL2CPP interop assemblies. Every build/deployment is fingerprinted. Python tests cover config merge conflicts, comments/unknown keys, recipe/source backups, deployment/rollback, Steam secondary library discovery, loader readiness and portable prebuilt installation into another path. JavaScript tests cover dirty-only saves, concurrent edits, focused inputs, module/pack grouping, advanced dependencies and default reset. Native pure logic tests cover jump branching, camera selection, FOV framing and immunity flags; community parser tests cover all six command families and permissions.
 
-Earlier analysis remains verified: 23,785 metadata types; 184,138 native function entries; 56 local pseudocode bodies; Ghidra executable hash matches installed GameAssembly; MKsKartersMods managed recovery has 37 local C# files. Legacy audit scanned 93 C# files and 81 named Harmony declarations: 79 present by name, one overload review, one absent method. Exact-address second Hit export at 0x18056dae0 succeeded. The old seven-tab analysis UI passed its earlier off-screen smoke check; that is not a visual check of the new Garage.
+Static GUI smoke checks validate unique controls, wiring, JavaScript syntax, themes, assets and reduced motion. Browser visual verification remains pending because the previous browser access request was declined; no retry or alternate access method was used.
 
-Installation created owned-file receipts under ignored `local/backups`; its report is `local/pack-installation.json`. The original binaries, Ghidra database and legacy source folders remain intact. Existing old config files were not deleted. Build receipts still have `runtimeTested=false`.
+The portable executable is packaged with Python and the supplied BepInEx loader. A relocated-folder API smoke test checks that it starts independently of the source checkout, serves its assets, lists all packs/options and searches its exported function catalog. This is not yet an installation test on another person's computer.
 
-## Remaining acceptance
+## Recorded local results
 
-Inspect the new GUI in light/dark and narrow/desktop layouts. Start the game manually with toggles off; record pack load and injected component registration. Test HUD naming/scalers/CanvasGroups, Wwise capture/restoration, FOV transitions and split-screen limits, shadow pipeline behavior, FrameLimiter/VSync restoration, config reload and recipe lifetime. None is claimed working solely because it compiles.
+- Plugin build: 0 warnings, 0 errors.
+- Python regression tests: 44 passed, including exclusive server-port ownership on Windows.
+- Frontend state: 67 assertions passed.
+- Readable behavior/camera/immunity: 71 assertions passed.
+- Community commands: 62 assertions passed.
+- Static GUI: 58 unique controls across three views, valid JavaScript, themes and assets.
+- Relocated executable: auto-detected Steam installation, bundled loader located under the relocated directory, 26 modules/231 settings, 32,350 indexed declarations, 12 reconstructed functions, UTF-8 assets and editable source served. No browser or game launched. Evidence: `local/portable-smoke.json`.
+- Deployment: current 0.3.0 DLL installed with backup, exactly one active DLL, all existing setting values preserved. Evidence: `local/deployment-0.3.0.json`.
 
-Gameplay modules stay runtime-locked. Audit all upload routes and callbacks, test local/network/AI/ghost selection and online/offline transitions, verify every parameter restore path and scene cleanup, then review opening the gate. Partial semantic reconstruction is not full source recovery or native equivalence proof.
+## Game log reviewed
 
-No-code recipe generation, completion, compiler-line navigation, conflict ownership, live scene inspection, package distribution and the remaining legacy ports are recorded in ROADMAP.md and MOD-PACK.md.
+The latest available BepInEx log ended after chainloader initialization and the warning `Class::Init signatures have been exhausted, using a substitute!`. It did not contain a 0.3.0 plugin-load marker or plugin exception. The warning is surfaced in diagnostics; it does not prove the new plugin loaded or ran. The user's earlier camera result relates to the earlier raw FOV implementation.
+
+No game was automatically launched. After installation, start it manually, reach the menu/race and then check Game setup again. The current-pack log check should pass; inspect runtime errors before enabling more features. The DLL remains one physical plugin. Existing Camera Enabled/FOV choices are preserved rather than silently reset.
+
+## Manual acceptance
+
+Test camera distance/height/FOV changes and toggles, menu/intro/spectator transitions, HUD filters/opacity, each of the five audio buses, configuration reload while racing, and frame/VSync restore. Then test each legacy module alone, pause/local/split-screen behavior, scene resets and offline-to-online transitions. Advanced overrides must restore their captured values; competing tuning modules use documented priority. Test reverse and whole-race rewind last because their current checkpoint histories are not fully reconstructed.
+
+The requested test build installs no leaderboard blocker. Full original source recovery, broad native equivalence, every migrated runtime feature, another-machine setup and visible resizing are not certified by compilation.

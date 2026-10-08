@@ -28,13 +28,13 @@ class GarageTests(unittest.TestCase):
         p = patch.object(pack, "SOURCE_ROOT", self.sources); p.start(); self.addCleanup(p.stop)
         self.app = webapp.Application(self.game)
 
-    def test_pack_defaults_and_gameplay_gate(self):
-        self.assertEqual(len(pack.FEATURES), 10)
+    def test_pack_defaults_allow_requested_offline_test_toggles(self):
+        self.assertGreaterEqual(len(pack.FEATURES), 25)
         values = pack.defaults()
         self.assertTrue(all(not v for k, v in values.items() if k.endswith("/Enabled")))
         for feature in pack.FEATURES:
             if feature.get("gameplay"):
-                with self.assertRaises(ValueError): pack.validate({feature["id"] + "/Enabled": True})
+                self.assertEqual(pack.validate({feature["id"] + "/Enabled": True})[(feature["id"],"Enabled")], "true")
         for value in (float('nan'), float('inf'), -1, 3):
             with self.assertRaises(ValueError): pack.validate({"Audio/MasterVolume": value})
         with self.assertRaises(ValueError): pack.validate({"Laps/Count": 1.5})
@@ -71,10 +71,17 @@ class GarageTests(unittest.TestCase):
 
     def test_install_builds_before_deploy_and_keeps_defaults_off(self):
         with patch.object(core, "require_game_stopped"), patch.object(core, "build_plugin", return_value={"artifact": str(self.root / "artifact")}) as build, patch.object(core, "deploy_plugin", return_value=self.root / "backup") as deploy:
-            result = self.app.action("install", {})
+            result = self.app.action("build-install", {})
         build.assert_called_once(); deploy.assert_called_once()
         self.assertIn("One pack", result["message"])
         self.assertTrue(all(not value for key, value in self.app.config_data()["settings"].items() if key.endswith("/Enabled")))
+
+    def test_only_one_garage_server_can_own_a_port(self):
+        server = webapp.Server(self.app, 0)
+        self.addCleanup(server.server_close)
+        with self.assertRaises(OSError):
+            duplicate = webapp.Server(self.app, server.server_port)
+            duplicate.server_close()
 
     def test_http_api_rejects_cross_origin_missing_token_and_wrong_host(self):
         server = webapp.Server(self.app, 0)
@@ -93,7 +100,7 @@ class GarageTests(unittest.TestCase):
         status, html = request("GET", "/")
         self.assertEqual(status, 200); self.assertIn(self.app.token.encode(), html); self.assertNotIn(b"__SESSION_TOKEN__", html)
         bad = json.dumps({"values": {"Audio/Enabled": True}, "hash": "stale"})
-        self.assertEqual(request("POST", "/api/settings", {**auth, "Content-Type": "application/json"}, bad)[0], 400)
+        self.assertEqual(request("POST", "/api/settings", {**auth, "Content-Type": "application/json"}, bad)[0], 409)
         self.assertFalse(self.app.config_path.exists())
         self.assertEqual(request("GET", "/api/source?file=../../outside.cs", auth)[0], 400)
         self.assertEqual(request("GET", "/api/source?file=plugins/TK2.Customization/Example.cs", auth)[0], 200)
