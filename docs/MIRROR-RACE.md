@@ -1,6 +1,6 @@
 # Physical Mirror Race
 
-Enable **Mirror Race**, save, then leave and load an offline track again. The module has one switch. Enabling or disabling it during a race applies to the next track load; changing a live track would invalidate the game's race-progress and AI caches.
+Enable **Mirror Race**, save, then leave and load an offline track again. The module has one switch. Enabling or disabling it during a race applies to the next track load; changing a live track would invalidate the game's race-progress and AI caches. Its hook runs in the prefix of the map's `Awake`, before the game constructs route and progress caches. At this point Unity has created the scene object but `Scene.isLoaded` is still false, so the mod checks that the scene handle is valid instead of incorrectly rejecting the track as unloaded.
 
 This module reflects authored track geometry and collision geometry across world X, including start positions, checkpoints and Bezier paths. It clones meshes, reflects vertices/normals/tangents, reverses triangle winding and preserves UVs/material assignments. It reflects positions and proper rotations, rather than introducing negative scale. The minimap image and world bounds are reflected together. Ordinary steering, camera projection, culling and HUD rendering remain in use.
 

@@ -15,8 +15,9 @@ public sealed class TrackInspector : IModRecipe
     public string Name => "TrackInspector";
     public bool ChangesGameplay => false;
     private ConfigEntry<KeyCode> _key = null!;
-    private ConfigEntry<bool> _walls = null!, _respawn = null!, _kill = null!, _other = null!, _through = null!, _labels = null!;
-    private ConfigEntry<float> _distance = null!, _opacity = null!;
+    private ConfigEntry<bool> _walls = null!, _respawn = null!, _kill = null!, _other = null!, _through = null!, _labels = null!, _boundsFallback = null!;
+    private ConfigEntry<float> _distance = null!, _opacity = null!, _lineWidth = null!;
+    private ConfigEntry<int> _sampleResolution = null!;
     private readonly Dictionary<int, Target> _targets = new();
     private readonly Dictionary<Kind, Material> _materials = new();
     private readonly List<Target> _nearby = new();
@@ -26,7 +27,8 @@ public sealed class TrackInspector : IModRecipe
     private bool _visible = true, _hasRace;
     private float _nextScan, _nextDraw;
     private int _scene;
-    private const int MaxVisible = 96, MaxEdges = 1800, MaxCached = 192;
+    private const int MaxVisible = 32, MaxEdges = 400, MaxCached = 192, MaxMeshTriangles = 12000;
+    private int _nearbyCount, _drawnCount, _observedSampleResolution = -1;
     internal struct Label { internal Camera Camera; internal Vector3 Position; internal string Text; internal Color Color; }
     private sealed class Target
     {
@@ -37,7 +39,10 @@ public sealed class TrackInspector : IModRecipe
         internal Vector3[]? Local, World;
         internal int[]? Indices;
         internal bool BoundsOnly;
-        internal string Caption = "";
+        internal bool GeometryUnavailable;
+        internal string GeometryLabel = "";
+        internal Vector3[]? WideVertices;
+        internal int[]? WideIndices;
     }
 
     public void Configure(ConfigFile config)
@@ -47,10 +52,13 @@ public sealed class TrackInspector : IModRecipe
         _respawn = config.Bind("Recipe." + Name, "ShowRespawn", true, "Always and conditional respawn wall layers. Orange and yellow.");
         _kill = config.Bind("Recipe." + Name, "ShowKillTriggers", true, "Triggers linked to an enabled kill command. Red; game conditions still apply.");
         _other = config.Bind("Recipe." + Name, "ShowOtherTriggers", false, "Other game logic trigger volumes. Purple; they are not assumed lethal.");
-        _distance = config.Bind("Recipe." + Name, "DrawDistance", 150f, new ConfigDescription("Outline distance in metres. Nearest 96 colliders are drawn.", new AcceptableValueRange<float>(20f, 1000f)));
-        _opacity = config.Bind("Recipe." + Name, "Opacity", 0.8f, new ConfigDescription("Outline opacity.", new AcceptableValueRange<float>(0.1f, 1f)));
-        _through = config.Bind("Recipe." + Name, "ShowThroughTrack", false, "Draw outlines through scenery. Labels are screen annotations.");
-        _labels = config.Bind("Recipe." + Name, "ShowLabels", true, "Show the category, object name and distance for nearby outlines; bounds fallbacks are marked.");
+        _distance = config.Bind("Recipe." + Name, "DrawDistance", 150f, new ConfigDescription("Outline distance in metres. Nearest 32 colliders are drawn.", new AcceptableValueRange<float>(20f, 1000f)));
+        _opacity = config.Bind("Recipe." + Name, "Opacity", 0.9f, new ConfigDescription("Outline opacity.", new AcceptableValueRange<float>(0.2f, 1f)));
+        _through = config.Bind("Recipe." + Name, "ShowThroughTrack", true, "Draw hidden wall and hazard outlines through scenery. Turn off to show only visible surfaces.");
+        _labels = config.Bind("Recipe." + Name, "ShowLabels", true, "Show category, object, distance and shape source for nearby outlines.");
+        _sampleResolution = config.Bind("Recipe." + Name, "ColliderSampleResolution", 4, new ConfigDescription("Surface sampling density for convex or unreadable colliders. Higher values capture more shape detail.", new AcceptableValueRange<int>(2, 6)));
+        _lineWidth = config.Bind("Recipe." + Name, "LineWidth", 0.035f, new ConfigDescription("Outline thickness in metres, adjusted for viewing distance.", new AcceptableValueRange<float>(0.01f, 0.08f)));
+        _boundsFallback = config.Bind("Recipe." + Name, "ShowBoundsFallback", false, "Show an explicitly labelled world bounds box only when shape sampling fails. Disabled by default to avoid misleading cubes.");
     }
 
     public void Tick()
@@ -80,6 +88,11 @@ public sealed class TrackInspector : IModRecipe
         _hasRace = true; _scene = scene;
         if (Input.GetKeyDown(_key.Value)) _visible = !_visible;
         if (!_visible) { Hide(); return; }
+        if (_observedSampleResolution != _sampleResolution.Value)
+        {
+            foreach (var target in _targets.Values) Release(target);
+            _observedSampleResolution = _sampleResolution.Value;
+        }
         if (Time.unscaledTime >= _nextScan)
         {
             _nextScan = Time.unscaledTime + 4f;
@@ -88,7 +101,7 @@ public sealed class TrackInspector : IModRecipe
         if (Time.unscaledTime < _nextDraw) return;
         _nextDraw = Time.unscaledTime + 0.1f;
         EnsureRoot(); UpdateMaterials();
-        _nearby.Clear(); _drawLabels.Clear();
+        _nearby.Clear(); _drawLabels.Clear(); _drawnCount = 0;
         foreach (var target in _targets.Values)
         {
             if (target.Overlay != null) target.Overlay.SetActive(false);
@@ -98,17 +111,20 @@ public sealed class TrackInspector : IModRecipe
         }
         _nearby.Sort((a, b) => DistanceSquared(a.Collider, cameras).CompareTo(DistanceSquared(b.Collider, cameras)));
         int count = Math.Min(MaxVisible, _nearby.Count);
+        _nearbyCount = _nearby.Count;
         for (int i = 0; i < count; i++)
         {
             var target = _nearby[i];
-            try { Draw(target); }
+            try { Draw(target, cameras[0]); }
             catch (Exception ex)
             {
-                // Unsupported collision meshes cannot disable the whole module.
-                target.BoundsOnly = true; target.Local = null; target.Caption = "bounds";
+                // Never turn a shape failure into a plausible-looking, misleading cube.
+                target.GeometryUnavailable = true;
                 if (target.Overlay != null) target.Overlay.SetActive(false);
-                Plugin.Instance?.Log.LogDebug($"Track Inspector bounds fallback: {ex.Message}");
+                Plugin.Instance?.Log.LogDebug($"Track Inspector skipped {target.Collider.name}: {ex.Message}");
             }
+            if (target.Overlay == null || !target.Overlay.activeSelf) continue;
+            _drawnCount++;
             if (!_labels.Value || i >= 24 || target.Overlay == null || !target.Overlay.activeSelf) continue;
             foreach (var camera in cameras)
             {
@@ -116,7 +132,7 @@ public sealed class TrackInspector : IModRecipe
                 if (point.z <= 0 || point.x < 0 || point.x > 1 || point.y < 0 || point.y > 1) continue;
                 float distance = Vector3.Distance(camera.transform.position, target.Collider.bounds.center);
                 _drawLabels.Add(new Label { Camera = camera, Position = target.Collider.bounds.center, Color = ColorFor(target.Kind),
-                    Text = $"{Caption(target.Kind)} · {target.Collider.name} · {distance:0}m" + (target.BoundsOnly ? " [bounds]" : "") });
+                    Text = $"{Caption(target.Kind)} · {target.Collider.name} · {distance:0}m · {target.GeometryLabel}" });
             }
         }
         // Release stale geometry to bound memory even when roaming an entire track.
@@ -225,9 +241,14 @@ public sealed class TrackInspector : IModRecipe
     private static string Caption(Kind kind) => kind == Kind.Wall ? "Wall" : kind == Kind.AlwaysRespawn ? "Respawn wall" :
         kind == Kind.ConditionalRespawn ? "Conditional respawn" : kind == Kind.KillLinked ? "Kill-linked trigger" : "Other trigger";
 
-    private void Draw(Target target)
+    private void Draw(Target target, Camera viewCamera)
     {
-        if (target.Local == null) BuildShape(target);
+        if (target.Local == null && !target.GeometryUnavailable) BuildShape(target);
+        if (target.GeometryUnavailable || target.Local == null || target.Local.Length == 0)
+        {
+            if (target.Overlay != null) target.Overlay.SetActive(false);
+            return;
+        }
         if (target.Overlay == null)
         {
             target.Overlay = new GameObject("TK2 outline"); target.Overlay.hideFlags = HideFlags.DontSave;
@@ -268,38 +289,142 @@ public sealed class TrackInspector : IModRecipe
             }
         }
         else for (int i = 0; i < world.Length; i++) world[i] = target.Collider.transform.TransformPoint(target.Local![i]);
-        target.Mesh!.vertices = world; target.Mesh.SetIndices(target.Indices!, MeshTopology.Lines, 0); target.Mesh.RecalculateBounds();
+        Vector3 cameraPosition = viewCamera.transform.position;
+        for (int edge = 0; edge < target.Indices!.Length; edge += 2)
+        {
+            int p = edge * 2, q = edge * 3;
+            Vector3 a = world[target.Indices[edge]], b = world[target.Indices[edge + 1]];
+            Vector3 center = (a + b) * .5f, toCamera = cameraPosition - center;
+            Vector3 side = Vector3.Cross(b - a, toCamera);
+            if (side.sqrMagnitude < 1e-8f) side = Vector3.Cross(b - a, viewCamera.transform.up);
+            if (side.sqrMagnitude < 1e-8f) side = Vector3.Cross(b - a, viewCamera.transform.right);
+            side.Normalize();
+            float distance = toCamera.magnitude;
+            float halfWidth = _lineWidth.Value * Mathf.Clamp(distance / 30f, .65f, 2.5f);
+            Vector3 bias = toCamera.sqrMagnitude > 1e-8f ? toCamera.normalized * .012f : Vector3.zero;
+            a += bias; b += bias;
+            target.WideVertices![p] = a + side * halfWidth;
+            target.WideVertices[p + 1] = a - side * halfWidth;
+            target.WideVertices[p + 2] = b + side * halfWidth;
+            target.WideVertices[p + 3] = b - side * halfWidth;
+            target.WideIndices![q] = p; target.WideIndices[q + 1] = p + 2; target.WideIndices[q + 2] = p + 1;
+            target.WideIndices[q + 3] = p + 1; target.WideIndices[q + 4] = p + 2; target.WideIndices[q + 5] = p + 3;
+        }
+        target.Mesh!.vertices = target.WideVertices!;
+        target.Mesh.SetIndices(target.WideIndices!, MeshTopology.Triangles, 0);
+        target.Mesh.RecalculateBounds();
         target.Overlay.SetActive(true);
     }
 
-    private static void BuildShape(Target target)
+    private void BuildShape(Target target)
     {
         var points = new List<Vector3>(); var edges = new List<int>();
         if (target.Collider.TryCast<BoxCollider>() is BoxCollider box)
         {
             Box(points, edges);
             for (int i = 0; i < points.Count; i++) points[i] = box.center + Vector3.Scale(points[i], box.size * .5f);
+            target.GeometryLabel = "box collider";
         }
-        else if (target.Collider.TryCast<SphereCollider>() is SphereCollider) Rings(points, edges, false);
-        else if (target.Collider.TryCast<CapsuleCollider>() is CapsuleCollider) Rings(points, edges, true);
+        else if (target.Collider.TryCast<SphereCollider>() is SphereCollider) { Rings(points, edges, false); target.GeometryLabel = "sphere collider"; }
+        else if (target.Collider.TryCast<CapsuleCollider>() is CapsuleCollider) { Rings(points, edges, true); target.GeometryLabel = "capsule collider"; }
         else if (target.Collider.TryCast<MeshCollider>() is MeshCollider collider && !collider.convex && collider.sharedMesh != null && collider.sharedMesh.isReadable)
         {
             var mesh = collider.sharedMesh;
-            if (mesh.vertexCount > 150000) target.BoundsOnly = true;
+            long triangleCount = 0;
+            for (int submesh = 0; submesh < mesh.subMeshCount; submesh++)
+                triangleCount += mesh.GetSubMesh(submesh).indexCount / 3;
+            if (mesh.vertexCount > 150000 || triangleCount > MaxMeshTriangles) SampleColliderSurface(target, points, edges);
             else
             {
-                var vertices = mesh.vertices; var tris = mesh.triangles;
-                int triangleLimit = Math.Min(tris.Length, 300000);
-                int[] native = new int[triangleLimit]; for (int i = 0; i < native.Length; i++) native[i] = tris[i];
-                var indices = TrackInspectorRules.MeshEdges(native, vertices.Length, MaxEdges);
-                // Compact to referenced vertices; each edge is independent and bounded.
-                foreach (int index in indices) { edges.Add(points.Count); points.Add(vertices[index]); }
-                if (points.Count == 0) target.BoundsOnly = true;
+                var triangles = mesh.triangles;
+                var vertices = mesh.vertices;
+                var featureEdges = TrackInspectorRules.FeatureEdges(triangles, vertices, MaxEdges);
+                foreach (int index in featureEdges) { edges.Add(points.Count); points.Add(vertices[index]); }
+                target.GeometryLabel = featureEdges.Length == 0 ? "empty mesh" : "mesh silhouette and creases";
             }
         }
-        else target.BoundsOnly = true;
-        if (target.BoundsOnly) { points.Clear(); edges.Clear(); Box(points, edges); }
+        else SampleColliderSurface(target, points, edges);
+
+        if (points.Count == 0 || edges.Count == 0)
+        {
+            if (_boundsFallback.Value)
+            {
+                points.Clear(); edges.Clear(); Box(points, edges);
+                target.BoundsOnly = true; target.GeometryLabel = "world bounds approximation";
+            }
+            else
+            {
+                target.GeometryUnavailable = true; target.GeometryLabel = "no surface samples";
+            }
+        }
         target.Local = points.ToArray(); target.World = new Vector3[target.Local.Length]; target.Indices = edges.ToArray();
+        target.WideVertices = new Vector3[target.Indices.Length * 2];
+        target.WideIndices = new int[target.Indices.Length * 3];
+    }
+
+    // Collider.Raycast queries the actual PhysX shape, including convex cooked
+    // hulls and meshes with Read/Write disabled. This avoids substituting their
+    // axis-aligned Collider.bounds (the cubes users were seeing).
+    private void SampleColliderSurface(Target target, List<Vector3> points, List<int> edges)
+    {
+        var collider = target.Collider;
+        Bounds bounds = collider.bounds;
+        int divisions = _sampleResolution.Value;
+        Vector3 size = bounds.size;
+        float span = Mathf.Max(size.x, Mathf.Max(size.y, size.z));
+        float padding = Mathf.Max(.025f, span * .03f);
+        for (int axis = 0; axis < 3 && edges.Count / 2 < MaxEdges; axis++)
+            SampleAxis(collider, bounds, axis, divisions, padding, points, edges);
+        target.GeometryLabel = edges.Count == 0 ? "no ray hits" : "sampled PhysX surface";
+    }
+
+    private static void SampleAxis(Collider collider, Bounds bounds, int axis, int divisions, float padding,
+        List<Vector3> points, List<int> edges)
+    {
+        float minimum = axis == 0 ? bounds.min.x : axis == 1 ? bounds.min.y : bounds.min.z;
+        float maximum = axis == 0 ? bounds.max.x : axis == 1 ? bounds.max.y : bounds.max.z;
+        float span = maximum - minimum, rayLength = span + padding * 2f;
+        if (span <= 1e-5f || rayLength <= 1e-5f) return;
+        float projectedStep = axis == 0 ? Mathf.Max(bounds.size.y, bounds.size.z) / divisions :
+            axis == 1 ? Mathf.Max(bounds.size.x, bounds.size.z) / divisions : Mathf.Max(bounds.size.x, bounds.size.y) / divisions;
+        float maxLinkDistance = Mathf.Max(.05f, projectedStep * 3f);
+        int columns = divisions + 1, cells = columns * columns;
+        for (int side = 0; side < 2; side++)
+        {
+            int[] grid = new int[cells]; Array.Fill(grid, -1);
+            for (int row = 0; row <= divisions; row++)
+            for (int column = 0; column <= divisions; column++)
+            {
+                float u = column / (float)divisions, v = row / (float)divisions;
+                Vector3 origin = bounds.min;
+                if (axis == 0) { origin.x = side == 0 ? minimum - padding : maximum + padding; origin.y = Mathf.Lerp(bounds.min.y, bounds.max.y, u); origin.z = Mathf.Lerp(bounds.min.z, bounds.max.z, v); }
+                else if (axis == 1) { origin.x = Mathf.Lerp(bounds.min.x, bounds.max.x, u); origin.y = side == 0 ? minimum - padding : maximum + padding; origin.z = Mathf.Lerp(bounds.min.z, bounds.max.z, v); }
+                else { origin.x = Mathf.Lerp(bounds.min.x, bounds.max.x, u); origin.y = Mathf.Lerp(bounds.min.y, bounds.max.y, v); origin.z = side == 0 ? minimum - padding : maximum + padding; }
+                Vector3 direction = axis == 0 ? Vector3.right : axis == 1 ? Vector3.up : Vector3.forward;
+                if (side != 0) direction = -direction;
+                if (!collider.Raycast(new Ray(origin, direction), out RaycastHit hit, rayLength)) continue;
+                grid[row * columns + column] = points.Count;
+                points.Add(collider.transform.InverseTransformPoint(hit.point));
+            }
+            for (int row = 0; row <= divisions; row++)
+            for (int column = 0; column <= divisions; column++)
+            {
+                int index = grid[row * columns + column];
+                if (index < 0) continue;
+                if (column < divisions) Connect(index, grid[row * columns + column + 1], collider, points, edges, maxLinkDistance);
+                if (row < divisions) Connect(index, grid[(row + 1) * columns + column], collider, points, edges, maxLinkDistance);
+                if (edges.Count / 2 >= MaxEdges) return;
+            }
+        }
+    }
+
+    private static void Connect(int a, int b, Collider collider, List<Vector3> points, List<int> edges, float maxLinkDistance)
+    {
+        if (b < 0 || a == b || edges.Count / 2 >= MaxEdges) return;
+        Vector3 worldA = collider.transform.TransformPoint(points[a]);
+        Vector3 worldB = collider.transform.TransformPoint(points[b]);
+        if ((worldA - worldB).sqrMagnitude > maxLinkDistance * maxLinkDistance) return;
+        edges.Add(a); edges.Add(b);
     }
     private static void Box(List<Vector3> points, List<int> edges)
     {
@@ -332,20 +457,50 @@ public sealed class TrackInspector : IModRecipe
 
     internal void DrawLabels()
     {
-        if (!_visible || !_labels.Value || !Plugin.OfflineLabAllowed) return;
-        foreach (var label in _drawLabels)
+        if (!_visible || !Plugin.OfflineLabAllowed) return;
+        if (_labels.Value)
         {
-            if (label.Camera == null) continue;
-            Vector3 point = label.Camera.WorldToScreenPoint(label.Position);
-            if (point.z <= 0) continue;
-            Rect viewport = label.Camera.pixelRect;
-            float width = Mathf.Min(340, viewport.width), left = Mathf.Clamp(point.x, viewport.xMin, viewport.xMax - width);
-            float top = Screen.height - Mathf.Clamp(point.y, viewport.yMin + 24, viewport.yMax);
-            var rect = new Rect(left, top, width, 24);
-            GUI.color = new Color(0, 0, 0, .85f); GUI.DrawTexture(rect, Texture2D.whiteTexture);
-            GUI.color = label.Color; GUI.Label(rect, label.Text);
+            foreach (var label in _drawLabels)
+            {
+                if (label.Camera == null) continue;
+                Vector3 point = label.Camera.WorldToScreenPoint(label.Position);
+                if (point.z <= 0) continue;
+                Rect viewport = label.Camera.pixelRect;
+                float width = Mathf.Min(340, viewport.width), left = Mathf.Clamp(point.x, viewport.xMin, viewport.xMax - width);
+                float top = Screen.height - Mathf.Clamp(point.y, viewport.yMin + 24, viewport.yMax);
+                var rect = new Rect(left, top, width, 24);
+                GUI.color = new Color(0, 0, 0, .88f); GUI.DrawTexture(rect, Texture2D.whiteTexture);
+                GUI.color = label.Color; GUI.Label(rect, label.Text);
+            }
         }
-        GUI.color = Color.white;
+        Matrix4x4 previousMatrix = GUI.matrix;
+        float scale = Mathf.Clamp(Screen.height / 900f, .8f, 1.4f);
+        GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+        try
+        {
+            Rect panel = new(16, 16, 366, 112);
+            GUI.color = new Color(.025f, .04f, .065f, .94f); GUI.DrawTexture(panel, Texture2D.whiteTexture);
+            GUI.color = new Color(.15f, .85f, 1f, 1f); GUI.DrawTexture(new Rect(16, 16, 4, 112), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(30, 22, 344, 22), $"TRACK INSPECTOR    {_key.Value}  hide/show");
+            string count = _nearbyCount == 0 ? "No classified zones in range" : $"{(_through.Value ? "X-ray" : "Visible surfaces")} · {_nearbyCount} zones · {_drawnCount} outlined";
+            GUI.Label(new Rect(30, 46, 344, 18), count);
+            LegendSwatch(30, 72, ColorFor(Kind.Wall)); GUI.Label(new Rect(45, 68, 92, 20), "Wall");
+            LegendSwatch(139, 72, ColorFor(Kind.AlwaysRespawn)); GUI.Label(new Rect(154, 68, 108, 20), "Respawn");
+            LegendSwatch(270, 72, ColorFor(Kind.ConditionalRespawn)); GUI.Label(new Rect(285, 68, 84, 20), "Conditional");
+            LegendSwatch(30, 96, ColorFor(Kind.KillLinked)); GUI.Label(new Rect(45, 92, 124, 20), "Kill linked");
+            LegendSwatch(170, 96, ColorFor(Kind.OtherTrigger)); GUI.Label(new Rect(185, 92, 150, 20), "Other trigger");
+        }
+        finally
+        {
+            GUI.color = Color.white;
+            GUI.matrix = previousMatrix;
+        }
+    }
+
+    private static void LegendSwatch(float x, float y, Color color)
+    {
+        GUI.color = color; GUI.DrawTexture(new Rect(x, y, 9, 9), Texture2D.whiteTexture); GUI.color = Color.white;
     }
     private void Hide()
     {
@@ -357,6 +512,7 @@ public sealed class TrackInspector : IModRecipe
         if (target.Mesh != null) UnityEngine.Object.Destroy(target.Mesh);
         if (target.Overlay != null) UnityEngine.Object.Destroy(target.Overlay);
         target.Mesh = null; target.Overlay = null; target.Local = null; target.World = null; target.Indices = null;
+        target.WideVertices = null; target.WideIndices = null; target.GeometryUnavailable = false; target.BoundsOnly = false;
     }
     public void Restore()
     {
@@ -364,7 +520,7 @@ public sealed class TrackInspector : IModRecipe
         foreach (var material in _materials.Values) if (material != null) UnityEngine.Object.Destroy(material);
         if (_root != null) UnityEngine.Object.Destroy(_root);
         _targets.Clear(); _materials.Clear(); _drawLabels.Clear(); _nearby.Clear(); _trackScenes.Clear();
-        _root = null; _hasRace = false; _visible = true; _nextScan = _nextDraw = 0;
+        _root = null; _hasRace = false; _visible = true; _nearbyCount = _drawnCount = 0; _observedSampleResolution = -1; _nextScan = _nextDraw = 0;
     }
 }
 

@@ -4,8 +4,8 @@ import re
 from . import core
 
 INFO = {
-    'MirrorRace': ('Mirror race', 'Reflect the track geometry and route data before route caches are built. Applies on the next track load; unsupported geometry is skipped with a diagnostic.', 'community'),
-    'TrackInspector': ('Track inspector', 'See physical walls, respawn boundaries and command-linked kill triggers. Press F10 to hide or show the overlay.', 'garage'),
+    'MirrorRace': ('Mirror race', 'Reflect supported offline track geometry and route data before the game builds its caches. Applies on the next track load.', 'community'),
+    'TrackInspector': ('Track inspector', 'Identify invisible walls, respawn boundaries and linked kill zones with clear in-race outlines. Convex and unreadable colliders are sampled from their actual physics surface. Press the configured key for the overlay.', 'garage'),
 }
 
 KEYS = ['F' + str(i) for i in range(1, 13)] + list('ABCDEFGHIJKLMNOPQRSTUVWXYZ') + ['Alpha' + str(i) for i in range(10)] + ['Space','LeftShift','RightShift','LeftControl','RightControl','UpArrow','DownArrow','LeftArrow','RightArrow','None']

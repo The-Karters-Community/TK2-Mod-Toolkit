@@ -96,7 +96,9 @@ public sealed class MirrorRace : IModRecipe
             try
             {
                 var scene = map.gameObject.scene;
-                if (!scene.IsValid() || !scene.isLoaded) throw new NotSupportedException("Track scene is not loaded.");
+                // This runs in Ant_MapData.Awake's prefix. Unity sets Scene.isLoaded only
+                // after scene objects have been enabled, which is after this cache hook.
+                if (!scene.IsValid()) throw new NotSupportedException("Track scene handle is invalid during map initialization.");
                 var config = Ant_CurrentGameConfiguration.GetFinalChoosedMapConfig(-1);
                 if (config == null || config.bIsCustomTrack || config.bIsModdedConfig)
                     throw new NotSupportedException("Custom track creation needs separate path/trigger reconstruction.");
