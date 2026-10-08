@@ -34,3 +34,11 @@ Game API reference and First mod tutorial have their own tabs. Method names are 
 Build the desktop executable from the checkout with **Build Toolkit.cmd**, or `tools/build_toolkit.ps1`. That script packages the application; `-RebuildPlugin` also compiles author changes. Neither action installs into the game. Install/update remains a deliberate action inside Game setup or Workshop.
 
 Closing the Toolkit window with Windows X does not unload a running game's plugin. The plugin reads config independently of the desktop UI.
+
+## Toolkit 0.6: recipes, model assets and sharing
+
+The module catalog reads literal C# recipe bindings and presents them as configurable modules in packs. Numeric bindings require declared acceptable ranges; helper-based bindings need an explicit catalog adapter. The compiled artifact retains the defaults used by its last build, so changing an unbuilt source default does not silently change reset behavior for the installed code.
+
+Per-value reset and header-level module reset stage changes. Save uses the existing semantic merge and config hot reload. This does not replace the DLL. Race Lab and CosmeticModel require updating the compiled plugin once (runtime 0.5.0) with the game closed.
+
+FBX import uses a discovered or selected Blender executable to produce a validated static OBJ/material copy. Use on kart installs only assets under BepInEx/models and stages ModelPath/Enabled. Save applies selection and placement live. Importing or exporting .tk2mod files never launches the game or automatically builds/installs C#. Models from a shared pack first enter the local model library.

@@ -53,3 +53,26 @@ New in-game panel appearance, cursor restore, race/pause/intro/spectator transit
 - The packaged DLL matches the new build artifact. The installed 0.4.0 DLL remains untouched; the user can update it through Installation. The game EXE, GameAssembly, UnityPlayer, installed DLL and config hashes were unchanged during tutorial validation. These tools performed no installation.
 
 The visible browser layout and small-icon appearance still need user inspection; the earlier rejected browser permission was not bypassed. No game was launched, and no new runtime behavior is claimed tested by these checks. Another-machine installation remains a separate manual acceptance check.
+
+## 0.6.1 resets, Race Lab, models and sharing (2026-10-09)
+
+- Backend: **83 Python tests** passed. New coverage exercises literal recipe catalogs, compiled default preservation, selective packages, explicit conflict replacement/rollback, checksum/range/path validation, model dependencies checked before source writes, geometry bounds, texture dimensions and asset-only deployment into a fake game.
+- Frontend: **122 offline state assertions** passed, including per-value reset, numeric slider synchronization, module header resets, Models/Share modules tab separation, module selection and staging imported presets without config writes. Static smoke checks **111 unique controls**, three main views, valid JavaScript and theme tokens.
+- Runtime 0.5.0 compiled against the current installed BepInEx/IL2CPP interop: **0 warnings, 0 errors**. Seven Race Lab recipes and CosmeticModel are discovered by the existing recipe host. All gameplay recipes default off and retain local/offline guards; leaderboard upload behavior is unchanged.
+- Durable managed harnesses: `tests/Mechanics/MechanicsTests.csproj` passed **29 transition/guard checks** on actual recipe files with Unity/game stubs. `tests/ModelParser/model-parser-tests.csproj` passed **23 parser/path/image-dimension checks**. These are simulations, not native runtime tests.
+- Installed **Blender 3.5.1** performed actual headless FBX conversion of a generated textured sample: eight vertices, twelve triangles, OBJ/MTL and PNG texture output; geometry preview bounds and dependencies validated. The newer 4.4 folder has no executable, so discovery correctly selects 3.5. Creator-provided FBX files still need individual compatibility checks.
+- Export/review/import roundtrip of all **35 modules / 323 settings** passed against actual Toolkit sources. All imported toggles were off; unchanged source was not rewritten. A single mechanic exports its helpers without unrelated custom recipes. Packages do not contain game binaries or loader/interop DLLs.
+- The public build script produced **TK2 Mod Toolkit 0.6.1** and its ZIP. The open 0.6.0 app was preserved; Windows correctly refused overwriting its running executable, so this release uses a new output directory.
+- Headless packaged-executable checks passed: all 35 source mappings, the compiled recipe catalog, 844 categorized APIs, 32,350 declarations, authenticated endpoints, all ten embedded icon resources matching the supplied ICO, and ZIP integrity. The installed game's plugin DLL stayed at its original SHA256 `ef3cc5b65201b573b731f4e927ae8c1aa983f08a8dd2c1ccbcbf0d2d9cc2bb08`; no plugin or model was deployed into the real game.
+
+The visible layout, handling, camera/model appearance and Unity bundle compatibility remain manual acceptance checks. The earlier denied browser preview was not bypassed. The game was not launched automatically. FBX is a static cosmetic shell: animations, driver skeleton, collision and full PBR reconstruction are outside this importer.
+
+Reproduce the checks:
+
+```powershell
+python -m unittest discover -s tests -p 'test_*.py'
+node tests/garage-state.test.cjs
+python tools/smoke_garage.py
+dotnet run --project tests/Mechanics/MechanicsTests.csproj
+dotnet run --project tests/ModelParser/model-parser-tests.csproj
+```
