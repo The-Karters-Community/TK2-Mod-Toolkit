@@ -27,4 +27,10 @@ Opening the panel exposes the mouse without pausing the race. Closing restores i
 
 Workshop creates/edits readable C# modules, then Build compiles the one plugin. Install/update replaces it with a backup while the game is closed. Restart once to load that code. After it is loaded, its ordinary options use the config-only path above.
 
+In Toolkit 0.5.0, expand a module and choose **Edit code** to filter Workshop's Module editor to its actual files. Built-in code lives in `plugins/TK2.Customization`; recipes get their own `.cs` files in its `Recipes` subfolder. Save C# writes the selected source, Reload file reads external edits, and Open folder lets you use an external editor. The compiled DLL remains a separate result.
+
+Game API reference and First mod tutorial have their own tabs. Method names are navigation; the signature pane is read-only reference. Only functions with reconstructed implementations can open recovered C# bodies. The tutorial creates a complete starter recipe and explains when to build versus save config.
+
+Build the desktop executable from the checkout with **Build Toolkit.cmd**, or `tools/build_toolkit.ps1`. That script packages the application; `-RebuildPlugin` also compiles author changes. Neither action installs into the game. Install/update remains a deliberate action inside Game setup or Workshop.
+
 Closing the Toolkit window with Windows X does not unload a running game's plugin. The plugin reads config independently of the desktop UI.
