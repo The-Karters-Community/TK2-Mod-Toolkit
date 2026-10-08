@@ -38,13 +38,13 @@ const fixture = {installed: false, packCurrent: false, pluginCount: 0, game: 'te
   recipes: [{section: 'Recipe.FrameLimiter', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Limit FPS'}],
   extraSettings: [{section: 'MK.BoostTrainer', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Trainer'}],
   extraPacks: {'MK.BoostTrainer': 'mks'},
-  settings: {'Audio/Enabled': false, 'Audio/MasterVolume': 1, 'Physics/Enabled': false, 'Camera/Enabled': false, 'Camera/FieldOfView': 65}, configHash: 'first-hash',
+  settings: {'Audio/Enabled': false, 'Audio/MasterVolume': 1, 'Physics/Enabled': false, 'Camera/Enabled': false, 'Camera/FieldOfView': 65, 'Camera/AimAtKart':true, 'Camera/PanelHotkey':'F8', 'Audio/LargeCount':120}, configHash: 'first-hash',
   packs: [{id:'garage', name:'Toolkit Essentials', features:['Audio','Camera']}, {id:'mks', name:"Community Mods", features:['Physics']}, {id:'community', name:'Community Pack', features:[]}],
   moduleSources: {Camera:['plugins/TK2.Customization/CameraFeature.cs','plugins/TK2.Customization/CameraSettings.cs'], Audio:['plugins/TK2.Customization/AudioFeature.cs'], 'Recipe.FrameLimiter':['plugins/TK2.Customization/Recipes/FrameLimiter.cs']},
   files: ['src/Reconstructed/KartLogic.cs','plugins/TK2.Customization/CameraFeature.cs','plugins/TK2.Customization/CameraSettings.cs','plugins/TK2.Customization/AudioFeature.cs','plugins/TK2.Customization/Recipes/FrameLimiter.cs'], features: [
-    {id:'Audio', name:'Audio mixer', category:'Audio', description:'Volume adjustment', origin:'New', settings:[['MasterVolume','Volume','float',1,0,1]]},
+    {id:'Audio', name:'Audio mixer', category:'Audio', description:'Volume adjustment', origin:'New', settings:[['MasterVolume','Volume','float',1,0,1],['LargeCount','Large count','int',120,0,20000]]},
     {id:'Physics', name:'Fast fall', category:'Driving', description:'Physics description', origin:'Adapted', gameplay:true, settings:[]},
-    {id:'Camera', name:'Camera', category:'Camera', description:'Keep your kart in view', origin:'New', settings:[['FieldOfView','Field of view','float',65,35,110]]}
+    {id:'Camera', name:'Camera', category:'Camera', description:'Keep your kart in view', origin:'New', settings:[['FieldOfView','Field of view','float',65,35,110],['AimAtKart','Aim at kart','bool',true,null,null],['PanelHotkey','Panel hotkey','text','F8',null,null,'Camera key',['F8','C','F6']]]}
   ]};
 const calls = []; let sourceConflict = false, settingsFailure, stateFailure = false, deferSave, pendingSave, hashCounter = 0, deferFunctions, pendingFunctions, functionFailure;
 function saveResponse(body) {
@@ -216,6 +216,31 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   ids['mod-search'].value = ''; ids['mod-search'].oninput();
   const hints = descendants(ids['feature-list']).filter(node => node.classes.has('setting-hint'));
   assert.ok(hints.some(node => node.textContent.includes('Default: 65') && node.textContent.includes('35 to 110')),'default and allowed values remain visible');
+  const optionCheckbox = control('Camera/AimAtKart');
+  assert.equal(typeof optionCheckbox.onchange,'function','boolean options need a real change handler');
+  optionCheckbox.checked = false; optionCheckbox.onchange();
+  assert.equal(run("state.settings['Camera/AimAtKart']"),false);
+  assert.equal(ids['save-settings'].disabled,false,'checkbox change prompts saving');
+  await run('refresh(true,true)');
+  assert.equal(control('Camera/AimAtKart').checked,false,'poll preserves unsaved checkbox edits');
+  await ids['save-settings'].click();
+  assert.equal(latestSave().values['Camera/AimAtKart'],false,'saving checkbox sends a boolean');
+  const hotkey = control('Camera/PanelHotkey');
+  assert.equal(typeof hotkey.onchange,'function','hotkey dropdowns need a change handler');
+  hotkey.value = 'C'; hotkey.onchange();
+  assert.equal(run("state.settings['Camera/PanelHotkey']"),'C');
+  assert.equal(ids['save-settings'].disabled,false,'key change prompts saving');
+  await run('refresh(true,true)');
+  assert.equal(control('Camera/PanelHotkey').value,'C','poll preserves unsaved key edits');
+  await ids['save-settings'].click();
+  assert.equal(latestSave().values['Camera/PanelHotkey'],'C');
+  const plainNumber = control('Audio/LargeCount');
+  assert.equal(plainNumber.slider,undefined);
+  assert.equal(typeof plainNumber.oninput,'function','number inputs without sliders need handlers');
+  plainNumber.value = '180'; plainNumber.oninput();
+  assert.equal(run("state.settings['Audio/LargeCount']"),180);
+  await ids['save-settings'].click();
+  assert.equal(latestSave().values['Audio/LargeCount'],180);
   const cameraValue = control('Camera/FieldOfView');
   assert.ok(cameraValue.slider, 'bounded numeric options have an interactive slider');
   cameraValue.slider.value = '82'; cameraValue.slider.oninput();
@@ -226,8 +251,7 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   assert.equal(Number(cameraValue.slider.value),65,'reset synchronizes the slider');
   const headerResets = descendants(ids['feature-list']).filter(node => node.classes.has('module-reset'));
   assert.ok(headerResets.length >= fixture.features.length,'every module has a reset without expansion');
-  ids['tab-models'].click(); assert.equal(ids['panel-models'].hidden,false); assert.equal(ids['panel-editor'].hidden,true);
-  ids['tab-sharing'].click(); assert.equal(ids['panel-sharing'].hidden,false); assert.equal(ids['panel-models'].hidden,true);
+  ids['tab-sharing'].click(); assert.equal(ids['panel-sharing'].hidden,false);
   ids['export-select-all'].click(); assert.equal(run('exportSelection.size'),fixture.features.length);
   assert.equal(ids['export-package'].disabled,false,'selected modules enable export');
   ids['export-select-none'].click(); assert.equal(run('exportSelection.size'),0); assert.equal(ids['export-package'].disabled,true);

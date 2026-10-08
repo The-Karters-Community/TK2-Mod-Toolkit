@@ -76,3 +76,11 @@ python tools/smoke_garage.py
 dotnet run --project tests/Mechanics/MechanicsTests.csproj
 dotnet run --project tests/ModelParser/model-parser-tests.csproj
 ```
+
+## Settings cleanup (2026-10-09)
+
+The Models importer and seven Race Lab recipes have been removed from active runtime source, UI, API, package support and tests. Removed config sections are preserved on disk but hidden in the Toolkit; importing retired modules is rejected. Portable builds now require an explicit user request, recorded in AGENTS.md.
+
+The checkbox/hotkey regression was caused by missing input/change listeners after the slider refactor. A new test first reproduced the missing boolean handler. All controls now receive handlers, including dropdowns and numeric fields without sliders. Regression checks verify typed boolean/key values, unsaved edits surviving background refreshes, save-button activation and saved payloads.
+
+Validation: **75 Python tests**, **133 offline frontend assertions**, static UI smoke (**96 controls**) and runtime **0.5.1 compilation with zero warnings/errors**. No portable executable/ZIP was built, no real game files were changed, and the game was not launched. Source changes are available through Launch Studio.cmd; old portable executables retain their embedded code until the user requests a new build.

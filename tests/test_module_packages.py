@@ -144,19 +144,11 @@ class ModulePackagesTests(unittest.TestCase):
         for value in (float("nan"), float("inf"), 31, True, "6"):
             with self.subTest(value=value), self.assertRaises(ValueError): self.exported({"Recipe.TestHop/Strength": value})
 
-    def test_model_assets_export_stage_without_game_write(self):
-        model_code = RECIPE.replace("TestHop", "CosmeticModel").replace('config.Bind("Recipe." + Name, "Strength", 6f, new ConfigDescription("Hop strength.", new AcceptableValueRange<float>(0, 30)));', 'config.Bind("Recipe." + Name, "ModelPath", "", "Model file.");')
-        model_file = self.sources / "Recipes/CosmeticModel.cs"; model_file.write_text(model_code)
-        game = self.root / "game"; folder = game / "BepInEx/models/fun-kart"; folder.mkdir(parents=True)
-        obj = folder / "model.obj"; obj.write_text("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n")
-        (folder / "license.txt").write_text("Creator attribution")
-        result = packages.export_package(["Recipe.CosmeticModel"], "Kart", {"Recipe.CosmeticModel/ModelPath": "fun-kart/model.obj"}, game)
-        path = packages.download_path(result["id"]); preview = packages.preview_import(path)
-        imported = packages.import_package(path, preview["hash"])
-        self.assertEqual(len(imported["models"]), 1)
-        self.assertTrue(Path(imported["models"][0]).is_relative_to(self.root / "local/module-assets"))
-        self.assertEqual(obj.read_text(), Path(imported["models"][0]).read_text())
-        self.assertFalse(imported["settings"]["Recipe.CosmeticModel/Enabled"])
+    def test_removed_modules_and_assets_are_rejected(self):
+        for name in ('models/kart/model.obj', 'plugins/TK2.Customization/Models/CosmeticModel.cs', 'plugins/TK2.Customization/Recipes/AirGlider.cs'):
+            path = self.exported(); self.rewrite(path, extra=(name,b'fixture'))
+            with self.subTest(name=name), self.assertRaises(ValueError): packages.preview_import(path)
+        with self.assertRaises(ValueError): packages.export_package(['Recipe.AirGlider'],'Removed',{})
 
     def test_shared_local_helper_export_and_rollback_on_write_failure(self):
         helper = self.sources / "Recipes/Helper.cs"

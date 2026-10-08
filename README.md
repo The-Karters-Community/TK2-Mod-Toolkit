@@ -6,11 +6,9 @@ A Windows mod manager and C# workshop for **The Karters 2 Turbo Charged 0.1.4.18
 
 ## Features
 
-- **35 modules** across Toolkit Essentials, Community Mods, Race Lab, Custom Models and Your Recipes.
+- Modules grouped into Toolkit Essentials, Community Mods and Your Recipes.
 - Per-value, module and pack resets; visible defaults, allowed ranges and interactive sliders.
 - Live camera tuning with **F8**, plus interface, audio, graphics and driving controls.
-- Seven new mechanics: slipstream dash, drift charge, air gliding, rewind, repulsor pulse, gravity surfing and landing combos.
-- **FBX/OBJ model import**, geometry preview and live cosmetic placement. FBX conversion needs Blender 3.5+.
 - C# editor, first-mod tutorial, game API browser and selective **.tk2mod** export/import.
 
 ## Get started
@@ -33,13 +31,12 @@ Double-click **Build Toolkit.cmd**, or run:
 
 Requires Python 3.10+ (64-bit), a .NET SDK and the initialized game. Steam discovery supplies the game path; optional `-GamePath` and `-LoaderPath` arguments support other installations. Omit `-RebuildPlugin` to reuse the existing compiled plugin.
 
-Output: `artifacts/portable/TK2 Mod Toolkit 0.6.1/` and its ZIP. Distribute the entire folder or ZIP. The build script never installs into the game.
+Only build a portable distribution when needed. Output: `artifacts/portable/TK2 Mod Toolkit 0.6.2/` and its ZIP. Distribute the entire folder or ZIP. The build script never installs into the game.
 
 ## Guides
 
 - [First mod](docs/FIRST-MOD.md) · [Application flow](docs/APPLICATION-FLOW.md)
-- [New mechanics](docs/NEW-MECHANICS.md) · [Model import](docs/MODEL-IMPORT.md)
 - [Share modules](docs/SHARING-MODULES.md) · [Community ports](docs/MOD-PACK.md)
 - [Readable source & limits](docs/READABLE-SOURCE.md) · [Validation](docs/VALIDATION.md)
 
-Modules start disabled. Gameplay changes run in local/offline races. This test build does not require Disable Leaderboards or block uploads. Imported models are static kart cosmetics; driver rigging and collision remain original. Native reconstruction is partial, not the original Unity source project. Compilation and simulated checks pass; handling and visuals still need manual in-game testing.
+Modules start disabled. Gameplay changes run in local/offline races. This test build does not require Disable Leaderboards or block uploads. Native reconstruction is partial, not the original Unity source project. Compilation and simulated checks pass; handling and visuals still need manual in-game testing.

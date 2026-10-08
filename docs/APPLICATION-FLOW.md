@@ -35,10 +35,10 @@ Build the desktop executable from the checkout with **Build Toolkit.cmd**, or `t
 
 Closing the Toolkit window with Windows X does not unload a running game's plugin. The plugin reads config independently of the desktop UI.
 
-## Toolkit 0.6: recipes, model assets and sharing
+## Recipes and sharing
 
-The module catalog reads literal C# recipe bindings and presents them as configurable modules in packs. Numeric bindings require declared acceptable ranges; helper-based bindings need an explicit catalog adapter. The compiled artifact retains the defaults used by its last build, so changing an unbuilt source default does not silently change reset behavior for the installed code.
+The module catalog reads literal C# recipe bindings and presents their configurable values. Numeric bindings require declared acceptable ranges. The compiled artifact retains the defaults used by its last build, so changing an unbuilt source default does not change reset behavior for installed code.
 
-Per-value reset and header-level module reset stage changes. Save uses the existing semantic merge and config hot reload. This does not replace the DLL. Race Lab and CosmeticModel require updating the compiled plugin once (runtime 0.5.0) with the game closed.
+Per-value and module resets stage edits. Save uses the semantic config merge and hot reload, without replacing the DLL. Source imports require an explicit Build & install with the game closed. Modules and settings can be shared as source-only .tk2mod packages.
 
-FBX import uses a discovered or selected Blender executable to produce a validated static OBJ/material copy. Use on kart installs only assets under BepInEx/models and stages ModelPath/Enabled. Save applies selection and placement live. Importing or exporting .tk2mod files never launches the game or automatically builds/installs C#. Models from a shared pack first enter the local model library.
+The earlier experimental Models importer and seven Race Lab recipes have been removed. Old config sections are preserved on disk but hidden from the active settings page. Portable packaging is performed only when explicitly requested.

@@ -20,7 +20,6 @@ VERSION = 1
 MAX_FILES = 512
 MAX_TOTAL = 384 * 1024 * 1024
 MAX_ARCHIVE = 512 * 1024 * 1024
-MODEL_EXTENSIONS = {".obj", ".mtl", ".png", ".jpg", ".jpeg", ".bundle", ".txt", ".md", ".json"}
 SOURCE_PREFIXES = ("plugins/TK2.Customization/", "src/Reconstructed/")
 WARNINGS = ["Imported C# is editable source, not sandboxed code. Review it before building.",
             "Built-in modules share source files. Replacing shared code can affect other modules.",
@@ -49,19 +48,17 @@ def _name(value):
 def _kind(path):
     name = _name(path)
     if name.startswith(SOURCE_PREFIXES) and name.endswith(".cs"):
+        if '/Models/' in name or PurePosixPath(name).stem in {identity.removeprefix('Recipe.') for identity in pack.RETIRED_MODULES}:
+            raise ValueError("This package contains a removed module")
         if any(p.lower() in ("bin", "obj", ".git") for p in PurePosixPath(name).parts):
             raise ValueError("Generated or repository files cannot be imported")
         return "source"
-    if name.startswith("models/") and len(PurePosixPath(name).parts) >= 3 and PurePosixPath(name).suffix.lower() in MODEL_EXTENSIONS:
-        return "model"
     raise ValueError("Unsupported package file: " + name)
 
 
 def _limit(name, kind):
     if kind == "source": return 2 * 1024 * 1024
-    return {".bundle": 256 * 1024 * 1024, ".obj": 32 * 1024 * 1024,
-            ".png": 16 * 1024 * 1024, ".jpg": 16 * 1024 * 1024,
-            ".jpeg": 16 * 1024 * 1024}.get(PurePosixPath(name).suffix.lower(), 1024 * 1024)
+    raise ValueError("Only C# source packages are supported")
 
 
 def _managed(path, root):
@@ -129,14 +126,9 @@ def _source_dependencies(features):
     for feature in features:
         sources.update(source for source in owners.get(feature["id"], [])
                        if not (feature["id"].startswith("Recipe.") and source.endswith("/RecipeHost.cs")))
-    # Export only relevant reconstructed adapters, with their same-folder helpers.
-    if any(f["id"] in ("Physics", "Recipe.SlipstreamSling", "Recipe.DriftCapacitor", "Recipe.AirGlider", "Recipe.RepulsorPulse", "Recipe.GravitySurf", "Recipe.LandingCombo") for f in features):
+    if any(f["id"] == "Physics" for f in features):
         sources.add("plugins/TK2.Customization/ReadableGame.cs")
         sources.update(s for s in pack.source_files() if s.startswith("src/Reconstructed/"))
-    if any(f.get("pack") == "mechanics" or f["id"] in {"Recipe." + n for n in recipe_catalog.INFO if recipe_catalog.INFO[n][2] == "mechanics"} for f in features):
-        sources.add("plugins/TK2.Customization/Recipes/MechanicsContext.cs")
-    if any(f["id"] == "Recipe.CosmeticModel" for f in features):
-        sources.update(s for s in pack.source_files() if s.startswith("plugins/TK2.Customization/Models/"))
     # Local custom recipes may use additional helper source files. Resolve declared
     # local type names transitively; never follow paths requested by imported code.
     available = {s: pack.source_path(s).read_text(encoding="utf-8-sig") for s in pack.source_files()}
@@ -173,24 +165,6 @@ def export_package(ids, name, values, game=None):
     for source in _source_dependencies(features):
         _kind(source)
         content[source] = _managed(core.ROOT / source, core.ROOT).read_bytes()
-    model_path = selected_values.get("Recipe.CosmeticModel/ModelPath", "")
-    if model_path:
-        if game is None: raise ValueError("Choose the game installation to include the selected model assets")
-        _name(model_path)
-        parts = PurePosixPath(model_path).parts
-        if len(parts) < 2 or PurePosixPath(model_path).suffix.lower() not in (".obj", ".bundle"):
-            raise ValueError("Choose an installed model inside its model folder")
-        root = Path(game) / "BepInEx/models"
-        model = _managed(root / model_path, root)
-        if not model.is_file(): raise ValueError("Selected model asset is missing")
-        folder = _managed(root / parts[0], root)
-        for file in sorted(folder.rglob("*")):
-            _managed(file, root)
-            if not file.is_file(): continue
-            relative = "models/" + file.relative_to(root).as_posix()
-            kind = _kind(relative)
-            if file.stat().st_size > _limit(relative, kind): raise ValueError("Model asset exceeds package size limits")
-            content[relative] = file.read_bytes()
     if len(content) + 1 > MAX_FILES or sum(map(len, content.values())) > MAX_TOTAL:
         raise ValueError("Selected package exceeds file or total size limits")
     entries = []
@@ -201,7 +175,7 @@ def export_package(ids, name, values, game=None):
     identity = uuid.uuid4().hex
     manifest = {"format": FORMAT, "version": VERSION, "name": name.strip(), "modules": modules,
                 "settings": selected_values, "files": entries,
-                "requires": {"toolkit": ">=0.6.0", "runtime": "TK2.Customization", "runtimeVersion": ">=0.5.0", "sourceProject": "TK2-Mod-SDK", "unity": "IL2CPP", "buildAfterSourceImport": True}}
+                "requires": {"toolkit": ">=0.6.2", "runtime": "TK2.Customization", "runtimeVersion": ">=0.5.1", "sourceProject": "TK2-Mod-SDK", "unity": "IL2CPP", "buildAfterSourceImport": True}}
     directory = core.ROOT / "local/module-exports"
     directory.mkdir(parents=True, exist_ok=True)
     destination = _managed(directory / (identity + ".tk2mod"), directory)
@@ -309,17 +283,6 @@ def _read(path):
         for name, source in content.items():
             target = stage / name; target.parent.mkdir(parents=True, exist_ok=True); target.write_bytes(source)
         parsed = {f["id"]: f for f in recipe_catalog.source_features(stage / "plugins/TK2.Customization")}
-        # Review model dependencies before replacing any source. Validation uses
-        # temporary copies; preview must not add models to the user's library.
-        from . import model_assets
-        for name in content:
-            if _kind(name) != 'model': continue
-            path = stage / name
-            if path.suffix.lower() == '.obj':
-                model_assets._copy_obj(path, stage / 'validated-models' / _digest(name.encode())[:16])
-            elif path.suffix.lower() == '.bundle':
-                if path.read_bytes()[:8].split(b'\0')[0] not in {b'UnityFS',b'UnityRaw',b'UnityWeb'}:
-                    raise ValueError('Package contains an invalid Unity AssetBundle')
     definitions = {}
     for module in modules:
         identity = module["id"]
@@ -335,18 +298,11 @@ def _read(path):
         _setting(value, definitions[compound])
     imported = {compound: settings.get(compound, definition["default"]) for compound, definition in definitions.items()}
     for identity in identities: imported[identity + "/Enabled"] = False
-    model_path = imported.get("Recipe.CosmeticModel/ModelPath", "")
-    if model_path:
-        _name(model_path)
-        if len(PurePosixPath(model_path).parts) < 2 or PurePosixPath(model_path).suffix.lower() not in (".obj", ".bundle") or "models/" + model_path not in content:
-            raise ValueError("Selected model path does not match packaged model assets")
     return path, _digest(data), manifest, content, imported
 
 
 def _destination(name, identity):
-    if _kind(name) == "source": return _managed(core.ROOT / name, core.ROOT)
-    root = core.ROOT / "local/module-assets" / identity
-    return _managed(root / name, root)
+    return _managed(core.ROOT / name, core.ROOT)
 
 
 def preview_import(path):
@@ -391,10 +347,8 @@ def import_package(path, hash, replace=False):
             if originals[name] is None: target.unlink(missing_ok=True)
             else: core.atomic_write(target, originals[name])
         raise
-    model_assets = [{"relative": name.removeprefix("models/"), "source": str(target)} for name, _, target in targets if _kind(name) == "model"]
-    models = [entry["source"] for entry in model_assets if PurePosixPath(entry["relative"]).suffix.lower() in (".obj", ".bundle")]
     return {"settings": settings, "modules": [m["id"] for m in manifest["modules"]],
-            "files": [name for name, _, _ in targets], "modelAssets": model_assets, "models": models,
+            "files": [name for name, _, _ in targets],
             "backup": str(backup) if conflicts else None, "warnings": WARNINGS,
             "requiresBuild": any(_kind(name) == "source" for name, _ in written),
             "message": "Imported selected source and settings. Modules remain disabled; review code, apply settings, and build changed C# explicitly."}

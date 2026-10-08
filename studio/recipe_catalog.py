@@ -3,16 +3,8 @@ from pathlib import Path
 import re
 from . import core
 
-INFO = {
-    'SlipstreamSling': ('Slipstream sling', 'Charge behind another kart, then release a straight-line dash.', 'mechanics'),
-    'DriftCapacitor': ('Drift capacitor', 'Bank charge while drifting and spend it on a burst when you choose.', 'mechanics'),
-    'AirGlider': ('Air glider', 'Trade a limited air fuel supply for lift and steering while airborne.', 'mechanics'),
-    'EchoRewind': ('Echo rewind', 'Rewind your kart along a short recorded trail without rewinding race progress.', 'mechanics'),
-    'RepulsorPulse': ('Repulsor pulse', 'Release a timed proximity pulse that pushes nearby rival karts away.', 'mechanics'),
-    'GravitySurf': ('Gravity surf', 'Build energy downhill and use it to climb or release a momentum burst.', 'mechanics'),
-    'LandingCombo': ('Landing combo', 'Time your landing input to chain increasingly strong forward impulses.', 'mechanics'),
-    'CosmeticModel': ('Imported kart model', 'Attach your imported static model to the local kart and tune its placement.', 'cosmetics'),
-}
+INFO = {}
+
 KEYS = ['F' + str(i) for i in range(1, 13)] + list('ABCDEFGHIJKLMNOPQRSTUVWXYZ') + ['Alpha' + str(i) for i in range(10)] + ['Space','LeftShift','RightShift','LeftControl','RightControl','UpArrow','DownArrow','LeftArrow','RightArrow','None']
 
 
@@ -78,18 +70,8 @@ def source_features(source_root=None):
                 desc = literal(match[1]) if match else ''
             choices = list(dict.fromkeys([str(default), *KEYS])) if args[2].startswith('KeyCode.') else None
             settings.append((key, re.sub(r'(?<=[a-z0-9])(?=[A-Z])', ' ', key), kind, default, low, high, desc, choices, None))
-        if name == 'CosmeticModel':
-            settings = [('ModelPath','Model path','text','',None,None,'Relative to BepInEx/models; choose a model in Workshop → Models.',None,None),
-                        ('AssetName','Bundle prefab','text','',None,None,'Empty selects the first prefab in a Unity bundle.',None,None)]
-            for key, label, default, low, high in [('Scale','Scale',1.0,.01,100), *[(f'Offset{a}',f'Position {a}',0.0,-10,10) for a in 'XYZ'], *[(f'Rotation{a}',f'Rotation {a}',0.0,-180,180) for a in 'XYZ']]:
-                settings.append((key,label,'float',default,low,high,'Cosmetic transform; physics and collision stay unchanged.',None,None))
-            settings += [('HideOriginalKart','Hide original kart','bool',False,None,None,'Keep the driver visible.',None,None),
-                         ('MirrorX','Convert OBJ handedness','bool',True,None,None,'Reloads geometry when changed.',None,None),
-                         ('Tint','Diffuse tint','text','#FFFFFF',None,None,'Use a #RRGGBB colour.',None,None),
-                         ('ReloadToken','Reload revision','int',0,0,2147483647,'Increase after editing textures or materials.',None,None)]
-            unsupported = []
-        features.append({'id':'Recipe.' + name, 'name':title, 'category':'Driving' if pack == 'mechanics' else 'Graphics',
-                         'description':description, 'pack':pack, 'gameplay':bool(re.search(r'ChangesGameplay\s*=>\s*true', text)) or pack == 'mechanics',
+        features.append({'id':'Recipe.' + name, 'name':title, 'category':'Driving',
+                         'description':description, 'pack':pack, 'gameplay':bool(re.search(r'ChangesGameplay\s*=>\s*true', text)),
                          'origin':'New recipe', 'settings':settings, 'source':str(file.relative_to(root)).replace('\\','/'),
                          'catalogWarnings':unsupported})
     return features

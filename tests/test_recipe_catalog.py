@@ -62,3 +62,15 @@ class RecipeCatalogTests(unittest.TestCase):
         feature = recipe_catalog.features()[0]
         self.assertNotIn('Strength',[s[0] for s in feature['settings']])
         self.assertTrue(feature['catalogWarnings'])
+
+    def test_removed_module_config_does_not_reappear_in_settings(self):
+        data = b'[Recipe.AirGlider]\nEnabled = true\nLift = 18\n[Recipe.CosmeticModel]\nEnabled = true\nModelPath = old/model.obj\n'
+        result = settings.read(data)
+        self.assertFalse(result['recipes'])
+        self.assertFalse(any(k.startswith(('Recipe.AirGlider/','Recipe.CosmeticModel/')) for k in result['settings']))
+        with self.assertRaises(ValueError): settings.merge(data,{'hash':result['configHash'],'recipes':{'Recipe.AirGlider/Enabled':'false'}})
+        saved = settings.merge(data,{'hash':result['configHash'],'values':{'Camera/PanelEnabled':False,'Camera/PanelHotkey':'C'}})
+        self.assertIn(b'ModelPath = old/model.obj',saved)
+        after = settings.read(saved)
+        self.assertIs(after['settings']['Camera/PanelEnabled'],False)
+        self.assertEqual(after['settings']['Camera/PanelHotkey'],'C')

@@ -6,10 +6,9 @@ const token = document.querySelector('meta[name="tk2-session"]').content;
 let state, category = 'All', source, sourceDirty = false, settingsDirty = false, busy = false, actionInFlight;
 let noticeTimer, revision = 0, refreshSequence = 0, conflictKeys = [];
 const settingEdits = new Map(), recipeEdits = new Map(), extraEdits = new Map(), expandedModules = new Set();
-const workshopTabs = ['editor', 'api', 'models', 'sharing', 'tutorial'];
+const workshopTabs = ['editor', 'api', 'sharing', 'tutorial'];
 const exportSelection = new Set();
-let selectedModel = '', modelGeometry, previewPackage, modelPreviewSequence = 0;
-let modelYaw = .6, modelPitch = -.3, modelZoom = 1, modelDrag;
+let previewPackage;
 const themeMedia = matchMedia('(prefers-color-scheme: dark)');
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
@@ -79,6 +78,7 @@ function settingsControl(key, label, kind, value, low, high, description, choice
   input.id = 'setting-' + encodeURIComponent(key); copy.setAttribute('for', input.id);
   input.dataset[dataset] = key; input.disabled = !state.game || busy && actionInFlight !== 'settings'; input.setAttribute('aria-label', label);
   const changed = () => onChange(kind === 'bool' && !choices?.length ? input.checked : ['text', 'select'].includes(kind) || choices?.length ? input.value : input.value === '' ? '' : Number(input.value));
+  input.oninput = changed; input.onchange = changed;
   const tools = el('div', 'value-tools'), reset = el('button', 'value-reset', 'Reset');
   reset.setAttribute('aria-label', 'Reset ' + label + ' to default'); reset.title = `Default: ${defaultText}`;
   reset.disabled = defaultValue === undefined || input.disabled;
@@ -293,7 +293,7 @@ function resetFeatures(features) {
   features.forEach(feature => {changeSetting(feature.id + '/Enabled', false); feature.settings.forEach(setting => changeSetting(feature.id + '/' + setting[0], setting[3]));});
   syncControls(); notice('Defaults restored. Save changes to apply.');
 }
-function render() {renderFeatures(); renderRecipes(); renderFiles(); renderInstallation(); renderAssets(); renderSharing(); syncDependencies(); updateSaveState();}
+function render() {renderFeatures(); renderRecipes(); renderFiles(); renderInstallation(); renderSharing(); syncDependencies(); updateSaveState();}
 function mergeState(next) {
   settingEdits.forEach((edit, key) => {next.settings[key] = edit.value;});
   [['recipes', recipeEdits], ['extraSettings', extraEdits]].forEach(([field, edits]) => {(next[field] || []).forEach(entry => {const edit = edits.get(entry.section + '/' + entry.key); if (edit) entry.value = edit.value;});});
@@ -306,7 +306,7 @@ function syncControls() {
 }
 async function refresh(preserveSettings = true, quiet = false) {
   const sequence = ++refreshSequence, next = await api('state'); if (sequence !== refreshSequence) return;
-  const structure = value => [value.features, value.packs, value.files, value.modelLibrary, ...( ['recipes', 'extraSettings'].map(field => (value[field] || []).map(entry => entry.section + '/' + entry.key)))];
+  const structure = value => [value.features, value.packs, value.files, ...( ['recipes', 'extraSettings'].map(field => (value[field] || []).map(entry => entry.section + '/' + entry.key)))];
   const changed = !state || JSON.stringify(structure(next)) !== JSON.stringify(structure(state));
   if (!preserveSettings) {settingEdits.clear(); recipeEdits.clear(); extraEdits.clear();}
   mergeState(next);
@@ -359,12 +359,12 @@ function showWorkshopTab(name) {
   if (name === 'api' && functionSequence === 0) searchFunctions().catch(error => notice(error.message, true));
 }
 function setBusy(value) {
-  busy = value; ['workshop-install', 'build', 'create-recipe', 'diagnose', 'prepare-loader', 'installation-install', 'scan-games', 'select-game', 'browse-game', 'browse-model', 'browse-blender', 'import-model', 'browse-package', 'preview-package'].forEach(id => {$(id).disabled = value;});
+  busy = value; ['workshop-install', 'build', 'create-recipe', 'diagnose', 'prepare-loader', 'installation-install', 'scan-games', 'select-game', 'browse-game', 'browse-package', 'preview-package'].forEach(id => {$(id).disabled = value;});
   $('save-source').disabled = value || !sourceDirty; $('code').readOnly = value || !source; $('reload-source').disabled = value || !source; $('open-source-folder').disabled = value || !source; updateSaveState();
   document.querySelectorAll('[data-edit-module]').forEach(button => {button.disabled = value || !state?.moduleSources?.[button.dataset.editModule]?.length;});
   // Keep controls mounted and editable during a settings save.
   document.querySelectorAll('[data-setting], [data-recipe], [data-extra]').forEach(input => {const feature = state?.features.find(item => item.id === input.dataset.setting?.split('/')[0]); input.disabled = value && actionInFlight !== 'settings' || feature?.available === false || !state?.game;});
-  syncDependencies(); if (state) {renderInstallation(); updateAssetButtons();}
+  syncDependencies(); if (state) {renderInstallation(); updateSharingButtons();}
 }
 function settingsError(error) {
   conflictKeys = error.details?.conflicts || error.details?.conflictKeys || []; if (!Array.isArray(conflictKeys)) conflictKeys = Object.keys(conflictKeys);
@@ -506,63 +506,20 @@ $('function-scroll').onscroll = () => {const list = $('function-scroll'); if (li
 
 $('browse-game').onclick = () => {if (settingsDirty || sourceDirty) {notice('Save your edits before switching game installations.',true); return;} runAction('browse-game');};
 
-function updateAssetButtons() {
-  $('use-model').disabled = busy || !state?.game || !selectedModel;
+function updateSharingButtons() {
   $('export-package').disabled = busy || !exportSelection.size;
   $('import-package').disabled = busy || !previewPackage;
   $('export-count').textContent = `${exportSelection.size} selected`;
 }
-function renderAssets() {
-  const library = state.modelLibrary || {}, models = library.models || [];
-  $('model-converter').textContent = library.blender ? 'Blender found. FBX conversion is ready.' : 'FBX needs Blender installed. Choose its executable above; converted OBJ and bundles do not need Blender.';
-  if (!$('blender-file').value && library.blender) $('blender-file').value = library.blender;
-  const list = $('model-library'); list.replaceChildren();
-  models.forEach(model => {
-    const button = el('button', 'model-library-row', model.name); button.classList.toggle('selected', selectedModel === model.id);
-    button.append(el('small', '', `${model.format} · ${model.vertices || 0} vertices · ${model.faces || 0} faces`));
-    button.onclick = () => selectModel(model.id); list.append(button);
-  });
-  if (!models.length) list.append(el('p', 'empty-state', 'Import a model to start.'));
-  updateAssetButtons();
-}
-async function selectModel(id) {
-  selectedModel = id; modelGeometry = undefined; const seq = ++modelPreviewSequence;
-  const model = state.modelLibrary?.models.find(m => m.id === id);
-  $('model-name').textContent = model?.name || id;
-  $('model-details').textContent = (model?.warnings || []).join(' ');
-  $('model-preview-note').textContent = 'Loading geometry…'; renderAssets();
-  try {
-    const geometry = await api('model-preview?id=' + encodeURIComponent(id)); if (seq !== modelPreviewSequence) return;
-    modelGeometry = geometry; modelYaw = .6; modelPitch = -.3; modelZoom = 1; drawModel();
-    $('model-preview-note').textContent = geometry.unsupported || `Geometry preview${geometry.sampled ? ' (sampled)' : ''} · drag to rotate, scroll to zoom. Textures and lighting are checked in game.`;
-  } catch (error) {if (seq === modelPreviewSequence) {notice(error.message, true); $('model-preview-note').textContent = 'Could not load this preview.';}}
-}
-function drawModel() {
-  const canvas = $('model-canvas'), context = canvas.getContext?.('2d'); if (!context) return;
-  const width = canvas.clientWidth || 640, height = canvas.clientHeight || 420, ratio = Math.min(devicePixelRatio || 1, 2);
-  canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio); context.setTransform(ratio,0,0,ratio,0,0); context.clearRect(0,0,width,height);
-  if (!modelGeometry?.vertices?.length) return;
-  const {min,max} = modelGeometry.bounds, center = min.map((v,i) => (v + max[i]) / 2), extent = Math.max(...min.map((v,i) => max[i]-v), .001), scale = Math.min(width,height) * .68 * modelZoom / extent;
-  const cy = Math.cos(modelYaw), sy = Math.sin(modelYaw), cp = Math.cos(modelPitch), sp = Math.sin(modelPitch);
-  const points = modelGeometry.vertices.map(p => {const x=p[0]-center[0], y=p[1]-center[1], z=p[2]-center[2], rx=x*cy+z*sy, rz=z*cy-x*sy; return [width/2+rx*scale,height/2-(y*cp-rz*sp)*scale];});
-  context.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#8793a8'; context.globalAlpha=.6; context.lineWidth=.7; context.beginPath();
-  modelGeometry.faces.forEach(face => {face.forEach((index,i) => {const point=points[index]; if (!point) return; if (!i) context.moveTo(...point); else context.lineTo(...point);}); context.closePath();}); context.stroke(); context.globalAlpha=1;
-}
-$('model-canvas').onpointerdown = event => {modelDrag = [event.clientX,event.clientY]; $('model-canvas').setPointerCapture?.(event.pointerId);};
-$('model-canvas').onpointermove = event => {if (!modelDrag) return; modelYaw += (event.clientX-modelDrag[0])*.01; modelPitch = Math.max(-1.5,Math.min(1.5,modelPitch+(event.clientY-modelDrag[1])*.01)); modelDrag=[event.clientX,event.clientY]; drawModel();};
-$('model-canvas').onpointerup = $('model-canvas').onpointercancel = () => {modelDrag=undefined;};
-$('model-canvas').onwheel = event => {event.preventDefault(); modelZoom=Math.max(.2,Math.min(5,modelZoom*Math.exp(-event.deltaY*.001))); drawModel();};
-$('model-canvas').onkeydown = event => {if (!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','-'].includes(event.key)) return; event.preventDefault(); if (event.key==='ArrowLeft') modelYaw-=.1; if (event.key==='ArrowRight') modelYaw+=.1; if (event.key==='ArrowUp') modelPitch-=.1; if (event.key==='ArrowDown') modelPitch+=.1; if (event.key==='+') modelZoom=Math.min(5,modelZoom*1.1); if (event.key==='-') modelZoom=Math.max(.2,modelZoom/1.1); drawModel();};
-window.addEventListener('resize', drawModel);
 function renderSharing() {
   const list = $('export-modules'); list.replaceChildren();
   packsForState().forEach(pack => {list.append(el('h4','export-pack',pack.name)); pack.features.forEach(feature => {
     const row=el('label','export-module'), input=el('input'); input.type='checkbox'; input.checked=exportSelection.has(feature.id); input.dataset.exportModule=feature.id;
-    input.onchange=() => {if (input.checked) exportSelection.add(feature.id); else exportSelection.delete(feature.id); updateAssetButtons();}; row.append(input,el('span','',feature.name)); list.append(row);
-  });}); updateAssetButtons();
+    input.onchange=() => {if (input.checked) exportSelection.add(feature.id); else exportSelection.delete(feature.id); updateSharingButtons();}; row.append(input,el('span','',feature.name)); list.append(row);
+  });}); updateSharingButtons();
 }
 async function authoringAction(action, body, callback) {
-  if (busy) return; actionInFlight=action; setBusy(true); notice(action==='import-model' ? 'Importing model… FBX conversion may take a moment.' : 'Working…');
+  if (busy) return; actionInFlight=action; setBusy(true); notice('Working…');
   try {const result=await api(action,body); await refresh(true); if (callback) await callback(result); notice(result.message || 'Done');}
   catch (error) {notice(error.message,true);} finally {actionInFlight=undefined; setBusy(false);}
 }
@@ -572,24 +529,21 @@ function stageImportedSettings(values) {
     else {const entry=[...(state.recipes||[]),...(state.extraSettings||[])].find(e=>e.section+'/'+e.key===key); if (entry) changeEntry(entry,String(value),(state.extraSettings||[]).includes(entry));}
   }); syncControls();
 }
-['model','blender','package'].forEach(kind => {$('browse-'+kind).onclick = () => authoringAction('browse-file',{kind}, result => {if (result.path) {$(kind==='blender'?'blender-file':kind==='package'?'package-file':'model-file').value=result.path; if (kind==='package') {previewPackage=undefined;updateAssetButtons();}}});});
-$('import-model').onclick = () => authoringAction('import-model',{path:$('model-file').value.trim(),blender:$('blender-file').value.trim()}, result => selectModel(result.id));
-$('use-model').onclick = () => authoringAction('use-model',{id:selectedModel}, result => {stageImportedSettings({'Recipe.CosmeticModel/ModelPath':result.modelPath,'Recipe.CosmeticModel/Enabled':true}); notice('Model selected. Save changes to apply it live.');});
-$('tune-model').onclick = () => {category='All'; $('mod-search').value=''; expandedModules.add('Recipe.CosmeticModel'); showView('mods'); renderFeatures(); document.getElementById('module-Recipe.CosmeticModel')?.scrollIntoView?.({block:'center'});};
+$('browse-package').onclick = () => authoringAction('browse-file',{kind:'package'},result => {if (result.path) {$('package-file').value=result.path; previewPackage=undefined; updateSharingButtons();}});
 $('export-select-all').onclick = () => {state.features.forEach(f=>exportSelection.add(f.id));renderSharing();};
 $('export-select-none').onclick = () => {exportSelection.clear();renderSharing();};
 $('export-package').onclick = () => {if (sourceDirty) {notice('Save your C# before exporting its source.',true);return;} authoringAction('export-package',{ids:[...exportSelection],name:$('package-name').value.trim(),values:state.settings},async result => {
   const response=await fetch('/api/download?id='+encodeURIComponent(result.id),{headers:{'X-TK2-Token':token}}); if (!response.ok) throw new Error('Could not download the package.');
   const url=URL.createObjectURL(await response.blob()), link=el('a'); link.href=url; link.download=result.filename; document.body.append(link); link.click(); link.remove(); setTimeout(()=>URL.revokeObjectURL(url),10000);
 });};
-$('package-file').oninput = () => {previewPackage=undefined;updateAssetButtons();};
+$('package-file').oninput = () => {previewPackage=undefined;updateSharingButtons();};
 $('preview-package').onclick = () => authoringAction('preview-package',{path:$('package-file').value.trim()}, result => {
   previewPackage=result; const panel=$('package-preview'); panel.replaceChildren(); panel.append(el('h4','',`${result.modules.length} modules`));
   result.modules.forEach(module=>panel.append(el('p','',typeof module==='string'?module:module.name || module.id)));
   const files=el('ul'); (result.files || []).forEach(file=>files.append(el('li','',typeof file==='string'?file:file.path || file.name))); panel.append(files);
   if (result.conflicts?.length) panel.append(el('p','',`${result.conflicts.length} existing files differ. Replacing shared source can affect other modules.`));
-  else panel.append(el('p','muted','No source conflicts. Imported modules start off.')); $('replace-package-files').checked=false; updateAssetButtons();
+  else panel.append(el('p','muted','No source conflicts. Imported modules start off.')); $('replace-package-files').checked=false; updateSharingButtons();
 });
 $('import-package').onclick = () => {if (sourceDirty) {notice('Save your C# before importing source files.',true);return;} if (!previewPackage) return;
-  authoringAction('import-package',{path:previewPackage.path,hash:previewPackage.hash,replace:$('replace-package-files').checked}, result => {stageImportedSettings(result.settings); previewPackage=undefined; updateAssetButtons();});
+  authoringAction('import-package',{path:previewPackage.path,hash:previewPackage.hash,replace:$('replace-package-files').checked}, result => {stageImportedSettings(result.settings); previewPackage=undefined; updateSharingButtons();});
 };

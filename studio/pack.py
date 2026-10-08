@@ -54,6 +54,11 @@ _CAMERA["settings"] = [
 _CAMERA["settingGroups"] = {"AimAtKart":"Aim & rotation", "TargetHeight":"Aim & rotation", "PitchOffset":"Aim & rotation", "YawOffset":"Aim & rotation", "RollOffset":"Aim & rotation", "SmoothingSeconds":"Transitions", "PanelEnabled":"In-race panel", "PanelHotkey":"In-race panel", "PanelScale":"In-race panel"}
 
 
+RETIRED_MODULES = frozenset('Recipe.' + name for name in (
+    'AirGlider','DriftCapacitor','EchoRewind','GravitySurf','LandingCombo',
+    'RepulsorPulse','SlipstreamSling','CosmeticModel'))
+
+
 def schema(features=None):
     result = {}
     for feature in features if features is not None else catalog_features():
@@ -110,13 +115,8 @@ def catalog_features():
 
 def catalog_packs():
     recipes = recipe_catalog.features()
-    extra = []
-    for identity, name, description in (
-        ('mechanics','Race Lab','Seven new local racing mechanics. Tune one at a time, then combine favorites.'),
-        ('cosmetics','Custom models','Your imported static kart cosmetics.'),
-        ('recipes','Your recipes','Create, edit and share your own C# modules.')):
-        members = [f['id'] for f in recipes if f['pack'] == identity]
-        if members: extra.append({'id':identity,'name':name,'description':description,'features':members})
+    members = [f['id'] for f in recipes]
+    extra = [{'id':'recipes','name':'Your recipes','description':'Create, edit and share your own C# modules.','features':members}] if members else []
     return PACKS + extra
 
 
@@ -169,15 +169,13 @@ def module_sources():
               for feature in FEATURES}
     import re
     for file in available:
-        if "/Recipes/" not in file and "/Models/" not in file: continue
+        if "/Recipes/" not in file: continue
         text = source_path(file).read_text(encoding="utf-8")
         match = re.search(r'public\s+(?:override\s+)?string\s+Name\s*=>\s*"([^"\r\n]+)"', text)
         if not match: continue
         name = match[1]
         helper = "plugins/TK2.Customization/RecipeHost.cs"
         dependencies = [helper]
-        if 'LocalKartMechanic' in text: dependencies.append('plugins/TK2.Customization/Recipes/MechanicsContext.cs')
-        if name == 'CosmeticModel': dependencies += ['plugins/TK2.Customization/Models/ObjModel.cs', 'plugins/TK2.Customization/Models/ModelPath.cs']
         result["Recipe." + name] = [file] + [dep for dep in dependencies if dep in available]
     return result
 

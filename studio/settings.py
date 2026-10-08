@@ -32,7 +32,7 @@ def read(data):
         if schema:
             values[compound] = normalized(entry["value"], schema[0])
     return {"settings": values, "configHash": hashlib.sha256(data).hexdigest(),
-            "recipes": [e for e in entries if e["section"].startswith("Recipe.") and (e["section"], e["key"]) not in known],
+            "recipes": [e for e in entries if e["section"].startswith("Recipe.") and e["section"] not in pack.RETIRED_MODULES and (e["section"], e["key"]) not in known],
             "extraSettings": [e for e in entries if (e["section"], e["key"]) not in known and not e["section"].startswith("Recipe.")],
             "entries": entries}
 
@@ -56,6 +56,8 @@ def merge(data, body):
         current_values.setdefault(compound, normalized(entry["value"], entry["type"]))
     for collection in (recipe_dirty, extra_dirty):
         for compound, value in collection.items():
+            if compound.partition('/')[0] in pack.RETIRED_MODULES:
+                raise ValueError('This module has been removed: ' + compound)
             if compound not in definitions or compound in current["settings"]:
                 raise ValueError("Unknown additional setting: " + compound)
             entry = definitions[compound]
