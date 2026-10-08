@@ -12,7 +12,7 @@ import subprocess
 import threading
 import webbrowser
 from urllib.parse import urlsplit, parse_qs
-from . import core, pack, settings, setup, symbols
+from . import core, pack, settings, setup, symbols, model_assets
 
 WEB = core.ROOT / "studio/web"
 
@@ -53,11 +53,11 @@ class Application:
         installed = self.game / "BepInEx/plugins/TK2-Mod-Studio/TK2.Customization.dll" if self.game else core.ROOT / "local/no-game"
         artifact = pack.ARTIFACT / "TK2.Customization.dll"
         current = installed.is_file() and artifact.is_file() and core.sha256(installed) == core.sha256(artifact)
-        return {"game": str(self.game) if self.game else "", "installed": installed.is_file(), "packCurrent": current, "features": pack.FEATURES,
+        return {"game": str(self.game) if self.game else "", "installed": installed.is_file(), "packCurrent": current, "features": pack.catalog_features(),
                 "plugin": "TK2.Customization.dll", "pluginCount": len([p for p in core.plugins(self.game) if p["enabled"]]) if self.game else 0,
                 "setup": setup.readiness(self.game),
-                "runtimeValidated": False, "packs": pack.PACKS, "files": pack.source_files(), "moduleSources": pack.module_sources(), "sourceRoot": str(core.ROOT), "logs": self.logs,
-                "backups": backups[:30], "buildLog": self.latest_build(), **self.config_data()}
+                "runtimeValidated": False, "packs": pack.catalog_packs(), "files": pack.source_files(), "moduleSources": pack.module_sources(), "sourceRoot": str(core.ROOT), "logs": self.logs,
+                "backups": backups[:30], "buildLog": self.latest_build(), "modelLibrary": model_assets.state(), **self.config_data()}
 
     def latest_build(self):
         lines = "\n".join(self.logs).splitlines()
@@ -77,6 +77,39 @@ class Application:
 
     def action(self, action, body):
         with self.lock:
+            if action == 'browse-file':
+                from tkinter import Tk, filedialog
+                choices = {'model': ('Choose a kart model', [('Model files','*.fbx *.obj *.bundle *.unity3d *.assetbundle')]),
+                           'blender': ('Choose blender.exe', [('Blender','blender.exe')]),
+                           'package': ('Choose a module package', [('Toolkit modules','*.tk2mod')])}
+                if body.get('kind') not in choices: raise ValueError('Unknown file picker')
+                title, filters = choices[body['kind']]
+                window = Tk(); window.withdraw()
+                try: chosen = filedialog.askopenfilename(title=title,filetypes=filters,parent=window)
+                finally: window.destroy()
+                return {'path':chosen,'message':'File selected' if chosen else 'Selection cancelled'}
+            if action == 'import-model':
+                result = model_assets.import_model(body.get('path',''),body.get('blender',''))
+                return {**result,'message':'Model imported. Choose Use on kart to stage its selection.'}
+            if action == 'use-model':
+                if self.game is None: raise ValueError('Choose the game folder in Installation first.')
+                return {**model_assets.deploy(self.game,body.get('id','')),'message':'Assets copied. Save changes to apply your model selection.'}
+            if action in ('export-package','preview-package','import-package'):
+                from . import module_packages
+                if action == 'export-package':
+                    return module_packages.export_package(body.get('ids',[]),body.get('name',''),body.get('values',{}),self.game)
+                if action == 'preview-package': return module_packages.preview_import(body.get('path',''))
+                result = module_packages.import_package(body.get('path',''),body.get('hash',''),body.get('replace',False))
+                imported = []
+                for model in result.get('models',[]):
+                    path = model.get('path') if isinstance(model,dict) else model
+                    try: imported.append(model_assets.import_model(path))
+                    except (OSError,ValueError) as error:
+                        result['message'] += ' Source imported; model library import failed: ' + str(error)
+                if imported:
+                    result['models'] = imported
+                    result['message'] += ' Model assets added to the model library; choose Use on kart to install them.'
+                return result
             if action == "scan-games": return {"games": [str(p) for p in setup.discover()]}
             if action == "browse-game":
                 from tkinter import Tk, filedialog
@@ -196,8 +229,14 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.authorized(): return self.reply(403, {"error": "Invalid session"})
                 app = self.server.app
                 with app.lock:
-                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Toolkit", "version": "0.5.0", "pid": os.getpid(), "game": str(app.game)})
+                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Toolkit", "version": "0.6.1", "pid": os.getpid(), "game": str(app.game)})
                     if parsed.path == "/api/state": return self.reply(200, app.state())
+                    if parsed.path == '/api/model-preview':
+                        return self.reply(200,model_assets.preview(parse_qs(parsed.query).get('id',[''])[0]))
+                    if parsed.path == '/api/download':
+                        from . import module_packages
+                        path = module_packages.download_path(parse_qs(parsed.query).get('id',[''])[0])
+                        return self.reply(200,path.read_bytes(),'application/zip')
                     if parsed.path == "/api/source":
                         name = parse_qs(parsed.query).get("file", [""])[0]
                         p = pack.source_path(name)
@@ -280,7 +319,7 @@ def main():
             if health.get("app") in ("TK2 Mod Toolkit", "TK2 Mod Garage"):
                 if args.game is not None and health.get("game") != str(core.validate_game(args.game)):
                     raise RuntimeError("Close the existing Toolkit before switching game installations")
-                if health.get("version") == "0.5.0":
+                if health.get("version") == "0.6.1":
                     if not args.no_browser: open_window(saved["origin"])
                     return
                 request = urllib.request.Request(saved["origin"] + "/api/shutdown", data=b"{}", headers={"X-TK2-Token": saved["token"], "Content-Type": "application/json"})
@@ -304,7 +343,7 @@ def main():
             if health.get("app") not in ("TK2 Mod Toolkit", "TK2 Mod Garage"): raise RuntimeError("Unexpected service on Toolkit port")
             if args.game is not None and health.get("game") != str(core.validate_game(args.game)):
                 raise RuntimeError("Close the existing Toolkit before switching game installations")
-        if health.get("version") == "0.5.0":
+        if health.get("version") == "0.6.1":
             if not args.no_browser: open_window(expected)
             return
         # Upgrade our old authenticated service so launching the new app cannot

@@ -307,9 +307,19 @@ def _read(path):
     with tempfile.TemporaryDirectory(prefix="tk2mod-review-") as temporary:
         stage = Path(temporary)
         for name, source in content.items():
-            if _kind(name) == "source":
-                target = stage / name; target.parent.mkdir(parents=True, exist_ok=True); target.write_bytes(source)
+            target = stage / name; target.parent.mkdir(parents=True, exist_ok=True); target.write_bytes(source)
         parsed = {f["id"]: f for f in recipe_catalog.source_features(stage / "plugins/TK2.Customization")}
+        # Review model dependencies before replacing any source. Validation uses
+        # temporary copies; preview must not add models to the user's library.
+        from . import model_assets
+        for name in content:
+            if _kind(name) != 'model': continue
+            path = stage / name
+            if path.suffix.lower() == '.obj':
+                model_assets._copy_obj(path, stage / 'validated-models' / _digest(name.encode())[:16])
+            elif path.suffix.lower() == '.bundle':
+                if path.read_bytes()[:8].split(b'\0')[0] not in {b'UnityFS',b'UnityRaw',b'UnityWeb'}:
+                    raise ValueError('Package contains an invalid Unity AssetBundle')
     definitions = {}
     for module in modules:
         identity = module["id"]

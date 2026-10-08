@@ -6,6 +6,10 @@ const token = document.querySelector('meta[name="tk2-session"]').content;
 let state, category = 'All', source, sourceDirty = false, settingsDirty = false, busy = false, actionInFlight;
 let noticeTimer, revision = 0, refreshSequence = 0, conflictKeys = [];
 const settingEdits = new Map(), recipeEdits = new Map(), extraEdits = new Map(), expandedModules = new Set();
+const workshopTabs = ['editor', 'api', 'models', 'sharing', 'tutorial'];
+const exportSelection = new Set();
+let selectedModel = '', modelGeometry, previewPackage, modelPreviewSequence = 0;
+let modelYaw = .6, modelPitch = -.3, modelZoom = 1, modelDrag;
 const themeMedia = matchMedia('(prefers-color-scheme: dark)');
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
@@ -75,7 +79,19 @@ function settingsControl(key, label, kind, value, low, high, description, choice
   input.id = 'setting-' + encodeURIComponent(key); copy.setAttribute('for', input.id);
   input.dataset[dataset] = key; input.disabled = !state.game || busy && actionInFlight !== 'settings'; input.setAttribute('aria-label', label);
   const changed = () => onChange(kind === 'bool' && !choices?.length ? input.checked : ['text', 'select'].includes(kind) || choices?.length ? input.value : input.value === '' ? '' : Number(input.value));
-  input.oninput = changed; input.onchange = changed; control.append(input); return control;
+  const tools = el('div', 'value-tools'), reset = el('button', 'value-reset', 'Reset');
+  reset.setAttribute('aria-label', 'Reset ' + label + ' to default'); reset.title = `Default: ${defaultText}`;
+  reset.disabled = defaultValue === undefined || input.disabled;
+  reset.onclick = () => {onChange(defaultValue); if (input.type === 'checkbox') input.checked = Boolean(defaultValue); else input.value = defaultValue; syncControls(); notice(label + ' restored. Save changes to apply.');};
+  tools.append(input, reset); input.linkedControls = [reset]; control.field = input; control.tools = tools;
+  if (['float','int'].includes(kind) && low !== null && low !== undefined && high !== null && high !== undefined && Number(high) - Number(low) <= 10000) {
+    const slider = el('input', 'value-slider'); slider.type = 'range'; slider.min = low; slider.max = high;
+    slider.step = kind === 'int' ? 1 : Math.max(.001, (Number(high) - Number(low)) / 1000); slider.value = value;
+    slider.setAttribute('aria-label', label + ' slider'); slider.disabled = input.disabled;
+    slider.oninput = () => {input.value = slider.value; changed();}; input.oninput = () => {slider.value = input.value; changed();};
+    input.slider = slider; input.linkedControls.push(slider); const stack = el('div', 'value-stack'); stack.append(tools, slider); control.append(stack);
+  } else control.append(tools);
+  input.defaultAvailable = defaultValue !== undefined; return control;
 }
 function syncModuleState(id) {document.querySelectorAll('[data-module-state]').forEach(node => {if (node.dataset.moduleState === id) node.textContent = state.settings[id + '/Enabled'] ? 'On' : 'Off';});}
 function syncDependencies() {
@@ -83,6 +99,10 @@ function syncDependencies() {
     const feature = state.features.find(item => item.id === input.dataset.setting.split('/')[0]);
     input.disabled = !state.game || busy && actionInFlight !== 'settings' || feature?.available === false || Boolean(input.dataset.requires && !state.settings[input.dataset.requires]);
     if (input.dataset.requires) input.setAttribute('aria-description', input.disabled ? 'Turn on this parameter’s override switch to edit its custom value.' : 'Custom override value.');
+  });
+  document.querySelectorAll('[data-setting], [data-recipe], [data-extra]').forEach(input => {
+    (input.linkedControls || []).forEach(link => {link.disabled = link.tagName === 'BUTTON' ? !state.game || busy && actionInFlight !== 'settings' || !input.defaultAvailable : input.disabled;});
+    if (input.slider && input.slider !== document.activeElement) input.slider.value = input.value;
   });
 }
 function parameterGroup(feature, key) {
@@ -115,10 +135,12 @@ function featureSettings(feature, search) {
       const control = settingsControl(fullKey, label, kind, state.settings[fullKey] ?? fallback, low, high, description, choices, value => changeSetting(fullKey, value), 'setting', fallback);
       if (requires) {
         const requireKey = requires.includes('/') ? requires : feature.id + '/' + requires;
-        const input = control.children[1]; input.dataset.requires = requireKey; input.disabled = busy && actionInFlight !== 'settings' || !state.settings[requireKey];
+        const input = control.field; input.dataset.requires = requireKey; input.disabled = busy && actionInFlight !== 'settings' || !state.settings[requireKey];
         const toggle = switchControl('Override ' + label, Boolean(state.settings[requireKey]), busy && actionInFlight !== 'settings', value => changeSetting(requireKey, value));
         toggle.children[0].dataset.setting = requireKey;
-        const paired = el('div', 'parameter-controls'); paired.append(toggle, input); control.replaceChildren(control.children[0], paired);
+        const paired = el('div', 'parameter-controls'), resetOverride = el('button', 'value-reset', 'Reset override');
+        resetOverride.onclick = () => {changeSetting(requireKey, false); syncControls();}; paired.append(toggle, resetOverride);
+        control.prepend ? control.insertBefore(paired, control.children[1]) : control.append(paired);
       }
       controls.append(control);
     });
@@ -165,10 +187,12 @@ function renderFeatures() {
       expand.append(info, status, el('span', 'expand-arrow', '⌄'));
       expand.onclick = () => {panel.hidden = !panel.hidden; expand.setAttribute('aria-expanded', String(!panel.hidden)); if (panel.hidden) expandedModules.delete(feature.id); else expandedModules.add(feature.id);};
       const toggle = switchControl('Enable ' + feature.name, enabled, unavailable || busy && actionInFlight !== 'settings', value => changeSetting(feature.id + '/Enabled', value));
-      toggle.children[0].dataset.setting = feature.id + '/Enabled'; heading.append(expand, toggle); row.append(heading);
+      toggle.children[0].dataset.setting = feature.id + '/Enabled';
+      const headerReset = el('button', 'quiet module-reset', 'Reset'); headerReset.setAttribute('aria-label', 'Reset ' + feature.name + ' to defaults'); headerReset.onclick = () => resetFeatures([feature]);
+      heading.append(expand, headerReset, toggle); row.append(heading);
       if (unavailable) panel.append(el('p', 'module-note', feature.reason || 'This module needs a compatibility update before it can be enabled.'));
       if (feature.status && feature.status !== 'verified') panel.append(el('p', 'module-note', feature.status));
-      const moduleTools = el('div', 'module-tools'), reset = el('button', 'quiet', 'Reset module to defaults'); reset.onclick = () => resetFeatures([feature]); moduleTools.append(reset, el('small', '', 'Defaults switch this module off.')); panel.append(moduleTools);
+      const moduleTools = el('div', 'module-tools'); moduleTools.append(el('small', '', 'Reset restores all defaults and switches this module off.')); panel.append(moduleTools);
       const edit = el('button', 'secondary', 'Edit code'); edit.dataset.editModule = feature.id; edit.disabled = busy || !state.moduleSources?.[feature.id]?.length;
       edit.onclick = () => editModule(feature.id); moduleTools.append(edit);
       panel.append(featureSettings(feature, search)); row.append(panel); section.append(row);
@@ -208,7 +232,8 @@ function appendEntryGroups(container, groups, extra = false) {
     });
     if (settings.length === 1 && enabled) controls.append(el('p', 'module-note', 'This module has no additional settings.'));
     const reset = el('button', 'quiet', 'Reset module to defaults'); reset.onclick = () => {settings.forEach(entry => {if (entry.default !== undefined && entry.hasDefault !== false) changeEntry(entry, entry.default, extra);}); syncControls(); notice('Defaults restored. Save changes to apply.');};
-    const tools = el('div', 'module-tools'); tools.append(reset);
+    reset.className = 'quiet module-reset'; reset.textContent = 'Reset'; reset.setAttribute('aria-label', 'Reset ' + title + ' to defaults'); heading.append(reset);
+    const tools = el('div', 'module-tools');
     const edit = el('button', 'secondary', 'Edit code'); edit.dataset.editModule = name; edit.disabled = busy || !state.moduleSources?.[name]?.length;
     edit.onclick = () => editModule(name); tools.append(edit); panel.append(tools, controls); row.append(panel); container.append(row);
   });
@@ -225,7 +250,7 @@ function renderFiles() {
   $('reconstructed-files').replaceChildren(); $('pack-files').replaceChildren();
   const select = $('module-focus'); select.replaceChildren();
   [['all', 'All project files'], ['reconstructed', 'Reconstructed game logic'], ...state.features.map(f => [f.id, f.name]),
-    ...Object.keys(state.moduleSources || {}).filter(id => id.startsWith('Recipe.')).map(id => [id, id.slice(7).replace(/([a-z])([A-Z])/g, '$1 $2') + ' (recipe)'])]
+    ...Object.keys(state.moduleSources || {}).filter(id => id.startsWith('Recipe.') && !state.features.some(f => f.id === id)).map(id => [id, id.slice(7).replace(/([a-z])([A-Z])/g, '$1 $2') + ' (recipe)'])]
     .forEach(([value, label]) => {const option = el('option', '', label); option.value = value; select.append(option);});
   select.value = selectedModule;
   const allowed = state.moduleSources?.[selectedModule], query = $('file-query').value.toLowerCase().trim();
@@ -268,7 +293,7 @@ function resetFeatures(features) {
   features.forEach(feature => {changeSetting(feature.id + '/Enabled', false); feature.settings.forEach(setting => changeSetting(feature.id + '/' + setting[0], setting[3]));});
   syncControls(); notice('Defaults restored. Save changes to apply.');
 }
-function render() {renderFeatures(); renderRecipes(); renderFiles(); renderInstallation(); syncDependencies(); updateSaveState();}
+function render() {renderFeatures(); renderRecipes(); renderFiles(); renderInstallation(); renderAssets(); renderSharing(); syncDependencies(); updateSaveState();}
 function mergeState(next) {
   settingEdits.forEach((edit, key) => {next.settings[key] = edit.value;});
   [['recipes', recipeEdits], ['extraSettings', extraEdits]].forEach(([field, edits]) => {(next[field] || []).forEach(entry => {const edit = edits.get(entry.section + '/' + entry.key); if (edit) entry.value = edit.value;});});
@@ -281,7 +306,7 @@ function syncControls() {
 }
 async function refresh(preserveSettings = true, quiet = false) {
   const sequence = ++refreshSequence, next = await api('state'); if (sequence !== refreshSequence) return;
-  const structure = value => [value.features, value.packs, value.files, ...( ['recipes', 'extraSettings'].map(field => (value[field] || []).map(entry => entry.section + '/' + entry.key)))];
+  const structure = value => [value.features, value.packs, value.files, value.modelLibrary, ...( ['recipes', 'extraSettings'].map(field => (value[field] || []).map(entry => entry.section + '/' + entry.key)))];
   const changed = !state || JSON.stringify(structure(next)) !== JSON.stringify(structure(state));
   if (!preserveSettings) {settingEdits.clear(); recipeEdits.clear(); extraEdits.clear();}
   mergeState(next);
@@ -330,16 +355,16 @@ function editModule(id) {
 }
 function showWorkshopTab(name) {
   workshopTab = name;
-  ['editor', 'api', 'tutorial'].forEach(tab => {const active = tab === name; $('panel-' + tab).hidden = !active; const button = $('tab-' + tab); button.classList.toggle('selected', active); button.setAttribute('aria-selected', String(active)); button.tabIndex = active ? 0 : -1;});
+  workshopTabs.forEach(tab => {const active = tab === name; $('panel-' + tab).hidden = !active; const button = $('tab-' + tab); button.classList.toggle('selected', active); button.setAttribute('aria-selected', String(active)); button.tabIndex = active ? 0 : -1;});
   if (name === 'api' && functionSequence === 0) searchFunctions().catch(error => notice(error.message, true));
 }
 function setBusy(value) {
-  busy = value; ['workshop-install', 'build', 'create-recipe', 'diagnose', 'prepare-loader', 'installation-install', 'scan-games', 'select-game', 'browse-game'].forEach(id => {$(id).disabled = value;});
+  busy = value; ['workshop-install', 'build', 'create-recipe', 'diagnose', 'prepare-loader', 'installation-install', 'scan-games', 'select-game', 'browse-game', 'browse-model', 'browse-blender', 'import-model', 'browse-package', 'preview-package'].forEach(id => {$(id).disabled = value;});
   $('save-source').disabled = value || !sourceDirty; $('code').readOnly = value || !source; $('reload-source').disabled = value || !source; $('open-source-folder').disabled = value || !source; updateSaveState();
   document.querySelectorAll('[data-edit-module]').forEach(button => {button.disabled = value || !state?.moduleSources?.[button.dataset.editModule]?.length;});
   // Keep controls mounted and editable during a settings save.
   document.querySelectorAll('[data-setting], [data-recipe], [data-extra]').forEach(input => {const feature = state?.features.find(item => item.id === input.dataset.setting?.split('/')[0]); input.disabled = value && actionInFlight !== 'settings' || feature?.available === false || !state?.game;});
-  syncDependencies(); if (state) renderInstallation();
+  syncDependencies(); if (state) {renderInstallation(); updateAssetButtons();}
 }
 function settingsError(error) {
   conflictKeys = error.details?.conflicts || error.details?.conflictKeys || []; if (!Array.isArray(conflictKeys)) conflictKeys = Object.keys(conflictKeys);
@@ -410,7 +435,7 @@ $('find-next').onclick = () => {
   $('code').scrollTop = Math.max(0, (text.slice(0, index).split('\n').length - 4) * 22.1); $('code').onscroll();
 };
 $('code-find').onkeydown = event => {if (event.key === 'Enter') $('find-next').click();};
-['editor', 'api', 'tutorial'].forEach((name, index, names) => {const button = $('tab-' + name); button.onclick = () => showWorkshopTab(name); button.onkeydown = event => {if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowRight' ? 1 : 2)) % 3; showWorkshopTab(names[next]); $('tab-' + names[next]).focus();}};});
+workshopTabs.forEach((name, index, names) => {const button = $('tab-' + name); button.onclick = () => showWorkshopTab(name); button.onkeydown = event => {if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? names.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : names.length - 1)) % names.length; showWorkshopTab(names[next]); $('tab-' + names[next]).focus();}};});
 $('tutorial-create').onclick = () => {if (sourceDirty) {notice('Save your current C# first.', true); return;} $('recipe-name').value = 'MyKartHop'; return runAction('create-recipe', {name: 'MyKartHop'});};
 $('tutorial-frame').onclick = () => editModule('Recipe.FrameLimiter');
 $('save-source').onclick = async () => {try {await saveSource(); notice('C# saved. Build the plugin to apply your code.');} catch (error) {notice(error.message, true);}};
@@ -480,3 +505,91 @@ $('functions-recovered').onchange = () => $('function-search').click();
 $('function-scroll').onscroll = () => {const list = $('function-scroll'); if (list.scrollHeight - list.scrollTop - list.clientHeight < 180) searchFunctions(true).catch(error => notice(error.message, true));};
 
 $('browse-game').onclick = () => {if (settingsDirty || sourceDirty) {notice('Save your edits before switching game installations.',true); return;} runAction('browse-game');};
+
+function updateAssetButtons() {
+  $('use-model').disabled = busy || !state?.game || !selectedModel;
+  $('export-package').disabled = busy || !exportSelection.size;
+  $('import-package').disabled = busy || !previewPackage;
+  $('export-count').textContent = `${exportSelection.size} selected`;
+}
+function renderAssets() {
+  const library = state.modelLibrary || {}, models = library.models || [];
+  $('model-converter').textContent = library.blender ? 'Blender found. FBX conversion is ready.' : 'FBX needs Blender installed. Choose its executable above; converted OBJ and bundles do not need Blender.';
+  if (!$('blender-file').value && library.blender) $('blender-file').value = library.blender;
+  const list = $('model-library'); list.replaceChildren();
+  models.forEach(model => {
+    const button = el('button', 'model-library-row', model.name); button.classList.toggle('selected', selectedModel === model.id);
+    button.append(el('small', '', `${model.format} · ${model.vertices || 0} vertices · ${model.faces || 0} faces`));
+    button.onclick = () => selectModel(model.id); list.append(button);
+  });
+  if (!models.length) list.append(el('p', 'empty-state', 'Import a model to start.'));
+  updateAssetButtons();
+}
+async function selectModel(id) {
+  selectedModel = id; modelGeometry = undefined; const seq = ++modelPreviewSequence;
+  const model = state.modelLibrary?.models.find(m => m.id === id);
+  $('model-name').textContent = model?.name || id;
+  $('model-details').textContent = (model?.warnings || []).join(' ');
+  $('model-preview-note').textContent = 'Loading geometry…'; renderAssets();
+  try {
+    const geometry = await api('model-preview?id=' + encodeURIComponent(id)); if (seq !== modelPreviewSequence) return;
+    modelGeometry = geometry; modelYaw = .6; modelPitch = -.3; modelZoom = 1; drawModel();
+    $('model-preview-note').textContent = geometry.unsupported || `Geometry preview${geometry.sampled ? ' (sampled)' : ''} · drag to rotate, scroll to zoom. Textures and lighting are checked in game.`;
+  } catch (error) {if (seq === modelPreviewSequence) {notice(error.message, true); $('model-preview-note').textContent = 'Could not load this preview.';}}
+}
+function drawModel() {
+  const canvas = $('model-canvas'), context = canvas.getContext?.('2d'); if (!context) return;
+  const width = canvas.clientWidth || 640, height = canvas.clientHeight || 420, ratio = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio); context.setTransform(ratio,0,0,ratio,0,0); context.clearRect(0,0,width,height);
+  if (!modelGeometry?.vertices?.length) return;
+  const {min,max} = modelGeometry.bounds, center = min.map((v,i) => (v + max[i]) / 2), extent = Math.max(...min.map((v,i) => max[i]-v), .001), scale = Math.min(width,height) * .68 * modelZoom / extent;
+  const cy = Math.cos(modelYaw), sy = Math.sin(modelYaw), cp = Math.cos(modelPitch), sp = Math.sin(modelPitch);
+  const points = modelGeometry.vertices.map(p => {const x=p[0]-center[0], y=p[1]-center[1], z=p[2]-center[2], rx=x*cy+z*sy, rz=z*cy-x*sy; return [width/2+rx*scale,height/2-(y*cp-rz*sp)*scale];});
+  context.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#8793a8'; context.globalAlpha=.6; context.lineWidth=.7; context.beginPath();
+  modelGeometry.faces.forEach(face => {face.forEach((index,i) => {const point=points[index]; if (!point) return; if (!i) context.moveTo(...point); else context.lineTo(...point);}); context.closePath();}); context.stroke(); context.globalAlpha=1;
+}
+$('model-canvas').onpointerdown = event => {modelDrag = [event.clientX,event.clientY]; $('model-canvas').setPointerCapture?.(event.pointerId);};
+$('model-canvas').onpointermove = event => {if (!modelDrag) return; modelYaw += (event.clientX-modelDrag[0])*.01; modelPitch = Math.max(-1.5,Math.min(1.5,modelPitch+(event.clientY-modelDrag[1])*.01)); modelDrag=[event.clientX,event.clientY]; drawModel();};
+$('model-canvas').onpointerup = $('model-canvas').onpointercancel = () => {modelDrag=undefined;};
+$('model-canvas').onwheel = event => {event.preventDefault(); modelZoom=Math.max(.2,Math.min(5,modelZoom*Math.exp(-event.deltaY*.001))); drawModel();};
+$('model-canvas').onkeydown = event => {if (!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','-'].includes(event.key)) return; event.preventDefault(); if (event.key==='ArrowLeft') modelYaw-=.1; if (event.key==='ArrowRight') modelYaw+=.1; if (event.key==='ArrowUp') modelPitch-=.1; if (event.key==='ArrowDown') modelPitch+=.1; if (event.key==='+') modelZoom=Math.min(5,modelZoom*1.1); if (event.key==='-') modelZoom=Math.max(.2,modelZoom/1.1); drawModel();};
+window.addEventListener('resize', drawModel);
+function renderSharing() {
+  const list = $('export-modules'); list.replaceChildren();
+  packsForState().forEach(pack => {list.append(el('h4','export-pack',pack.name)); pack.features.forEach(feature => {
+    const row=el('label','export-module'), input=el('input'); input.type='checkbox'; input.checked=exportSelection.has(feature.id); input.dataset.exportModule=feature.id;
+    input.onchange=() => {if (input.checked) exportSelection.add(feature.id); else exportSelection.delete(feature.id); updateAssetButtons();}; row.append(input,el('span','',feature.name)); list.append(row);
+  });}); updateAssetButtons();
+}
+async function authoringAction(action, body, callback) {
+  if (busy) return; actionInFlight=action; setBusy(true); notice(action==='import-model' ? 'Importing model… FBX conversion may take a moment.' : 'Working…');
+  try {const result=await api(action,body); await refresh(true); if (callback) await callback(result); notice(result.message || 'Done');}
+  catch (error) {notice(error.message,true);} finally {actionInFlight=undefined; setBusy(false);}
+}
+function stageImportedSettings(values) {
+  Object.entries(values || {}).forEach(([key,value]) => {
+    if (Object.hasOwn(state.settings,key)) changeSetting(key,value);
+    else {const entry=[...(state.recipes||[]),...(state.extraSettings||[])].find(e=>e.section+'/'+e.key===key); if (entry) changeEntry(entry,String(value),(state.extraSettings||[]).includes(entry));}
+  }); syncControls();
+}
+['model','blender','package'].forEach(kind => {$('browse-'+kind).onclick = () => authoringAction('browse-file',{kind}, result => {if (result.path) {$(kind==='blender'?'blender-file':kind==='package'?'package-file':'model-file').value=result.path; if (kind==='package') {previewPackage=undefined;updateAssetButtons();}}});});
+$('import-model').onclick = () => authoringAction('import-model',{path:$('model-file').value.trim(),blender:$('blender-file').value.trim()}, result => selectModel(result.id));
+$('use-model').onclick = () => authoringAction('use-model',{id:selectedModel}, result => {stageImportedSettings({'Recipe.CosmeticModel/ModelPath':result.modelPath,'Recipe.CosmeticModel/Enabled':true}); notice('Model selected. Save changes to apply it live.');});
+$('tune-model').onclick = () => {category='All'; $('mod-search').value=''; expandedModules.add('Recipe.CosmeticModel'); showView('mods'); renderFeatures(); document.getElementById('module-Recipe.CosmeticModel')?.scrollIntoView?.({block:'center'});};
+$('export-select-all').onclick = () => {state.features.forEach(f=>exportSelection.add(f.id));renderSharing();};
+$('export-select-none').onclick = () => {exportSelection.clear();renderSharing();};
+$('export-package').onclick = () => {if (sourceDirty) {notice('Save your C# before exporting its source.',true);return;} authoringAction('export-package',{ids:[...exportSelection],name:$('package-name').value.trim(),values:state.settings},async result => {
+  const response=await fetch('/api/download?id='+encodeURIComponent(result.id),{headers:{'X-TK2-Token':token}}); if (!response.ok) throw new Error('Could not download the package.');
+  const url=URL.createObjectURL(await response.blob()), link=el('a'); link.href=url; link.download=result.filename; document.body.append(link); link.click(); link.remove(); setTimeout(()=>URL.revokeObjectURL(url),10000);
+});};
+$('package-file').oninput = () => {previewPackage=undefined;updateAssetButtons();};
+$('preview-package').onclick = () => authoringAction('preview-package',{path:$('package-file').value.trim()}, result => {
+  previewPackage=result; const panel=$('package-preview'); panel.replaceChildren(); panel.append(el('h4','',`${result.modules.length} modules`));
+  result.modules.forEach(module=>panel.append(el('p','',typeof module==='string'?module:module.name || module.id)));
+  const files=el('ul'); (result.files || []).forEach(file=>files.append(el('li','',typeof file==='string'?file:file.path || file.name))); panel.append(files);
+  if (result.conflicts?.length) panel.append(el('p','',`${result.conflicts.length} existing files differ. Replacing shared source can affect other modules.`));
+  else panel.append(el('p','muted','No source conflicts. Imported modules start off.')); $('replace-package-files').checked=false; updateAssetButtons();
+});
+$('import-package').onclick = () => {if (sourceDirty) {notice('Save your C# before importing source files.',true);return;} if (!previewPackage) return;
+  authoringAction('import-package',{path:previewPackage.path,hash:previewPackage.hash,replace:$('replace-package-files').checked}, result => {stageImportedSettings(result.settings); previewPackage=undefined; updateAssetButtons();});
+};

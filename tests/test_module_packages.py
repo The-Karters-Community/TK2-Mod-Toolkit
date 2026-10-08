@@ -182,5 +182,18 @@ class ModulePackagesTests(unittest.TestCase):
         self.rewrite(path, mutate)
         with self.assertRaisesRegex(ValueError, "does not match any packaged source"): packages.preview_import(path)
 
+    def test_invalid_model_dependency_rejected_before_source_write(self):
+        path = self.exported()
+        bad = b'mtllib ../outside.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3'
+        name = 'models/kart/model.obj'
+        def mutate(manifest, data):
+            data[name] = bad
+            manifest['files'].append({'path':name,'kind':'model','size':len(bad),'sha256':hashlib.sha256(bad).hexdigest()})
+        self.rewrite(path,mutate)
+        self.file.write_text('// local change')
+        with self.assertRaises(ValueError): packages.preview_import(path)
+        self.assertEqual(self.file.read_text(),'// local change')
+        self.assertFalse((self.root / 'local/module-assets').exists())
+
 
 if __name__ == "__main__": unittest.main()
