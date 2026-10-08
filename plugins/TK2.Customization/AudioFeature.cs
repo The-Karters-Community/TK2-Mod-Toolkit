@@ -10,36 +10,52 @@ internal static class AudioFeature
     private static readonly Dictionary<string, int> Levels = new();
     private static PTK_AudioListenerManager? _manager;
     private static bool _reapplying;
-    private static bool _previousEnabled;
-    private static float _previousMultiplier = 1f;
+    private static (bool Enabled, float Master, float Music, float Effects, float Voice, float Interface) _previousMix;
+
+    // These exact RTPC strings occur in the current build's stringliteral.json.
+    internal static float Multiplier(Plugin p, string rtpc) => rtpc switch {
+        "Master_Volume_RTPC" => p.Volume.Value,
+        "Music_Volume_RTPC" => p.MusicVolume.Value,
+        "SFX_Volume_RTPC" => p.SfxVolume.Value,
+        "VO_Volume_RTPC" => p.VoiceVolume.Value,
+        "UI_Volume_RTPC" => p.UiVolume.Value,
+        _ => 1f
+    };
 
     internal static void BeforeSetVolume(PTK_AudioListenerManager manager, string rtpc, ref int value, bool enabled, float multiplier)
     {
         if (_reapplying) return;
         if (_manager != manager) { Levels.Clear(); _manager = manager; }
         Levels[rtpc] = value;
-        if (enabled) value = (int)Math.Round(value * multiplier);
+        if (enabled) {
+            if (!float.IsFinite(multiplier)) throw new ArgumentOutOfRangeException("Audio multiplier must be finite.");
+            value = (int)Math.Round(value * multiplier);
+        }
     }
 
-    internal static void Tick(bool enabled, float multiplier)
+    internal static void Tick(Plugin p)
     {
-        if (_previousEnabled == enabled && Math.Abs(_previousMultiplier - multiplier) < 0.0001f) return;
-        Reapply(enabled, multiplier);
-        _previousEnabled = enabled;
-        _previousMultiplier = multiplier;
+        var mix = (p.AudioEnabled.Value, p.Volume.Value, p.MusicVolume.Value, p.SfxVolume.Value, p.VoiceVolume.Value, p.UiVolume.Value);
+        if (_previousMix.Equals(mix)) return;
+        Reapply(p.AudioEnabled.Value);
+        _previousMix = mix;
     }
 
-    private static void Reapply(bool enabled, float multiplier)
+    private static void Reapply(bool enabled)
     {
         if (_manager == null) return;
         _reapplying = true;
         try
         {
             foreach (var pair in Levels)
-                _manager.SetVolume(pair.Key, enabled ? (int)Math.Round(pair.Value * multiplier) : pair.Value);
+            {
+                float multiplier = enabled ? Multiplier(Plugin.Instance!, pair.Key) : 1;
+                if (!float.IsFinite(multiplier)) throw new ArgumentOutOfRangeException("Audio multiplier must be finite.");
+                _manager.SetVolume(pair.Key, (int)Math.Round(pair.Value * multiplier));
+            }
         }
         finally { _reapplying = false; }
     }
 
-    internal static void Restore() { Reapply(false, 1f); _previousEnabled = false; }
+    internal static void Restore() { Reapply(false); _previousMix = default; }
 }

@@ -40,4 +40,22 @@ CameraLogic.ForceInstantTeleport(ref forced, ref tribune);
 Check(forced && !tribune, "teleport must clear tribune camera");
 CameraLogic.EnableTribune(ref tribune, true);
 Check(tribune && CameraLogic.IsSpectator(true) && !CameraLogic.IsSpectator(false), "camera field accessors");
-Console.WriteLine($"Readable native behavior: {assertions} assertions passed.");
+Check(Math.Abs(CameraFraming.DistanceScale(75, 75, true, 1) - 1) < .00001, "equal FOV preserves distance");
+foreach (float fov in new[] {35f, 65f, 90f, 110f}) {
+    float distance = CameraFraming.DistanceScale(75, fov, true, 1);
+    double before = 1 / Math.Tan(75 * Math.PI / 360);
+    double after = 1 / (distance * Math.Tan(fov * Math.PI / 360));
+    Check(Math.Abs(before - after) < .00001, "compensated distance preserves projected kart size");
+}
+Check(CameraFraming.DistanceScale(75, 110, true, 1) < 1 && CameraFraming.DistanceScale(75, 35, true, 1) > 1, "wide view moves closer, narrow view further");
+Check(CameraFraming.DistanceScale(75, 35, false, 1.2f) == 1.2f, "manual framing uses chosen distance");
+uint modDodge = 0x10000;
+foreach (uint mask in new uint[]{0,1,2,4,8,16,32,1|16}) {
+    uint added = HealthLogic.ChangeSource(mask, modDodge, true);
+    Check(HealthLogic.ChangeSource(added, modDodge, false) == mask, "mod dodge must not remove native protection sources");
+    Check(HealthLogic.IsImmune(added, false), "a custom source protects against damage");
+    Check(HealthLogic.IsDeathImmune(added) == ((mask & 16) != 0), "mod source must not grant death immunity");
+    Check(HealthLogic.CollidersActive(mask) == (mask == 0 || (mask & 16) != 0), "native collider flag truth table");
+}
+Check(HealthLogic.IsImmune(0,true) && !HealthLogic.IsImmune(0,false), "ghost transformation grants immunity independently");
+Console.WriteLine($"Readable behavior and camera geometry: {assertions} assertions passed.");

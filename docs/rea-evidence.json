@@ -1,0 +1,115 @@
+[
+  {
+    "evidence_id": "ev_bbf5a29ad719e088eca37d846db717d9907a2086c7ff61208c677f297b036b44",
+    "subject": {
+      "name": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\The Karters 2 Turbo Charged\\BepInEx\\core\\BepInEx.Core.dll",
+      "digest": {
+        "sha256": "1d492eeecd40cd4feb7dc35aff7f08839928ac1637d4993bbde0060de36b7e0a"
+      },
+      "format": "pe",
+      "architecture": "x86",
+      "local_path": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\The Karters 2 Turbo Charged\\BepInEx\\core\\BepInEx.Core.dll"
+    },
+    "operation": "inspect_managed_members",
+    "provider": {
+      "id": "rea-dotnet-static",
+      "name": "REA managed static analysis provider",
+      "version": "1"
+    },
+    "limitations": [
+      "Metadata tokens are build-local coordinates and are only meaningful with the reported artifact SHA-256 and MVID.",
+      "CIL instruction anchors are decoded from file-backed method bodies only; no target assembly is loaded or executed.",
+      "Signatures are decoded for common ECMA-335 primitive, class, valuetype, pointer, byref, array, and generic variable forms; unsupported forms retain raw signature hashes."
+    ]
+  },
+  {
+    "evidence_id": "ev_d7f20f22da0808286f9d332865db79e750a2106d2f29e6c8eb80f3daca3350f2",
+    "subject": {
+      "name": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\The Karters 2 Turbo Charged\\BepInEx\\core\\0Harmony.dll",
+      "digest": {
+        "sha256": "6c898933b52149e8bcf6722305c7e4d94add47c9e53b364096f91721624c0877"
+      },
+      "format": "pe",
+      "architecture": "x86",
+      "local_path": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\The Karters 2 Turbo Charged\\BepInEx\\core\\0Harmony.dll"
+    },
+    "operation": "inspect_managed_members",
+    "provider": {
+      "id": "rea-dotnet-static",
+      "name": "REA managed static analysis provider",
+      "version": "1"
+    },
+    "limitations": [
+      "Metadata tokens are build-local coordinates and are only meaningful with the reported artifact SHA-256 and MVID.",
+      "CIL instruction anchors are decoded from file-backed method bodies only; no target assembly is loaded or executed.",
+      "Signatures are decoded for common ECMA-335 primitive, class, valuetype, pointer, byref, array, and generic variable forms; unsupported forms retain raw signature hashes."
+    ]
+  },
+  {
+    "evidence_id": "ev_68cccc95a11cc3100cc1b2ce5dcb9bd97520bcbd72f775366800e3d62303efec",
+    "subject": {
+      "name": "C:\\Users\\adela\\Documents\\TheKarters2_Decompiling\\MKsKartersMods\\MKsKartersMods.dll",
+      "digest": {
+        "sha256": "113b38c4e2442eff0246097330f1fb7d5ff9e27c0fe8e299f118054d296c412f"
+      },
+      "format": "pe",
+      "architecture": "x86",
+      "local_path": "C:\\Users\\adela\\Documents\\TheKarters2_Decompiling\\MKsKartersMods\\MKsKartersMods.dll"
+    },
+    "operation": "inspect_managed_artifact",
+    "provider": {
+      "id": "rea-dotnet-static",
+      "name": "REA managed static analysis provider",
+      "version": "1"
+    },
+    "limitations": [
+      "Static inspection did not load the assembly, resolve dependencies through a CLR, decompile C#, or execute target code."
+    ]
+  },
+  {
+    "evidence_id": "ev_d67866698e51df1c18f1f46e6cd9a39bd3723e4727b02084730fbe977c8cbf19",
+    "subject": {
+      "name": "C:\\Users\\adela\\Documents\\TheKarters2_Decompiling\\MKsKartersMods\\MKsKartersMods.dll",
+      "digest": {
+        "sha256": "113b38c4e2442eff0246097330f1fb7d5ff9e27c0fe8e299f118054d296c412f"
+      },
+      "format": "pe",
+      "architecture": "x86",
+      "local_path": "C:\\Users\\adela\\Documents\\TheKarters2_Decompiling\\MKsKartersMods\\MKsKartersMods.dll"
+    },
+    "operation": "inspect_managed_members",
+    "provider": {
+      "id": "rea-dotnet-static",
+      "name": "REA managed static analysis provider",
+      "version": "1"
+    },
+    "limitations": [
+      "Metadata tokens are build-local coordinates and are only meaningful with the reported artifact SHA-256 and MVID.",
+      "CIL instruction anchors are decoded from file-backed method bodies only; no target assembly is loaded or executed.",
+      "Signatures are decoded for common ECMA-335 primitive, class, valuetype, pointer, byref, array, and generic variable forms; unsupported forms retain raw signature hashes."
+    ]
+  },
+  {
+    "evidence_id": "ev_0890a3e58da6f95f67f48c4975fcd265dc8f741f45cd06c0864ed438f21b578e",
+    "subject": {
+      "name": "C:\\Users\\adela\\Documents\\TheKarters2_Decompiling\\MKsKartersMods\\NightmareAIs.dll",
+      "digest": {
+        "sha256": "bbe51bc06d9242623d73730854df6c6da558326203f196965ab70ace89a950a8"
+      },
+      "format": "pe",
+      "architecture": "x86",
+      "local_path": "C:\\Users\\adela\\Documents\\TheKarters2_Decompiling\\MKsKartersMods\\NightmareAIs.dll"
+    },
+    "operation": "inspect_managed_members",
+    "provider": {
+      "id": "rea-dotnet-static",
+      "name": "REA managed static analysis provider",
+      "version": "1"
+    },
+    "limitations": [
+      "Metadata tokens are build-local coordinates and are only meaningful with the reported artifact SHA-256 and MVID.",
+      "CIL instruction anchors are decoded from file-backed method bodies only; no target assembly is loaded or executed.",
+      "Signatures are decoded for common ECMA-335 primitive, class, valuetype, pointer, byref, array, and generic variable forms; unsupported forms retain raw signature hashes."
+    ]
+  }
+]

@@ -5,7 +5,7 @@ namespace TK2.Customization;
 
 // These adapters execute the reconstructed C# against actual interop objects.
 // Editing the linked src/Reconstructed files changes the behavior compiled into the one pack DLL.
-public static class ReadableGame
+public static partial class ReadableGame
 {
     public static void AddVelocity(PixelKartPhysics physics, Vector3 added)
     {

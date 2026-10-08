@@ -57,6 +57,46 @@
       "evidence": "local/ghidra/pseudocode/1804ed730_PixelGameKartCamera__ForceInstantTeleport.c",
       "evidenceSha256": "1dbf643787a4ab815d5c4c0b03c389377a43109004f877f5bc95f4fe99c4225b",
       "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "PixelGameKartCamera.InitOriginalProperties",
+      "address": "1804eff80",
+      "source": "src/Reconstructed/NativeAdapters.cs",
+      "evidence": "local/ghidra/pseudocode/1804eff80_PixelGameKartCamera__InitOriginalProperties.c",
+      "evidenceSha256": "45de366e72b9b0465fe54b1a448e3ad1a4246a2406a8fcf0a0d5c941df50d8d1",
+      "confidence": "reviewed normal-object-state native translation; runtime equivalence not yet tested"
+    },
+    {
+      "method": "Ant_BoostManager.GetCurrentBoostReservesTime",
+      "address": "180667ce0",
+      "source": "src/Reconstructed/NativeAdapters.cs",
+      "evidence": "local/ghidra/pseudocode/180667ce0_Ant_BoostManager__GetCurrentBoostReservesTime.c",
+      "evidenceSha256": "548e80f39b0a04ef0299196ec988d8ecd29335a35b2a0b925dec6a47cc71db00",
+      "confidence": "reviewed normal-object-state native translation; runtime equivalence not yet tested"
+    },
+    {
+      "method": "HpBarController.GetCurrentHP",
+      "address": "18056d2b0",
+      "source": "src/Reconstructed/NativeAdapters.cs",
+      "evidence": "local/ghidra/pseudocode/18056d2b0_PlayerGlobalStats__GetCurrentHP.c",
+      "evidenceSha256": "a0c3e91105aa119f5f10f3c4810fea2571f944e180f045ea99b19aede43d8d35",
+      "confidence": "reviewed normal-object-state native translation; runtime equivalence not yet tested"
+    },
+    {
+      "method": "HpBarController.ActivateImmunityNow",
+      "address": "18056c150",
+      "source": "src/Reconstructed/NativeAdapters.cs",
+      "evidence": "local/ghidra/pseudocode/18056c150_HpBarController__ActivateImmunityNow.c",
+      "evidenceSha256": "cc26b0be38e73411012f0bcc29e3900243ff5a7237d887efe7789a467844c57d",
+      "confidence": "reviewed normal-object-state native translation; runtime equivalence not yet tested"
+    },
+    {
+      "method": "HpBarController.RefreshImmunityState",
+      "address": "18056ee90",
+      "source": "src/Reconstructed/NativeAdapters.cs",
+      "evidence": "local/ghidra/pseudocode/18056ee90_HpBarController__RefreshImmunityState.c",
+      "evidenceSha256": "6fb1c0a39e4a6386f5d6a8a6d9b52508fba488f71ea717de7db6c683274fcdf3",
+      "confidence": "reviewed normal-object-state native translation; runtime equivalence not yet tested"
     }
   ],
   "constant": {

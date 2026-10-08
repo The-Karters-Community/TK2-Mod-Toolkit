@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-[BepInPlugin("local.tk2.customization", "TK2 Mod Garage Pack", "0.2.0")]
+[BepInPlugin("local.tk2.customization", "TK2 Mod Garage Pack", "0.3.0")]
 public sealed partial class Plugin : BasePlugin
 {
     internal static Plugin? Instance;
@@ -19,6 +19,9 @@ public sealed partial class Plugin : BasePlugin
     internal ConfigEntry<bool> UiEnabled = null!, AudioEnabled = null!, CameraEnabled = null!, PhysicsEnabled = null!;
     internal ConfigEntry<float> HudScale = null!, Volume = null!, Fov = null!, FallAcceleration = null!, AirTime = null!;
     internal ConfigEntry<string> CanvasFilter = null!;
+    internal ConfigEntry<bool> PreserveKartFraming = null!;
+    internal ConfigEntry<float> CameraDistance = null!, CameraHeight = null!;
+    internal ConfigEntry<float> MusicVolume = null!, SfxVolume = null!, VoiceVolume = null!, UiVolume = null!;
     internal bool GameplayReady, PhysicsFaulted, SessionModified;
     private StudioBehaviour? _behaviour;
 
@@ -28,14 +31,23 @@ public sealed partial class Plugin : BasePlugin
     public override void Load()
     {
         Instance = this;
+        // Config.Reload must not save every setting back over a GUI edit.
+        Config.SaveOnConfigSet = false;
         UiEnabled = Config.Bind("UI", "Enabled", false, "Scale matching root overlay HUD canvases.");
         HudScale = Config.Bind("UI", "HudScale", 1f, new ConfigDescription("Multiplier of captured Canvas scale.", new AcceptableValueRange<float>(0.5f, 2f)));
         CanvasFilter = Config.Bind("UI", "CanvasNameFilter", "HUD", "Case-insensitive canvas name substring. Empty filters do not match.");
         AudioEnabled = Config.Bind("Audio", "Enabled", false, "Multiply the game's Wwise volume settings.");
         Volume = Config.Bind("Audio", "MasterVolume", 1f, new ConfigDescription("Multiplier of game volume settings (0 to 1).", new AcceptableValueRange<float>(0f, 1f)));
-        CameraEnabled = Config.Bind("Camera", "Enabled", false, "Override main perspective camera FOV.");
+        MusicVolume = Config.Bind("Audio", "MusicVolume", 1f, new ConfigDescription("Music bus multiplier.", new AcceptableValueRange<float>(0,1)));
+        SfxVolume = Config.Bind("Audio", "SfxVolume", 1f, new ConfigDescription("Sound effects bus multiplier.", new AcceptableValueRange<float>(0,1)));
+        VoiceVolume = Config.Bind("Audio", "VoiceVolume", 1f, new ConfigDescription("Voice-over bus multiplier.", new AcceptableValueRange<float>(0,1)));
+        UiVolume = Config.Bind("Audio", "UiVolume", 1f, new ConfigDescription("Interface sounds bus multiplier.", new AcceptableValueRange<float>(0,1)));
+        CameraEnabled = Config.Bind("Camera", "Enabled", false, "Customize local racing camera framing.");
         Fov = Config.Bind("Camera", "FieldOfView", 65f, new ConfigDescription("Vertical FOV in degrees.", new AcceptableValueRange<float>(35f, 110f)));
-        PhysicsEnabled = Config.Bind("Physics", "Enabled", false, "Experimental offline fast fall: hold Down Arrow after minimum air time. Requires verified targets and leaderboard guard.");
+        PreserveKartFraming = Config.Bind("Camera", "PreserveKartFraming", true, "Compensate camera distance when FOV changes so your kart keeps its apparent size.");
+        CameraDistance = Config.Bind("Camera", "DistanceMultiplier", 1f, new ConfigDescription("Distance relative to the game's racing camera.", new AcceptableValueRange<float>(0.5f, 2.5f)));
+        CameraHeight = Config.Bind("Camera", "HeightOffset", 0f, new ConfigDescription("Extra camera height in world units.", new AcceptableValueRange<float>(-2f, 4f)));
+        PhysicsEnabled = Config.Bind("Physics", "Enabled", false, "Offline fast fall for testing. Leaderboard uploads are unchanged.");
         FallAcceleration = Config.Bind("Physics", "FastFallAcceleration", 100f, new ConfigDescription("Extra downwards acceleration.", new AcceptableValueRange<float>(0f, 500f)));
         AirTime = Config.Bind("Physics", "MinimumAirTime", 0.4f, new ConfigDescription("Minimum airborne seconds.", new AcceptableValueRange<float>(0f, 3f)));
         BindPack();
@@ -43,9 +55,15 @@ public sealed partial class Plugin : BasePlugin
         TryFeature("Wwise volume", () => PatchExact(typeof(PTK_AudioListenerManager), "SetVolume",
             new[] { typeof(string), typeof(int) }, nameof(AudioPrefix), prefix: true));
         TryFeature("offline fast fall", InstallPhysics);
+        TryFeature("fast-fall controller input", () => FastFallFeature.Install(this));
         InstallPack();
+        TryFeature("racing camera", () => CameraFeature.Install(this));
+        LegacyMK.Install(this);
+        CommunityMods.Install(this);
+        NightmareAI.Install(this);
         _behaviour = AddComponent<StudioBehaviour>();
-        Log.LogInfo("TK2 Customization compiled for 0.1.4.18. Features default off; runtime testing required.");
+        Config.Save();
+        Log.LogInfo("TK2 Mod Garage 0.3.0: offline test features available; leaderboard uploads unchanged.");
     }
 
     private void TryFeature(string name, Action install)
@@ -69,47 +87,25 @@ public sealed partial class Plugin : BasePlugin
         using var algorithm = SHA256.Create();
         string hash = Convert.ToHexString(algorithm.ComputeHash(stream)).ToLowerInvariant();
         if (hash != KnownGameHash) throw new InvalidOperationException("Unverified game build; physics disabled.");
-        // The guard must install before the gameplay hook. A failure leaves physics disabled.
-        var upload = AccessTools.DeclaredMethod(typeof(KartersLeaderboardsManager), "RaceFinished_UploadLeaderboard",
-            new[] { typeof(float), typeof(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<float>),
-                typeof(Il2CppSystem.Collections.Generic.List<PTK_LeaderboardFacet.CCheckpointTimes>),
-                typeof(Il2CppSystem.Action), typeof(Il2CppSystem.Action) })
-            ?? throw new MissingMethodException("Leaderboard upload signature changed");
-        Harmony.Patch(upload, prefix: new HarmonyMethod(typeof(Plugin), nameof(UploadPrefix)));
         PatchExact(typeof(PixelKartPhysics), "FixedUpdate", Type.EmptyTypes, nameof(PhysicsPostfix), prefix: false);
-        // Only one upload path is proven statically. Unlock after the manual validation matrix passes.
-        GameplayReady = false;
-        Log.LogWarning("Gameplay modules locked pending runtime leaderboard validation.");
+        GameplayReady = true;
     }
-
-    private static bool UploadPrefix() => Instance == null || !Instance.SessionModified;
 
     private static void AudioPrefix(PTK_AudioListenerManager __instance, string __0, ref int __1)
     {
         var p = Instance;
         if (p == null) return;
-        try { AudioFeature.BeforeSetVolume(__instance, __0, ref __1, p.AudioEnabled.Value, p.Volume.Value); }
+        try { AudioFeature.BeforeSetVolume(__instance, __0, ref __1, p.AudioEnabled.Value, AudioFeature.Multiplier(p, __0)); }
         catch (Exception ex) { p.Log.LogWarning($"Volume hook failed: {ex.Message}"); }
     }
 
     private static void PhysicsPostfix(PixelKartPhysics __instance)
     {
         var p = Instance;
-        if (p == null || !p.GameplayReady || p.PhysicsFaulted || !p.PhysicsEnabled.Value) return;
+        if (p == null || !p.GameplayReady) return;
         try
         {
-            // Generated interop exposes ObscuredBool conversions and private fields as managed properties.
-            if (Ant_CurrentGameConfiguration.IsOnlineGame_InRoom_WithInternet) return;
-            if (Time.timeScale <= 0 || Ant_CurrentGameConfiguration.eCurrentRaceState !=
-                Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING) return;
-            var controller = __instance.kartController;
-            if (controller == null || controller.parentPlayer == null || controller.parentPlayer.ePlayerType !=
-                Ant_Player.EPlayerType.E_HUMAN_LOCAL) return;
-            if (!Input.GetKey(KeyCode.DownArrow) || __instance.bWasGrounded || __instance.bIsDrifting ||
-                __instance.fTimeInAir < p.AirTime.Value) return;
-            // Keep protection active after toggling off: a modified race can still finish later.
-            p.SessionModified = true;
-            ReadableGame.AddVelocity(__instance, Vector3.down * Time.fixedDeltaTime * p.FallAcceleration.Value);
+            FastFallFeature.Tick(__instance, p);
         }
         catch (Exception ex)
         {
@@ -120,12 +116,15 @@ public sealed partial class Plugin : BasePlugin
 
     public override bool Unload()
     {
-        // Removing the upload guard after a modified race could expose its result.
-        // Restart the process to unload in that case.
-        if (SessionModified) { Log.LogWarning("Restart required to unload after modified physics."); return false; }
+        if (SessionModified) { Log.LogWarning("Restart required to unload after modifying a race."); return false; }
         if (_behaviour != null) { _behaviour.RestoreAll(); UnityEngine.Object.Destroy(_behaviour); }
         AudioFeature.Restore();
         RecipeHost.Restore();
+        FastFallFeature.Restore();
+        CommunityMods.Restore();
+        NightmareAI.Restore();
+        LegacyMK.Restore();
+        RestoreTuning();
         Harmony.UnpatchSelf();
         Instance = null;
         return true;

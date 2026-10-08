@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework><Nullable>enable</Nullable><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <ItemGroup><Compile Include="../../plugins/TK2.Customization/CommunityCommandParser.cs" Link="CommunityCommandParser.cs" /></ItemGroup>
+  <ItemGroup><None Include="../../studio/community_catalog.json" Link="community_catalog.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+</Project>

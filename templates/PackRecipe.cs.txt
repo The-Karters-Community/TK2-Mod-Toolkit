@@ -3,33 +3,30 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-// This module joins the SAME pack DLL. No separate plugin project or dependency installation.
-// Example: camera focus. Turn off the built-in Camera FOV module to avoid competing settings.
+// New recipe compiles into the same plugin. The host limits gameplay recipes to
+// the supported local/offline build. This example uses editable recovered logic.
 public sealed class RecipeName : IModRecipe
 {
     public string Name => "RecipeName";
-    public bool ChangesGameplay => false; // Set true for rules/physics; the offline validation lock then applies.
-    private ConfigEntry<float> _fov = null!;
-    private Camera? _camera;
-    private float _original;
+    public bool ChangesGameplay => true;
+    private ConfigEntry<float> _hop = null!;
+    private ConfigEntry<KeyCode> _key = null!;
 
     public void Configure(ConfigFile config)
     {
-        _fov = config.Bind("Recipe." + Name, "FieldOfView", 75f,
-            new ConfigDescription("Camera focus in degrees.", new AcceptableValueRange<float>(35f, 110f)));
+        _hop = config.Bind("Recipe." + Name, "UpwardVelocity", 6f,
+            new ConfigDescription("Extra upward velocity when the shortcut is pressed.", new AcceptableValueRange<float>(0, 30)));
+        _key = config.Bind("Recipe." + Name, "Shortcut", KeyCode.F9, "Keyboard shortcut for this example kart hop.");
     }
 
     public void Tick()
     {
-        Camera current = Camera.main;
-        if (current == null || current.orthographic) { Restore(); return; }
-        if (current != _camera) { Restore(); _camera = current; _original = current.fieldOfView; }
-        _camera.fieldOfView = _fov.Value;
+        if (Time.timeScale <= 0 || Ant_CurrentGameConfiguration.eCurrentRaceState !=
+            Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING || !Input.GetKeyDown(_key.Value)) return;
+        foreach (var kart in UnityEngine.Object.FindObjectsOfType<PixelKartPhysics>())
+            if (kart.kartController?.parentPlayer?.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL)
+                ReadableGame.AddVelocity(kart, Vector3.up * _hop.Value);
     }
 
-    public void Restore()
-    {
-        if (_camera != null) _camera.fieldOfView = _original;
-        _camera = null;
-    }
+    public void Restore() { } // An impulse ends naturally; no persistent setting is replaced.
 }

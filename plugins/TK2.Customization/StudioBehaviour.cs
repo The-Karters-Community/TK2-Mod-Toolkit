@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using UnityEngine;
+using Il2CppInterop.Runtime.Attributes;
 
 namespace TK2.Customization;
 
@@ -9,12 +10,12 @@ public sealed class StudioBehaviour : MonoBehaviour
 {
     public StudioBehaviour(IntPtr pointer) : base(pointer) { }
     private readonly Dictionary<int, (Canvas Item, float Original)> _canvases = new();
-    private readonly Dictionary<int, (Camera Item, float Original)> _cameras = new();
     private readonly Dictionary<int, (CanvasGroup Item, float Original)> _opacity = new();
     private float? _originalShadowDistance;
     private DateTime _configTime;
     private float _nextScan, _nextConfig;
-    private bool _uiFaulted, _cameraFaulted, _audioFaulted;
+    private bool _uiFaulted, _audioFaulted;
+    private bool _mkFaulted, _communityFaulted, _nightmareFaulted;
 
     public void Update()
     {
@@ -27,13 +28,22 @@ public sealed class StudioBehaviour : MonoBehaviour
             try
             {
                 var modified = File.GetLastWriteTimeUtc(p.Config.ConfigFilePath);
-                if (_configTime != default && modified != _configTime) p.Config.Reload();
+                if (modified != _configTime)
+                {
+                    p.Config.Reload();
+                    _uiFaulted = _audioFaulted = false;
+                    _mkFaulted = _communityFaulted = _nightmareFaulted = false;
+                    p.PhysicsFaulted = false;
+                }
                 _configTime = modified;
             }
             catch (Exception ex) { p.Log.LogWarning($"Config reload failed: {ex.Message}"); }
         }
-        RunFeature(ref _audioFaulted, "audio", () => AudioFeature.Tick(p.AudioEnabled.Value, p.Volume.Value));
+        RunFeature(ref _audioFaulted, "audio", () => AudioFeature.Tick(p));
         RecipeHost.Tick();
+        RunFeature(ref _mkFaulted, "MK modules", LegacyMK.Tick);
+        RunFeature(ref _communityFaulted, "community commands", CommunityMods.Tick);
+        RunFeature(ref _nightmareFaulted, "Nightmare AI", NightmareAI.Tick);
         if (Time.unscaledTime >= _nextScan)
         {
             _nextScan = Time.unscaledTime + 1f;
@@ -43,13 +53,7 @@ public sealed class StudioBehaviour : MonoBehaviour
         }
     }
 
-    // Follow cameras often update after normal Update; apply FOV in LateUpdate.
-    public void LateUpdate()
-    {
-        var p = Plugin.Instance;
-        if (p != null) RunFeature(ref _cameraFaulted, "camera", () => UpdateCamera(p));
-    }
-
+    [HideFromIl2Cpp]
     private void RunFeature(ref bool faulted, string name, Action work)
     {
         if (faulted) return;
@@ -59,11 +63,18 @@ public sealed class StudioBehaviour : MonoBehaviour
             faulted = true;
             Plugin.Instance?.Log.LogError($"{name} disabled after runtime failure: {ex.Message}");
             // Best-effort restore after failure; isolate restoration from other modules.
-            try { if (name == "UI") RestoreHud(); else if (name == "camera") RestoreCamera(); else AudioFeature.Restore(); }
+            try {
+                if (name == "UI") RestoreHud();
+                else if (name == "MK modules") LegacyMK.Restore();
+                else if (name == "Nightmare AI") NightmareAI.Restore();
+                else if (name == "community commands") CommunityMods.Restore();
+                else AudioFeature.Restore();
+            }
             catch (Exception restoreEx) { Plugin.Instance?.Log.LogWarning(restoreEx.Message); }
         }
     }
 
+    [HideFromIl2Cpp]
     private void UpdateHud(Plugin p)
     {
         if (!p.UiEnabled.Value) { RestoreHud(); return; }
@@ -88,35 +99,13 @@ public sealed class StudioBehaviour : MonoBehaviour
         canvas.renderMode != RenderMode.WorldSpace && !string.IsNullOrWhiteSpace(filter) &&
         canvas.name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
 
-    private void UpdateCamera(Plugin p)
-    {
-        if (!p.CameraEnabled.Value) { RestoreCamera(); return; }
-        Camera camera = Camera.main;
-        var stale = new List<int>();
-        foreach (var pair in _cameras)
-        {
-            if (pair.Value.Item == null) stale.Add(pair.Key);
-            else if (pair.Value.Item != camera) { pair.Value.Item.fieldOfView = pair.Value.Original; stale.Add(pair.Key); }
-        }
-        foreach (int id in stale) _cameras.Remove(id);
-        if (camera == null || camera.orthographic) return;
-        int current = camera.GetInstanceID();
-        if (!_cameras.TryGetValue(current, out var data)) { data = (camera, camera.fieldOfView); _cameras[current] = data; }
-        camera.fieldOfView = p.Fov.Value;
-    }
-
     private void RestoreHud()
     {
         foreach (var pair in _canvases) if (pair.Value.Item != null) pair.Value.Item.scaleFactor = pair.Value.Original;
         _canvases.Clear();
     }
 
-    private void RestoreCamera()
-    {
-        foreach (var pair in _cameras) if (pair.Value.Item != null) pair.Value.Item.fieldOfView = pair.Value.Original;
-        _cameras.Clear();
-    }
-
+    [HideFromIl2Cpp]
     private void UpdateVisualPack(Plugin p)
     {
         if (p.RenderEnabled.Value)
@@ -158,6 +147,6 @@ public sealed class StudioBehaviour : MonoBehaviour
         _originalShadowDistance = null;
     }
 
-    public void RestoreAll() { RestoreHud(); RestoreCamera(); RestoreVisualPack(); }
+    public void RestoreAll() { RestoreHud(); RestoreVisualPack(); }
     public void OnDestroy() { RestoreAll(); }
 }

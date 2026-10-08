@@ -1,0 +1,10 @@
+^PixelGameKartCamera\$\$(UnityCustomUpdate|InitOriginalProperties|GetRacingCamPositionAndRotation)$
+^PixelKartPhysics\$\$GetCurrentEngineSpeedPowerWithReservesPercentageInfo$
+^PTK_VehicleOutsideMapValidator\$\$(HandleRespawnPhases|PlayerOutsideTrack_RespawnPlayer)$
+^HpBarController\$\$(CheckHp|GetCurrentHP|Death)$
+^Ant_BoostManager\$\$GetCurrentBoostReservesTime$
+^PTK_PlayerVoiceOverManager\$\$(CanPlayVOForPlayer|PlayVoiceOver)$
+^PlayerRaceLogic\$\$UpdateAndCalculateLapCount$
+^HpBarController\$\$(SetImmunity|ActivateImmunityNow|RefreshImmunityState)$
+^PlayerGlobalStats\$\$GetCurrentHP$
+^Ant_BoostManager\$\$WallCollisionOccuredInTimeFromLastOne$
