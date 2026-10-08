@@ -73,8 +73,8 @@ Reproduce the checks:
 python -m unittest discover -s tests -p 'test_*.py'
 node tests/garage-state.test.cjs
 python tools/smoke_garage.py
-dotnet run --project tests/Mechanics/MechanicsTests.csproj
-dotnet run --project tests/ModelParser/model-parser-tests.csproj
+dotnet run --project tests/MirrorRace/MirrorRace.Tests.csproj
+dotnet run --project tests/TrackInspector/TrackInspectorTests.csproj
 ```
 
 ## Settings cleanup (2026-10-09)
@@ -84,3 +84,13 @@ The Models importer and seven Race Lab recipes have been removed from active run
 The checkbox/hotkey regression was caused by missing input/change listeners after the slider refactor. A new test first reproduced the missing boolean handler. All controls now receive handlers, including dropdowns and numeric fields without sliders. Regression checks verify typed boolean/key values, unsaved edits surviving background refreshes, save-button activation and saved payloads.
 
 Validation: **75 Python tests**, **133 offline frontend assertions**, static UI smoke (**96 controls**) and runtime **0.5.1 compilation with zero warnings/errors**. No portable executable/ZIP was built, no real game files were changed, and the game was not launched. Source changes are available through Launch Studio.cmd; old portable executables retain their embedded code until the user requests a new build.
+
+## Native track tools (2026-10-09)
+
+The old mirror projection/culling/steering hooks are retired. Mirror Race reflects supported authored track geometry before the exact parameterless `Ant_MapData.Awake()` builds road/progress and minimap caches. Mesh channels/winding, collider centers, Bezier widths/points and minimap bounds are handled together. Unsupported geometry is rejected before scene edits; camera/UI hierarchies remain separate. This is a new implementation guided by native evidence, not recovered original mirror source. [Support limits](MIRROR-RACE.md) include static batching, animated geometry and GPU-only instancing; no stock track has been runtime-certified.
+
+Track Inspector uses current native wall/respawn masks and initialized executor-to-trigger kill links. It follows the map's additive scene and local racing cameras, requires registered physics-trigger collider membership, and releases its own outlines on disable. [Coverage limits](TRACK-INSPECTOR.md) distinguish potential kill triggers, conditional respawns and approximate collider bounds.
+
+The module catalog places Mirror Race in Community Mods and Track Inspector in Toolkit Essentials. Their helpers are editable/exportable, defaults remain off, and ordinary settings stay in the same hot-reloaded config. Old mirror settings remain preserved but hidden. Installation diagnostics now recognize the actual plugin version instead of hard-coded 0.4.1. Source-app version 0.6.3 prevents reuse of an older Toolkit backend.
+
+Final checks: **81 Python tests**, **133 offline frontend assertions**, **3,021 mirror geometry assertions**, **26 inspector rules assertions**, static UI smoke (**96 controls**), and full runtime **0.6.0 compilation with zero warnings/errors**. Existing game logs still show installed 0.4.0. No game installation/config/save files were written, no game was launched, and no portable executable or distribution ZIP was built. Real rendering, collision, AI race completion and GPU recovery require manual in-game validation after installing the new DLL.

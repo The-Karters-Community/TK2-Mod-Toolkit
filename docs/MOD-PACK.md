@@ -4,7 +4,7 @@ One physical plugin, TK2.Customization.dll, contains these logical packs. New mo
 
 | Pack | Modules |
 |---|---|
-| Toolkit Essentials | HUD size, HUD transparency, audio mixer, camera setup, graphics |
+| Toolkit Essentials | HUD size, HUD transparency, audio mixer, camera setup, graphics, track inspector |
 | Community Mods | Custom laps, driving challenge, automatic drift boost, basic kart tuning, fast respawn, boost trainer, alternate reserves, Dash and Stash, portal tricks, mirror, Bobby Gang, nearby voice lines, CNK-style boost meter, air brake, kart/boost parameters, practice save states, reverse race, Nightmare AI, fast fall/dodge, health/reserve/elimination chat commands |
 | Your recipes | FrameLimiter and author-created modules in the same DLL |
 
@@ -14,4 +14,4 @@ The full 57 legacy numeric tuning ideas have typed current-build bindings. They 
 
 Automatic boost includes the legacy early-press suppression and boost release on drift stop, with a configurable threshold. Driving challenge exposes separate jump/drift restrictions. Fast fall exposes press/hold, controller action, air time, acceleration, deadzone and optional dodge duration. Dodge uses an independent immunity flag, preserving native shield/respawn/death flags.
 
-All legacy **ideas** have a current code path or documented adaptation. This is not a claim of complete native/runtime parity: CNK bars replace the external arc overlay, mirror particle/GI fixes remain limited, reverse track checkpoint/respawn semantics remain experimental, snapshot route histories/other racers are not rewound, and old empirical reserve-speed percentages were replaced by explicit seconds. Framework SDK projects are absorbed into the single plugin; they are not separately toggled empty mods. Disable Leaderboards is deliberately excluded for this requested test build.
+Legacy ideas have a current code path or documented adaptation. This is not complete native/runtime parity: CNK bars replace the external arc overlay, reverse track checkpoint/respawn semantics remain experimental, snapshot route histories/other racers are not rewound, and old empirical reserve-speed percentages were replaced by explicit seconds. The old mirror camera/culling hack is removed; [Mirror race](MIRROR-RACE.md) reflects supported track geometry before native route caches are built, with explicit preflight limits. [Track inspector](TRACK-INSPECTOR.md) reads collision masks and trigger links without changing collision behavior. Framework SDK projects are absorbed into the single plugin; they are not separately toggled empty mods. Disable Leaderboards is deliberately excluded for this requested test build.

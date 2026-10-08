@@ -76,7 +76,12 @@ def readiness(game):
     log = next((game / "BepInEx" / name for name in ("LogOutput.log", "LogOutput.txt") if (game / "BepInEx" / name).is_file()), None)
     text = log.read_text(encoding="utf-8", errors="replace") if log else ""
     initialized = "Chainloader initialized" in text and interop.is_file() and core.is_managed_dll(interop)
-    loaded = "Loading [TK2 Mod Toolkit Pack 0.4.1]" in text or "TK2 Mod Toolkit 0.4.1:" in text
+    # Match the checkout's actual plugin version; a hard-coded legacy version
+    # made new installations look unverified even after a successful launch.
+    plugin_source = core.ROOT / 'plugins/TK2.Customization/Plugin.cs'
+    match = re.search(r'BepInPlugin\("local\.tk2\.customization",\s*"[^"]+",\s*"([^"]+)"', plugin_source.read_text(encoding='utf-8-sig')) if plugin_source.is_file() else None
+    version = match[1] if match else None
+    loaded = bool(version and (f"Loading [TK2 Mod Toolkit Pack {version}]" in text or f"TK2 Mod Toolkit {version}:" in text))
     warnings = [line for line in text.splitlines() if "[Warning" in line][-15:]
     errors = [line for line in text.splitlines() if any(word in line.lower() for word in ("[error", "exception", "error loading", "unavailable", "disabled after", "stopped:"))][-35:]
     stage = "install-loader" if missing or not enabled or not target_ok else "initialize-loader" if not initialized else "ready"

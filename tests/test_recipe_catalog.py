@@ -64,9 +64,10 @@ class RecipeCatalogTests(unittest.TestCase):
         self.assertTrue(feature['catalogWarnings'])
 
     def test_removed_module_config_does_not_reappear_in_settings(self):
-        data = b'[Recipe.AirGlider]\nEnabled = true\nLift = 18\n[Recipe.CosmeticModel]\nEnabled = true\nModelPath = old/model.obj\n'
+        data = b'[Recipe.AirGlider]\nEnabled = true\nLift = 18\n[Recipe.CosmeticModel]\nEnabled = true\nModelPath = old/model.obj\n[MirrorMode]\nEnabled = true\n'
         result = settings.read(data)
         self.assertFalse(result['recipes'])
+        self.assertFalse(result['extraSettings'])
         self.assertFalse(any(k.startswith(('Recipe.AirGlider/','Recipe.CosmeticModel/')) for k in result['settings']))
         with self.assertRaises(ValueError): settings.merge(data,{'hash':result['configHash'],'recipes':{'Recipe.AirGlider/Enabled':'false'}})
         saved = settings.merge(data,{'hash':result['configHash'],'values':{'Camera/PanelEnabled':False,'Camera/PanelHotkey':'C'}})
@@ -74,3 +75,16 @@ class RecipeCatalogTests(unittest.TestCase):
         after = settings.read(saved)
         self.assertIs(after['settings']['Camera/PanelEnabled'],False)
         self.assertEqual(after['settings']['Camera/PanelHotkey'],'C')
+
+    def test_host_enabled_binding_has_one_header_toggle(self):
+        (self.sources / 'ToyKart.cs').write_text(RECIPE.replace('void Configure(ConfigFile config) {', 'void Configure(ConfigFile config) { config.Bind("Recipe." + Name, "Enabled", false, "Next load");'))
+        feature = recipe_catalog.features()[0]
+        self.assertNotIn('Enabled', [s[0] for s in feature['settings']])
+        self.assertIs(pack.defaults()['Recipe.ToyKart/Enabled'], False)
+
+    def test_builtin_recipes_join_appropriate_pack_without_duplicate_members(self):
+        (self.sources / 'ToyKart.cs').write_text(RECIPE.replace('ToyKart', 'TrackInspector'))
+        packs = pack.catalog_packs()
+        self.assertIn('Recipe.TrackInspector', next(p for p in packs if p['id'] == 'garage')['features'])
+        self.assertEqual(sum(p['features'].count('Recipe.TrackInspector') for p in packs), 1)
+        self.assertNotIn('MirrorMode', [f['id'] for f in pack.catalog_features()])

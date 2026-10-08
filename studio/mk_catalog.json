@@ -202,15 +202,6 @@
       "settings": []
     },
     {
-      "id": "MirrorMode",
-      "name": "Mirror mode",
-      "description": "Mirror gameplay cameras and local steering. Particle effects may still need visual adjustment.",
-      "category": "Race rules",
-      "origin": "MK legacy port",
-      "gameplay": true,
-      "settings": []
-    },
-    {
       "id": "BobbyGang",
       "name": "Character names",
       "description": "Replace character-name text in the visible UI.",

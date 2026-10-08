@@ -9,7 +9,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from studio import core, pack, setup, symbols
 
-VERSION = '0.6.2'
+VERSION = '0.6.3'
 
 
 def publish_directory(source, target):

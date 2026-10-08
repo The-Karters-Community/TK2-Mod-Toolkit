@@ -54,9 +54,9 @@ _CAMERA["settings"] = [
 _CAMERA["settingGroups"] = {"AimAtKart":"Aim & rotation", "TargetHeight":"Aim & rotation", "PitchOffset":"Aim & rotation", "YawOffset":"Aim & rotation", "RollOffset":"Aim & rotation", "SmoothingSeconds":"Transitions", "PanelEnabled":"In-race panel", "PanelHotkey":"In-race panel", "PanelScale":"In-race panel"}
 
 
-RETIRED_MODULES = frozenset('Recipe.' + name for name in (
+RETIRED_MODULES = frozenset({'MirrorMode'} | {'Recipe.' + name for name in (
     'AirGlider','DriftCapacitor','EchoRewind','GravitySurf','LandingCombo',
-    'RepulsorPulse','SlipstreamSling','CosmeticModel'))
+    'RepulsorPulse','SlipstreamSling','CosmeticModel')})
 
 
 def schema(features=None):
@@ -115,9 +115,10 @@ def catalog_features():
 
 def catalog_packs():
     recipes = recipe_catalog.features()
-    members = [f['id'] for f in recipes]
+    packs = [{**p, 'features': p['features'] + [f['id'] for f in recipes if f['pack'] == p['id']]} for p in PACKS]
+    members = [f['id'] for f in recipes if f['pack'] not in {p['id'] for p in PACKS}]
     extra = [{'id':'recipes','name':'Your recipes','description':'Create, edit and share your own C# modules.','features':members}] if members else []
-    return PACKS + extra
+    return packs + extra
 
 
 def initial_config():
@@ -176,7 +177,11 @@ def module_sources():
         name = match[1]
         helper = "plugins/TK2.Customization/RecipeHost.cs"
         dependencies = [helper]
-        result["Recipe." + name] = [file] + [dep for dep in dependencies if dep in available]
+        # Built-in recipes expose their supporting code in Edit and exports.
+        dependencies += sorted(dep for dep in available if dep.startswith('plugins/TK2.Customization/Recipes/' + name) and dep != file)
+        if name == 'MirrorRace':
+            dependencies += ['plugins/TK2.Customization/Recipes/' + dep for dep in ('MirrorGeometry.cs', 'MirrorMesh.cs')]
+        result["Recipe." + name] = [file] + list(dict.fromkeys(dep for dep in dependencies if dep in available))
     return result
 
 

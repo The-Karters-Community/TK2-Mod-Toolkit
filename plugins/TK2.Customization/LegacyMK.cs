@@ -14,7 +14,7 @@ internal static partial class LegacyMK
 {
     private static Plugin _plugin = null!;
     private static ConfigEntry<bool> Respawn = null!, Trainer = null!, Reserves = null!, Dash = null!,
-        TeleportTricks = null!, Mirror = null!, Bobby = null!, Voice = null!, AirBrake = null!;
+        TeleportTricks = null!, Bobby = null!, Voice = null!, AirBrake = null!;
     private static ConfigEntry<float> RespawnSpeed = null!, TrainerThreshold = null!, TrainerStrength = null!,
         ReserveRate = null!, ReservesToSet = null!, VoiceDistance = null!;
     private static ConfigEntry<int> Ammo = null!;
@@ -39,7 +39,6 @@ internal static partial class LegacyMK
         Weapon = plugin.Config.Bind("DashAndStash", "Item", PixelWeaponObject.EWeaponType.TELEPORT_DASH_12, "Item to award. Choose an actual weapon, not __WEAPONS_COUNT.");
         Ammo = plugin.Config.Bind("DashAndStash", "Ammo", 1, new ConfigDescription("Item quantity.", new AcceptableValueRange<int>(1, 99)));
         TeleportTricks = Toggle("TeleportersForTricks", "Award a teleport item after landing a trick; portal use blocks the next award.");
-        Mirror = Toggle("MirrorMode", "Mirror gameplay cameras and local steering. Particle effects may still need visual adjustment.");
         Bobby = Toggle("BobbyGang", "Replace character-name text in the visible UI.");
         NameFrom = plugin.Config.Bind("BobbyGang", "OriginalName", "Bubble", "Case-sensitive text to replace; blank does nothing.");
         NameTo = plugin.Config.Bind("BobbyGang", "ReplacementName", "Bobby", "Replacement text.");
@@ -55,12 +54,6 @@ internal static partial class LegacyMK
         Capability("teleport trick reward", () => {
             Hook(typeof(Ant_BoostManager), "OnKartLandedAfterPlayerTriggeredJump", new[] { typeof(bool) }, nameof(LandingPostfix), false);
             Hook(typeof(PortalDash), "StartEffect", Type.EmptyTypes, nameof(PortalPostfix), false);
-        });
-        Capability("mirror", () => {
-            Hook(typeof(PixelSDK_CameraEvents), "OnPreCull", Type.EmptyTypes, nameof(MirrorCullPostfix), false);
-            Hook(typeof(PixelSDK_CameraEvents), "OnPreRender", Type.EmptyTypes, nameof(MirrorRenderPrefix), true);
-            Hook(typeof(PixelSDK_CameraEvents), "OnPostRender", Type.EmptyTypes, nameof(MirrorEndPostfix), false);
-            Hook(typeof(PixelEasyCharMoveKartController), "SteerInput", new[] { typeof(float) }, nameof(MirrorSteerPrefix), true);
         });
         Capability("nearby voices", () => {
             Hook(typeof(PTK_PlayerVoiceOverManager), "CanPlayVOForPlayer", Type.EmptyTypes, nameof(VoiceAllowedPostfix), false);
@@ -209,37 +202,6 @@ internal static partial class LegacyMK
         catch (Exception ex) { Fault(TeleportTricks, ex); }
     }
 
-    private static readonly Dictionary<int, (Camera Camera, Matrix4x4 Matrix)> MirroredCameras = new();
-    private static readonly Dictionary<int, bool> CullingBefore = new();
-    private static void MirrorCullPostfix(PixelSDK_CameraEvents __instance)
-    {
-        if (!Mirror.Value || !Plugin.OfflineLabAllowed) return;
-        var camera = __instance.parentCamera?.unityCamera;
-        if (camera == null) return;
-        int id = camera.GetInstanceID();
-        // Restore any unfinished previous render before capturing; never repeatedly multiply -1.
-        if (MirroredCameras.Remove(id, out var old)) camera.projectionMatrix = old.Matrix;
-        MirroredCameras[id] = (camera, camera.projectionMatrix);
-        camera.projectionMatrix *= Matrix4x4.Scale(new Vector3(-1, 1, 1));
-    }
-    private static void MirrorRenderPrefix(PixelSDK_CameraEvents __instance)
-    {
-        var camera = __instance.parentCamera?.unityCamera;
-        if (camera == null || !MirroredCameras.ContainsKey(camera.GetInstanceID())) return;
-        CullingBefore[camera.GetInstanceID()] = GL.invertCulling;
-        GL.invertCulling = !GL.invertCulling;
-    }
-    private static void MirrorEndPostfix(PixelSDK_CameraEvents __instance)
-    {
-        var camera = __instance.parentCamera?.unityCamera;
-        if (camera == null) return;
-        int id = camera.GetInstanceID();
-        if (CullingBefore.Remove(id, out bool culling)) GL.invertCulling = culling;
-        if (MirroredCameras.Remove(id, out var original)) camera.projectionMatrix = original.Matrix;
-    }
-    private static void MirrorSteerPrefix(PixelEasyCharMoveKartController __instance, ref float __0)
-    { if (Mirror.Value && Allowed(__instance.parentPlayer)) __0 = -__0; }
-
     private static float NearestLocalDistance(PTK_PlayerVoiceOverManager manager)
     {
         var source = manager.visualInstanceParent?.parentPlayer;
@@ -304,10 +266,6 @@ internal static partial class LegacyMK
         foreach (var old in ReserveOriginals.Values) if (old.Target != null)
         { old.Target.fBoostLengthFor1 = old.One; old.Target.fBoostLengthFor2 = old.Two; old.Target.fBoostLengthFor3 = old.Three; }
         ReserveOriginals.Clear();
-        foreach (var old in MirroredCameras.Values) if (old.Camera != null) old.Camera.projectionMatrix = old.Matrix;
-        MirroredCameras.Clear();
-        if (CullingBefore.Count > 0) foreach (bool old in CullingBefore.Values) { GL.invertCulling = old; break; }
-        CullingBefore.Clear();
         foreach (var input in RumblePlayers.Values) input.StopVibration();
         RumblePlayers.Clear(); TrainerWasReady.Clear(); PortalBlocksAward.Clear();
         foreach (var old in ChangedText.Values) if (old.Text != null && old.Text.text == old.After) old.Text.text = old.Before;

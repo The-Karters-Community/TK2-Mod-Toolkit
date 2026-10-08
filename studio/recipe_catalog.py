@@ -3,7 +3,10 @@ from pathlib import Path
 import re
 from . import core
 
-INFO = {}
+INFO = {
+    'MirrorRace': ('Mirror race', 'Reflect the track geometry and route data before route caches are built. Applies on the next track load; unsupported geometry is skipped with a diagnostic.', 'community'),
+    'TrackInspector': ('Track inspector', 'See physical walls, respawn boundaries and command-linked kill triggers. Press F10 to hide or show the overlay.', 'garage'),
+}
 
 KEYS = ['F' + str(i) for i in range(1, 13)] + list('ABCDEFGHIJKLMNOPQRSTUVWXYZ') + ['Alpha' + str(i) for i in range(10)] + ['Space','LeftShift','RightShift','LeftControl','RightControl','UpArrow','DownArrow','LeftArrow','RightArrow','None']
 
@@ -59,6 +62,7 @@ def source_features(source_root=None):
             if len(args) < 3 or not re.fullmatch(r'"Recipe\."\s*\+\s*Name', args[0]): continue
             key, default = literal(args[1]), literal(args[2])
             if not isinstance(key, str) or default is None: unsupported.append(args[1]); continue
+            if key == 'Enabled': continue  # The module header owns this shared host binding.
             low = high = None
             bounds = re.search(r'new\s+AcceptableValueRange<(float|int)>\s*\(([^,]+),\s*([^\)]+)\)', ','.join(args[3:]))
             if bounds: low, high = literal(bounds[2]), literal(bounds[3])
@@ -70,9 +74,10 @@ def source_features(source_root=None):
                 desc = literal(match[1]) if match else ''
             choices = list(dict.fromkeys([str(default), *KEYS])) if args[2].startswith('KeyCode.') else None
             settings.append((key, re.sub(r'(?<=[a-z0-9])(?=[A-Z])', ' ', key), kind, default, low, high, desc, choices, None))
-        features.append({'id':'Recipe.' + name, 'name':title, 'category':'Driving',
+        features.append({'id':'Recipe.' + name, 'name':title, 'category':'Graphics' if name == 'TrackInspector' else 'Driving',
                          'description':description, 'pack':pack, 'gameplay':bool(re.search(r'ChangesGameplay\s*=>\s*true', text)),
-                         'origin':'New recipe', 'settings':settings, 'source':str(file.relative_to(root)).replace('\\','/'),
+                         'origin':'Native-evidence implementation' if name in INFO else 'New recipe', 'settings':settings, 'source':str(file.relative_to(root)).replace('\\','/'),
+                         'status': 'Manual in-game validation required.' if name in INFO else '',
                          'catalogWarnings':unsupported})
     return features
 

@@ -175,7 +175,7 @@ def export_package(ids, name, values, game=None):
     identity = uuid.uuid4().hex
     manifest = {"format": FORMAT, "version": VERSION, "name": name.strip(), "modules": modules,
                 "settings": selected_values, "files": entries,
-                "requires": {"toolkit": ">=0.6.2", "runtime": "TK2.Customization", "runtimeVersion": ">=0.5.1", "sourceProject": "TK2-Mod-SDK", "unity": "IL2CPP", "buildAfterSourceImport": True}}
+                "requires": {"toolkit": ">=0.6.3", "runtime": "TK2.Customization", "runtimeVersion": ">=0.5.1", "sourceProject": "TK2-Mod-SDK", "unity": "IL2CPP", "buildAfterSourceImport": True}}
     directory = core.ROOT / "local/module-exports"
     directory.mkdir(parents=True, exist_ok=True)
     destination = _managed(directory / (identity + ".tk2mod"), directory)

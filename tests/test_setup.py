@@ -81,5 +81,17 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(result["reconstructed"], 1)
         self.assertIn('public void Jump(bool pressed);', symbols.detail('0:0')["declaration"])
 
+    def test_runtime_check_tracks_plugin_version_instead_of_legacy_constant(self):
+        source = self.root / 'plugins/TK2.Customization/Plugin.cs'
+        source.parent.mkdir(parents=True)
+        source.write_text('[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.0")]')
+        log = self.game / 'BepInEx/LogOutput.log'
+        log.parent.mkdir(parents=True)
+        for version, expected in [('0.4.1', False), ('0.6.0', True)]:
+            log.write_text(f'[Info: BepInEx] Loading [TK2 Mod Toolkit Pack {version}]\n')
+            result = setup.readiness(self.game)
+            self.assertEqual(next(c for c in result['checks'] if c['name'] == 'Current pack appeared in game log')['ok'], expected)
+            self.assertNotEqual(result['loaderSource'], str(source))
+
 
 if __name__ == '__main__': unittest.main()

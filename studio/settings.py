@@ -33,7 +33,7 @@ def read(data):
             values[compound] = normalized(entry["value"], schema[0])
     return {"settings": values, "configHash": hashlib.sha256(data).hexdigest(),
             "recipes": [e for e in entries if e["section"].startswith("Recipe.") and e["section"] not in pack.RETIRED_MODULES and (e["section"], e["key"]) not in known],
-            "extraSettings": [e for e in entries if (e["section"], e["key"]) not in known and not e["section"].startswith("Recipe.")],
+            "extraSettings": [e for e in entries if (e["section"], e["key"]) not in known and not e["section"].startswith("Recipe.") and e["section"] not in pack.RETIRED_MODULES],
             "entries": entries}
 
 
