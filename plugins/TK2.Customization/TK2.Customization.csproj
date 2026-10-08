@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>TK2.Customization</AssemblyName>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <NoStdLib>true</NoStdLib>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <RestoreSources></RestoreSources>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <Import Project="$(LocalReferences)" Condition="Exists('$(LocalReferences)')" />
+  <Target Name="RequireLocalReferences" BeforeTargets="ResolveReferences" Condition="!Exists('$(LocalReferences)')">
+    <Error Text="Build through Mod Studio or python -m studio.cli build to supply current local references." />
+  </Target>
+</Project>

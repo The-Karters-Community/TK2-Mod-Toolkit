@@ -17,6 +17,7 @@ public class ExportTk2 extends GhidraScript {
         Path out = Paths.get(args[0]);
         Files.createDirectories(out.resolve("pseudocode"));
         String filter = args.length > 1 ? args[1] : "PixelKartPhysics|Ant_MainGame|HpBarController|KartersLeaderboardsManager|PixelGameKartCamera|Ant_KartInput|Ant_BoostManager|PTK_Audio";
+        if (filter.startsWith("@")) filter = String.join("|", Files.readAllLines(Paths.get(filter.substring(1))));
         int limit = args.length > 2 ? Integer.parseInt(args[2]) : 30;
         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(filter);
         DecompInterface decompiler = new DecompInterface();

@@ -1,0 +1,16 @@
+PixelKartPhysics..FixedUpdate$
+PixelKartPhysics..JumpInput$
+PixelKartPhysics..UpdateJumping$
+PixelKartPhysics..AddVelocity$
+PixelKartPhysics..StopDrifting$
+Ant_MainGame..GetGameModeRequiredLapCount$
+Ant_MainGame..Start$
+Ant_KartInput..ProcessRacingInput$
+HpBarController..Hit
+KartersLeaderboardsManager..RaceFinished_UploadLeaderboard$
+PTK_AudioListenerManager..SetVolume$
+PTK_AudioListenerManager..Start$
+PTK_AudioListenerManager..Awake$
+PTK_AudioListenerManager..Update$
+PTK_ModsContentLoader..GetModsPath$
+PTK_ModGameplayDataSync..
