@@ -9,7 +9,7 @@ A Windows mod manager and C# workshop for **The Karters 2 Turbo Charged 0.1.4.18
 - Modules grouped into Toolkit Essentials, Community Mods and Your Recipes.
 - Per-value, module and pack resets; visible defaults, allowed ranges and interactive sliders.
 - Live camera tuning with **F8**, plus interface, audio, graphics and driving controls.
-- Track inspector (**F10**) for walls, respawn boundaries and kill-linked triggers; track geometry mirror mode for the next track load.
+- Track inspector (**F10**) for the game's trigger-collision debug meshes; camera-mirror racing for local offline races and time trials.
 - C# editor, first-mod tutorial, game API browser and selective **.tk2mod** export/import.
 
 ## Get started

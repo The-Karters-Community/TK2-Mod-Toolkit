@@ -13,21 +13,31 @@ class TrackModuleIntegrationTests(unittest.TestCase):
             self.assertEqual(sum(p['features'].count(identity) for p in packs), 1)
             self.assertIn(identity, next(p for p in packs if p['id'] == group)['features'])
 
-    def test_inspector_options_and_hotkey_save_as_typed_config(self):
-        edits = {'Recipe.TrackInspector/Enabled': True,
-                 'Recipe.TrackInspector/ShowWalls': False,
-                 'Recipe.TrackInspector/ShowKillTriggers': False,
-                 'Recipe.TrackInspector/ToggleKey': 'C'}
+    def test_inspector_hotkey_saves_as_typed_config(self):
+        edits = {'Recipe.TrackInspector/Enabled': True, 'Recipe.TrackInspector/ToggleKey': 'C'}
         values = pack.validate(edits)
         self.assertEqual(values[('Recipe.TrackInspector', 'Enabled')], 'true')
-        self.assertEqual(values[('Recipe.TrackInspector', 'ShowWalls')], 'false')
-        self.assertEqual(values[('Recipe.TrackInspector', 'ShowKillTriggers')], 'false')
         self.assertEqual(values[('Recipe.TrackInspector', 'ToggleKey')], 'C')
 
-    def test_export_includes_geometry_and_overlay_helpers(self):
+    def test_inspector_uses_native_trigger_debug_path(self):
+        source = (pack.PROJECT.parent / 'Recipes/TrackInspector.cs').read_text(encoding='utf-8')
+        self.assertIn('bForceDebugShowTriggerCollisionMeshes', source)
+        self.assertIn('mapPhysicsTriggerColliderList', source)
+        self.assertNotIn('FindObjectsOfType<Collider>', source)
+        self.assertNotIn('Graphics.DrawMeshNow', source)
+        self.assertNotIn('ClassInjector', source)
+
+    def test_mirror_flips_clip_space_and_reverses_local_steering(self):
+        source = (pack.PROJECT.parent / 'Recipes/MirrorRace.cs').read_text(encoding='utf-8')
+        self.assertIn('camera.projectionMatrix = flipX * state.Projection;', source)
+        self.assertNotIn('state.Projection * flipX', source)
+        self.assertIn('BeforeSteerInput', source)
+        self.assertIn('E_HUMAN_LOCAL', source)
+        self.assertIn('Mirror Race applied to local camera', source)
+
+    def test_export_includes_only_active_recipe_helpers(self):
         features = {f['id']: f for f in pack.catalog_features()}
-        for name, helpers in [('MirrorRace', ['MirrorGeometry.cs', 'MirrorMesh.cs']),
-                              ('TrackInspector', ['TrackInspectorRules.cs'])]:
+        for name, helpers in [('MirrorRace', []), ('TrackInspector', [])]:
             identity = 'Recipe.' + name
             paths = module_packages._source_dependencies([features[identity]])
             for helper in helpers:

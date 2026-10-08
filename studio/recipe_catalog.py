@@ -4,8 +4,8 @@ import re
 from . import core
 
 INFO = {
-    'MirrorRace': ('Mirror race', 'Reflect supported offline track geometry and route data before the game builds its caches. Applies on the next track load.', 'community'),
-    'TrackInspector': ('Track inspector', 'Identify invisible walls, respawn boundaries and linked kill zones with clear in-race outlines. Convex and unreadable colliders are sampled from their actual physics surface. Press the configured key for the overlay.', 'garage'),
+    'MirrorRace': ('Mirror race', 'Flip the local race camera and steering in offline races and time trials. Applies immediately and works without rewriting track assets.', 'community'),
+    'TrackInspector': ('Track inspector', 'Show the game-authored trigger collision meshes in an offline race. Press the configured key to show or hide them.', 'garage'),
 }
 
 KEYS = ['F' + str(i) for i in range(1, 13)] + list('ABCDEFGHIJKLMNOPQRSTUVWXYZ') + ['Alpha' + str(i) for i in range(10)] + ['Space','LeftShift','RightShift','LeftControl','RightControl','UpArrow','DownArrow','LeftArrow','RightArrow','None']

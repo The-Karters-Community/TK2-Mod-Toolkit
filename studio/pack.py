@@ -179,8 +179,6 @@ def module_sources():
         dependencies = [helper]
         # Built-in recipes expose their supporting code in Edit and exports.
         dependencies += sorted(dep for dep in available if dep.startswith('plugins/TK2.Customization/Recipes/' + name) and dep != file)
-        if name == 'MirrorRace':
-            dependencies += ['plugins/TK2.Customization/Recipes/' + dep for dep in ('MirrorGeometry.cs', 'MirrorMesh.cs')]
         result["Recipe." + name] = [file] + list(dict.fromkeys(dep for dep in dependencies if dep in available))
     return result
 
