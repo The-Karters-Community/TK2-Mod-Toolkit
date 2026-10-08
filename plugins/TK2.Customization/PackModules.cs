@@ -46,7 +46,7 @@ public sealed partial class Plugin
         });
         TryFeature("auto boost", () => {
             PatchExact(typeof(Ant_BoostManager), "FixedUpdate", Type.EmptyTypes, nameof(BoostPostfix), false);
-            PatchExact(typeof(PixelKartPhysics), "StopDrifting", new[] {typeof(bool)}, nameof(DriftStopPrefix), true);
+            PatchExact(typeof(PixelKartPhysics), "StopDrifting", Type.EmptyTypes, nameof(DriftStopPrefix), true);
             PatchExact(typeof(Ant_BoostManager), "BoostInput", new[] {typeof(bool)}, nameof(BoostInputPrefix), true);
         });
         TryFeature("kart tuning", () => PatchExact(typeof(PixelKartPhysics), "FixedUpdate", Type.EmptyTypes, nameof(TuningPostfix), false));
