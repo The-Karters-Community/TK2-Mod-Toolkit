@@ -11,8 +11,8 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-[BepInPlugin("local.tk2.customization", "TK2 Customization", "0.1.0")]
-public sealed class Plugin : BasePlugin
+[BepInPlugin("local.tk2.customization", "TK2 Mod Garage Pack", "0.2.0")]
+public sealed partial class Plugin : BasePlugin
 {
     internal static Plugin? Instance;
     internal readonly Harmony Harmony = new("local.tk2.customization");
@@ -38,10 +38,12 @@ public sealed class Plugin : BasePlugin
         PhysicsEnabled = Config.Bind("Physics", "Enabled", false, "Experimental offline fast fall: hold Down Arrow after minimum air time. Requires verified targets and leaderboard guard.");
         FallAcceleration = Config.Bind("Physics", "FastFallAcceleration", 100f, new ConfigDescription("Extra downwards acceleration.", new AcceptableValueRange<float>(0f, 500f)));
         AirTime = Config.Bind("Physics", "MinimumAirTime", 0.4f, new ConfigDescription("Minimum airborne seconds.", new AcceptableValueRange<float>(0f, 3f)));
+        BindPack();
 
         TryFeature("Wwise volume", () => PatchExact(typeof(PTK_AudioListenerManager), "SetVolume",
             new[] { typeof(string), typeof(int) }, nameof(AudioPrefix), prefix: true));
         TryFeature("offline fast fall", InstallPhysics);
+        InstallPack();
         _behaviour = AddComponent<StudioBehaviour>();
         Log.LogInfo("TK2 Customization compiled for 0.1.4.18. Features default off; runtime testing required.");
     }
@@ -75,7 +77,9 @@ public sealed class Plugin : BasePlugin
             ?? throw new MissingMethodException("Leaderboard upload signature changed");
         Harmony.Patch(upload, prefix: new HarmonyMethod(typeof(Plugin), nameof(UploadPrefix)));
         PatchExact(typeof(PixelKartPhysics), "FixedUpdate", Type.EmptyTypes, nameof(PhysicsPostfix), prefix: false);
-        GameplayReady = true;
+        // Only one upload path is proven statically. Unlock after the manual validation matrix passes.
+        GameplayReady = false;
+        Log.LogWarning("Gameplay modules locked pending runtime leaderboard validation.");
     }
 
     private static bool UploadPrefix() => Instance == null || !Instance.SessionModified;
@@ -105,7 +109,7 @@ public sealed class Plugin : BasePlugin
                 __instance.fTimeInAir < p.AirTime.Value) return;
             // Keep protection active after toggling off: a modified race can still finish later.
             p.SessionModified = true;
-            controller.AddVelocity(Vector3.down * Time.fixedDeltaTime * p.FallAcceleration.Value);
+            ReadableGame.AddVelocity(__instance, Vector3.down * Time.fixedDeltaTime * p.FallAcceleration.Value);
         }
         catch (Exception ex)
         {
@@ -121,6 +125,7 @@ public sealed class Plugin : BasePlugin
         if (SessionModified) { Log.LogWarning("Restart required to unload after modified physics."); return false; }
         if (_behaviour != null) { _behaviour.RestoreAll(); UnityEngine.Object.Destroy(_behaviour); }
         AudioFeature.Restore();
+        RecipeHost.Restore();
         Harmony.UnpatchSelf();
         Instance = null;
         return true;

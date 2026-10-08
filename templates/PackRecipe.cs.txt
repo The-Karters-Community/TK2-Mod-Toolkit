@@ -1,0 +1,35 @@
+using BepInEx.Configuration;
+using UnityEngine;
+
+namespace TK2.Customization;
+
+// This module joins the SAME pack DLL. No separate plugin project or dependency installation.
+// Example: camera focus. Turn off the built-in Camera FOV module to avoid competing settings.
+public sealed class RecipeName : IModRecipe
+{
+    public string Name => "RecipeName";
+    public bool ChangesGameplay => false; // Set true for rules/physics; the offline validation lock then applies.
+    private ConfigEntry<float> _fov = null!;
+    private Camera? _camera;
+    private float _original;
+
+    public void Configure(ConfigFile config)
+    {
+        _fov = config.Bind("Recipe." + Name, "FieldOfView", 75f,
+            new ConfigDescription("Camera focus in degrees.", new AcceptableValueRange<float>(35f, 110f)));
+    }
+
+    public void Tick()
+    {
+        Camera current = Camera.main;
+        if (current == null || current.orthographic) { Restore(); return; }
+        if (current != _camera) { Restore(); _camera = current; _original = current.fieldOfView; }
+        _camera.fieldOfView = _fov.Value;
+    }
+
+    public void Restore()
+    {
+        if (_camera != null) _camera.fieldOfView = _original;
+        _camera = null;
+    }
+}

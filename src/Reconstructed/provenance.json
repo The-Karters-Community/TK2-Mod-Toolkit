@@ -1,0 +1,68 @@
+{
+  "version": "0.1.4.18",
+  "gameAssemblySha256": "e55fab2cdcbf3852160183504a847b1a1b7af61c24bc9619e3736e3753aee130",
+  "methods": [
+    {
+      "method": "PixelKartPhysics.AddVelocity",
+      "address": "1805dd8a0",
+      "source": "src/Reconstructed/KartLogic.cs",
+      "evidence": "local/ghidra/pseudocode/1805dd8a0_PixelKartPhysics__AddVelocity.c",
+      "evidenceSha256": "faac216705f06ea541c2b3dfc0cfbf511271039ad7c14af5fa9a39ed4f8c995a",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "PixelKartPhysics.JumpInput",
+      "address": "1805e0270",
+      "source": "src/Reconstructed/KartLogic.cs",
+      "evidence": "local/ghidra/pseudocode/1805e0270_PixelKartPhysics__JumpInput.c",
+      "evidenceSha256": "4e4406f1631a68da6d6bfc1dc78efd1025b2b6efd1baf4382c47f4fb16bdb750",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "PixelGameKartCamera.GetCamera",
+      "address": "1804ee5b0",
+      "source": "src/Reconstructed/CameraLogic.cs",
+      "evidence": "local/ghidra/pseudocode/1804ee5b0_PixelGameKartCamera__GetCamera.c",
+      "evidenceSha256": "8e5d5a47d54fe3e2e71241cfb9dbb4059558c1d87cfc05c382628af35fb0279f",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "PixelGameKartCamera.IsCameraASpectatorCamera",
+      "address": "1804f05a0",
+      "source": "src/Reconstructed/CameraLogic.cs",
+      "evidence": "local/ghidra/pseudocode/1804f05a0_PixelGameKartCamera__IsCameraASpectatorCamera.c",
+      "evidenceSha256": "f8161a41bff95715c5fd12841930bf8036493c7a08a3d64a2d5a1fd52d562ce6",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "PixelGameKartCamera.IsIntroCameraActiveAndRunning",
+      "address": "1804f05b0",
+      "source": "src/Reconstructed/CameraLogic.cs",
+      "evidence": "local/ghidra/pseudocode/1804f05b0_PixelGameKartCamera__IsIntroCameraActiveAndRunning.c",
+      "evidenceSha256": "76cdcf57a7af177bff54f6708337a820b413b4cf328a4ad2d4a84dce3928ab41",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "PixelGameKartCamera.EnableTribuneCamera",
+      "address": "1804ed620",
+      "source": "src/Reconstructed/CameraLogic.cs",
+      "evidence": "local/ghidra/pseudocode/1804ed620_PixelGameKartCamera__EnableTribuneCamera.c",
+      "evidenceSha256": "6f1c8145ce2ccd033bc76e30a3dcc18ca8cb00cfff94e9e8828b01230eaf2579",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "PixelGameKartCamera.ForceInstantTeleport",
+      "address": "1804ed730",
+      "source": "src/Reconstructed/CameraLogic.cs",
+      "evidence": "local/ghidra/pseudocode/1804ed730_PixelGameKartCamera__ForceInstantTeleport.c",
+      "evidenceSha256": "1dbf643787a4ab815d5c4c0b03c389377a43109004f877f5bc95f4fe99c4225b",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    }
+  ],
+  "constant": {
+    "address": "183707e34",
+    "fileOffset": "3706634",
+    "bytes": "3333733f",
+    "value": 0.95
+  }
+}

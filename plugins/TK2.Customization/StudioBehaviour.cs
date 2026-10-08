@@ -10,6 +10,8 @@ public sealed class StudioBehaviour : MonoBehaviour
     public StudioBehaviour(IntPtr pointer) : base(pointer) { }
     private readonly Dictionary<int, (Canvas Item, float Original)> _canvases = new();
     private readonly Dictionary<int, (Camera Item, float Original)> _cameras = new();
+    private readonly Dictionary<int, (CanvasGroup Item, float Original)> _opacity = new();
+    private float? _originalShadowDistance;
     private DateTime _configTime;
     private float _nextScan, _nextConfig;
     private bool _uiFaulted, _cameraFaulted, _audioFaulted;
@@ -31,10 +33,13 @@ public sealed class StudioBehaviour : MonoBehaviour
             catch (Exception ex) { p.Log.LogWarning($"Config reload failed: {ex.Message}"); }
         }
         RunFeature(ref _audioFaulted, "audio", () => AudioFeature.Tick(p.AudioEnabled.Value, p.Volume.Value));
+        RecipeHost.Tick();
         if (Time.unscaledTime >= _nextScan)
         {
             _nextScan = Time.unscaledTime + 1f;
             RunFeature(ref _uiFaulted, "UI", () => UpdateHud(p));
+            try { UpdateVisualPack(p); }
+            catch (Exception ex) { p.HudOpacityEnabled.Value = false; p.RenderEnabled.Value = false; p.Log.LogError(ex); RestoreVisualPack(); }
         }
     }
 
@@ -112,6 +117,47 @@ public sealed class StudioBehaviour : MonoBehaviour
         _cameras.Clear();
     }
 
-    public void RestoreAll() { RestoreHud(); RestoreCamera(); }
+    private void UpdateVisualPack(Plugin p)
+    {
+        if (p.RenderEnabled.Value)
+        {
+            _originalShadowDistance ??= QualitySettings.shadowDistance;
+            QualitySettings.shadowDistance = p.ShadowDistance.Value;
+        }
+        else if (_originalShadowDistance.HasValue)
+        {
+            QualitySettings.shadowDistance = _originalShadowDistance.Value;
+            _originalShadowDistance = null;
+        }
+        var stale = new List<int>();
+        foreach (var pair in _opacity)
+        {
+            var group = pair.Value.Item;
+            if (group == null) stale.Add(pair.Key);
+            else if (!p.HudOpacityEnabled.Value || !Matches(group.GetComponent<Canvas>(), p.CanvasFilter.Value))
+            { group.alpha = pair.Value.Original; stale.Add(pair.Key); }
+        }
+        foreach (int id in stale) _opacity.Remove(id);
+        if (!p.HudOpacityEnabled.Value) return;
+        foreach (var canvas in UnityEngine.Object.FindObjectsOfType<Canvas>())
+        {
+            if (!Matches(canvas, p.CanvasFilter.Value)) continue;
+            var group = canvas.GetComponent<CanvasGroup>();
+            if (group == null) continue;
+            int id = group.GetInstanceID();
+            if (!_opacity.ContainsKey(id)) _opacity[id] = (group, group.alpha);
+            group.alpha = p.HudOpacity.Value;
+        }
+    }
+
+    private void RestoreVisualPack()
+    {
+        foreach (var pair in _opacity) if (pair.Value.Item != null) pair.Value.Item.alpha = pair.Value.Original;
+        _opacity.Clear();
+        if (_originalShadowDistance.HasValue) QualitySettings.shadowDistance = _originalShadowDistance.Value;
+        _originalShadowDistance = null;
+    }
+
+    public void RestoreAll() { RestoreHud(); RestoreCamera(); RestoreVisualPack(); }
     public void OnDestroy() { RestoreAll(); }
 }
