@@ -53,7 +53,7 @@ internal static partial class LegacyMK
     {
         if (_meterRoot == null)
         {
-            _meterRoot = new GameObject("TK2 Mod Garage Boost Meter");
+            _meterRoot = new GameObject("TK2 Mod Toolkit Boost Meter");
             _meterRoot.AddComponent<RectTransform>();
             var canvas = _meterRoot.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = 30000;

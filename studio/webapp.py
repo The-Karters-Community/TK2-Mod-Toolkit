@@ -57,7 +57,12 @@ class Application:
                 "plugin": "TK2.Customization.dll", "pluginCount": len([p for p in core.plugins(self.game) if p["enabled"]]) if self.game else 0,
                 "setup": setup.readiness(self.game),
                 "runtimeValidated": False, "packs": pack.PACKS, "files": pack.source_files(), "logs": self.logs,
-                "backups": backups[:30], **self.config_data()}
+                "backups": backups[:30], "buildLog": self.latest_build(), **self.config_data()}
+
+    def latest_build(self):
+        lines = "\n".join(self.logs).splitlines()
+        starts = [i for i,line in enumerate(lines) if line.startswith("Building against installed")]
+        return "\n".join(lines[starts[-1]:]) if starts else ""
 
     def save_settings(self, body):
         for _ in range(4):
@@ -187,7 +192,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.authorized(): return self.reply(403, {"error": "Invalid session"})
                 app = self.server.app
                 with app.lock:
-                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Garage", "version": "0.3.0", "pid": os.getpid(), "game": str(app.game)})
+                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Toolkit", "version": "0.4.0", "pid": os.getpid(), "game": str(app.game)})
                     if parsed.path == "/api/state": return self.reply(200, app.state())
                     if parsed.path == "/api/source":
                         name = parse_qs(parsed.query).get("file", [""])[0]
@@ -208,7 +213,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, source, "text/html")
             files = {"/app.js": WEB / "app.js", "/style.css": WEB / "style.css",
                      "/assets/logo.png": core.ROOT / "assets/Logo.png",
-                     "/assets/art.jpg": core.ROOT / "assets/library_600x900_2x.jpg"}
+                     "/assets/art.jpg": core.ROOT / "assets/library_600x900_2x.jpg",
+                     "/assets/app.ico": core.ROOT / "assets/TheKartersLogoModified.ico"}
             if parsed.path in files:
                 path = files[parsed.path]
                 return self.reply(200, path.read_bytes(), mimetypes.guess_type(path.name)[0] or "application/octet-stream")
@@ -226,14 +232,14 @@ class Handler(BaseHTTPRequestHandler):
             if action == "shutdown":
                 # Another window must not stop the process halfway through a build/install.
                 with self.server.app.lock:
-                    self.reply(200, {"message": "Garage closed. You can close this window."})
+                    self.reply(200, {"message": "Toolkit closed. You can close this window."})
                     threading.Thread(target=self.server.shutdown, daemon=True).start()
                 return
             result = self.server.app.action(action, body)
             self.reply(200, result)
         except Exception as exc:
             if isinstance(exc, PermissionError):
-                exc = ValueError("Windows denied access to the game folder. Close Garage, run the executable as administrator, then retry the installation.")
+                exc = ValueError("Windows denied access to the game folder. Close Toolkit, run the executable as administrator, then retry the installation.")
             self.server.app.log(str(exc))
             self.reply(409 if isinstance(exc, settings.SettingsConflict) else 400,
                        {"error": str(exc), **({"conflicts": exc.keys} if isinstance(exc, settings.SettingsConflict) else {})})
@@ -264,13 +270,13 @@ def main():
         try:
             saved = json.loads(session.read_text(encoding="utf-8"))
             parsed = urlsplit(saved["origin"])
-            if parsed.hostname != "127.0.0.1" or parsed.scheme != "http": raise ValueError("Invalid saved Garage address")
+            if parsed.hostname != "127.0.0.1" or parsed.scheme != "http": raise ValueError("Invalid saved Toolkit address")
             request = urllib.request.Request(saved["origin"] + "/api/health", headers={"X-TK2-Token": saved["token"]})
             with urllib.request.urlopen(request, timeout=2) as response: health = json.load(response)
-            if health.get("app") == "TK2 Mod Garage":
+            if health.get("app") in ("TK2 Mod Toolkit", "TK2 Mod Garage"):
                 if args.game is not None and health.get("game") != str(core.validate_game(args.game)):
-                    raise RuntimeError("Close the existing Garage before switching game installations")
-                if health.get("version") == "0.3.0":
+                    raise RuntimeError("Close the existing Toolkit before switching game installations")
+                if health.get("version") == "0.4.0":
                     if not args.no_browser: open_window(saved["origin"])
                     return
                 request = urllib.request.Request(saved["origin"] + "/api/shutdown", data=b"{}", headers={"X-TK2-Token": saved["token"], "Content-Type": "application/json"})
@@ -284,17 +290,17 @@ def main():
         # Reuse only our authenticated instance; never open an unrelated service occupying the port.
         import urllib.request
         if not session.is_file():
-            raise RuntimeError("Another Garage copy is already open on this port. Close it before launching this copy.")
+            raise RuntimeError("Another Toolkit copy is already open on this port. Close it before launching this copy.")
         saved = json.loads(session.read_text(encoding="utf-8"))
         expected = f"http://127.0.0.1:{requested_port}"
-        if saved["origin"] != expected: raise RuntimeError("Garage port is occupied by another service")
+        if saved["origin"] != expected: raise RuntimeError("Toolkit port is occupied by another service")
         request = urllib.request.Request(expected + "/api/health", headers={"X-TK2-Token": saved["token"]})
         with urllib.request.urlopen(request, timeout=3) as response:
             health = json.load(response)
-            if health.get("app") != "TK2 Mod Garage": raise RuntimeError("Unexpected service on Garage port")
+            if health.get("app") not in ("TK2 Mod Toolkit", "TK2 Mod Garage"): raise RuntimeError("Unexpected service on Toolkit port")
             if args.game is not None and health.get("game") != str(core.validate_game(args.game)):
-                raise RuntimeError("Close the existing Garage before switching game installations")
-        if health.get("version") == "0.3.0":
+                raise RuntimeError("Close the existing Toolkit before switching game installations")
+        if health.get("version") == "0.4.0":
             if not args.no_browser: open_window(expected)
             return
         # Upgrade our old authenticated service so launching the new app cannot
@@ -307,7 +313,7 @@ def main():
                 server = Server(Application(args.game), requested_port)
                 break
             except OSError:
-                if attempt == 39: raise RuntimeError("The old Garage is still closing. Try launching again.")
+                if attempt == 39: raise RuntimeError("The old Toolkit is still closing. Try launching again.")
                 time.sleep(.1)
     core.write_json(session, {"origin": server.origin, "token": server.app.token})
     if not args.no_browser: open_window(server.origin)

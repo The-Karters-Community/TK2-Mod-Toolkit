@@ -38,16 +38,16 @@ def main():
     # the author's local Il2CppDumper files. It contains no original game bodies.
     core.write_json(staging / 'exports/functions.json', symbols.methods())
     command = [str(args.python.resolve()), '-m', 'PyInstaller', '--noconfirm', '--onedir', '--windowed', '--contents-directory', '.',
-               '--name', 'TK2 Mod Garage', '--distpath', str(artifact), '--workpath', str(core.ROOT / 'local/portable-pyinstaller'),
+               '--icon', str(core.ROOT / 'assets/TheKartersLogoModified.ico'), '--name', 'TK2 Mod Toolkit', '--distpath', str(artifact), '--workpath', str(core.ROOT / 'local/portable-pyinstaller'),
                '--specpath', str(core.ROOT / 'local/portable-pyinstaller'), '--add-data', str(staging) + ':.', str(core.ROOT / 'launch.py')]
-    core.contained(artifact, artifact / 'TK2 Mod Garage')  # PyInstaller may replace this output folder.
+    core.contained(artifact, artifact / 'TK2 Mod Toolkit')  # PyInstaller may replace this output folder.
     subprocess.run(command, cwd=core.ROOT, check=True, creationflags=core.CREATE_NO_WINDOW)
-    output = artifact / 'TK2 Mod Garage'
-    core.write_json(output / 'portable-manifest.json', {'version':'0.3.0', 'playerRequirements':['Windows x64', 'The Karters 2 supported game build', 'Edge or another browser'],
+    output = artifact / 'TK2 Mod Toolkit'
+    core.write_json(output / 'portable-manifest.json', {'version':'0.4.0', 'playerRequirements':['Windows x64', 'The Karters 2 supported game build', 'Edge or another browser'],
         'pythonIncluded':True, 'loaderIncluded':True, 'compilerRequiredForPlayerInstall':False, 'authorBuildRequires':'.NET SDK',
         'gameBinaryIncluded':False, 'supportedGameHash':json.loads((pack.ARTIFACT / 'build.json').read_text())['fingerprint']['files']['GameAssembly.dll']})
-    archive = shutil.make_archive(str(artifact / 'TK2-Mod-Garage-0.3.0-win-x64'), 'zip', artifact, output.name)
-    print(json.dumps({'executable':str(output / 'TK2 Mod Garage.exe'),'archive':archive},indent=2))
+    archive = shutil.make_archive(str(artifact / 'TK2-Mod-Toolkit-0.4.0-win-x64'), 'zip', artifact, output.name)
+    print(json.dumps({'executable':str(output / 'TK2 Mod Toolkit.exe'),'archive':archive},indent=2))
 
 
 if __name__ == '__main__': main()

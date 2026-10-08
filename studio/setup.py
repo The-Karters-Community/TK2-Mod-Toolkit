@@ -76,7 +76,7 @@ def readiness(game):
     log = next((game / "BepInEx" / name for name in ("LogOutput.log", "LogOutput.txt") if (game / "BepInEx" / name).is_file()), None)
     text = log.read_text(encoding="utf-8", errors="replace") if log else ""
     initialized = "Chainloader initialized" in text and interop.is_file() and core.is_managed_dll(interop)
-    loaded = "Loading [TK2 Mod Garage Pack 0.3.0]" in text or "TK2 Mod Garage 0.3.0:" in text
+    loaded = "Loading [TK2 Mod Toolkit Pack 0.4.0]" in text or "TK2 Mod Toolkit 0.4.0:" in text
     warnings = [line for line in text.splitlines() if "[Warning" in line][-15:]
     errors = [line for line in text.splitlines() if any(word in line.lower() for word in ("[error", "exception", "error loading", "unavailable", "disabled after", "stopped:"))][-35:]
     stage = "install-loader" if missing or not enabled or not target_ok else "initialize-loader" if not initialized else "ready"

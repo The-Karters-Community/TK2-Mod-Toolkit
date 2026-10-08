@@ -49,6 +49,14 @@ foreach (float fov in new[] {35f, 65f, 90f, 110f}) {
 }
 Check(CameraFraming.DistanceScale(75, 110, true, 1) < 1 && CameraFraming.DistanceScale(75, 35, true, 1) > 1, "wide view moves closer, narrow view further");
 Check(CameraFraming.DistanceScale(75, 35, false, 1.2f) == 1.2f, "manual framing uses chosen distance");
+Check(CameraFraming.BlendFactor(.016f, 0) == 1, "zero smoothing is immediate");
+Check(CameraFraming.BlendFactor(0, .12f) == 0, "zero elapsed time preserves value");
+float half = CameraFraming.BlendFactor(.5f, .7f);
+float full = CameraFraming.BlendFactor(1, .7f);
+Check(Math.Abs((1 - half) * (1 - half) - (1 - full)) < .000001, "smoothing is independent of update subdivision");
+Check(full > 0 && full < 1, "smoothing approaches without overshooting");
+try { CameraFraming.BlendFactor(float.NaN, .12f); throw new Exception("NaN accepted"); }
+catch (ArgumentOutOfRangeException) { Check(true, "invalid timing rejected"); }
 uint modDodge = 0x10000;
 foreach (uint mask in new uint[]{0,1,2,4,8,16,32,1|16}) {
     uint added = HealthLogic.ChangeSource(mask, modDodge, true);

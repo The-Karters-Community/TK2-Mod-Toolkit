@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-[BepInPlugin("local.tk2.customization", "TK2 Mod Garage Pack", "0.3.0")]
+[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.4.0")]
 public sealed partial class Plugin : BasePlugin
 {
     internal static Plugin? Instance;
@@ -42,11 +42,7 @@ public sealed partial class Plugin : BasePlugin
         SfxVolume = Config.Bind("Audio", "SfxVolume", 1f, new ConfigDescription("Sound effects bus multiplier.", new AcceptableValueRange<float>(0,1)));
         VoiceVolume = Config.Bind("Audio", "VoiceVolume", 1f, new ConfigDescription("Voice-over bus multiplier.", new AcceptableValueRange<float>(0,1)));
         UiVolume = Config.Bind("Audio", "UiVolume", 1f, new ConfigDescription("Interface sounds bus multiplier.", new AcceptableValueRange<float>(0,1)));
-        CameraEnabled = Config.Bind("Camera", "Enabled", false, "Customize local racing camera framing.");
-        Fov = Config.Bind("Camera", "FieldOfView", 65f, new ConfigDescription("Vertical FOV in degrees.", new AcceptableValueRange<float>(35f, 110f)));
-        PreserveKartFraming = Config.Bind("Camera", "PreserveKartFraming", true, "Compensate camera distance when FOV changes so your kart keeps its apparent size.");
-        CameraDistance = Config.Bind("Camera", "DistanceMultiplier", 1f, new ConfigDescription("Distance relative to the game's racing camera.", new AcceptableValueRange<float>(0.5f, 2.5f)));
-        CameraHeight = Config.Bind("Camera", "HeightOffset", 0f, new ConfigDescription("Extra camera height in world units.", new AcceptableValueRange<float>(-2f, 4f)));
+        BindCamera();
         PhysicsEnabled = Config.Bind("Physics", "Enabled", false, "Offline fast fall for testing. Leaderboard uploads are unchanged.");
         FallAcceleration = Config.Bind("Physics", "FastFallAcceleration", 100f, new ConfigDescription("Extra downwards acceleration.", new AcceptableValueRange<float>(0f, 500f)));
         AirTime = Config.Bind("Physics", "MinimumAirTime", 0.4f, new ConfigDescription("Minimum airborne seconds.", new AcceptableValueRange<float>(0f, 3f)));
@@ -63,7 +59,8 @@ public sealed partial class Plugin : BasePlugin
         NightmareAI.Install(this);
         _behaviour = AddComponent<StudioBehaviour>();
         Config.Save();
-        Log.LogInfo("TK2 Mod Garage 0.3.0: offline test features available; leaderboard uploads unchanged.");
+        LiveConfig.Initialize(this);
+        Log.LogInfo("TK2 Mod Toolkit 0.4.0: offline test features available; leaderboard uploads unchanged.");
     }
 
     private void TryFeature(string name, Action install)
@@ -117,6 +114,7 @@ public sealed partial class Plugin : BasePlugin
     public override bool Unload()
     {
         if (SessionModified) { Log.LogWarning("Restart required to unload after modifying a race."); return false; }
+        CameraPanel.Close(this);
         if (_behaviour != null) { _behaviour.RestoreAll(); UnityEngine.Object.Destroy(_behaviour); }
         AudioFeature.Restore();
         RecipeHost.Restore();

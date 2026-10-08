@@ -37,7 +37,7 @@ const fixture = {installed: false, packCurrent: false, pluginCount: 0, game: 'te
   extraSettings: [{section: 'MK.BoostTrainer', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Trainer'}],
   extraPacks: {'MK.BoostTrainer': 'mks'},
   settings: {'Audio/Enabled': false, 'Audio/MasterVolume': 1, 'Physics/Enabled': false, 'Camera/Enabled': false, 'Camera/FieldOfView': 65}, configHash: 'first-hash',
-  packs: [{id:'garage', name:'Garage Essentials', features:['Audio','Camera']}, {id:'mks', name:"MK’s Kart Pack", features:['Physics']}, {id:'community', name:'Community Pack', features:[]}],
+  packs: [{id:'garage', name:'Toolkit Essentials', features:['Audio','Camera']}, {id:'mks', name:"Community Mods", features:['Physics']}, {id:'community', name:'Community Pack', features:[]}],
   files: ['src/Reconstructed/KartLogic.cs'], features: [
     {id:'Audio', name:'Audio mixer', category:'Audio', description:'Volume adjustment', origin:'New', settings:[['MasterVolume','Volume','float',1,0,1]]},
     {id:'Physics', name:'Fast fall', category:'Driving', description:'Physics description', origin:'Adapted', gameplay:true, settings:[]},
@@ -177,5 +177,12 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   assert.ok(calls.every(call => call.options.headers['X-TK2-Token'] === 'test-token'));
   assert.ok(!html.includes('Make it<br>your race.'), 'remove decorative hero');
   assert.ok(!html.includes('Gameplay modules are locked'), 'remove superseded blanket lock');
+  assert.ok(html.includes('<title>TK2 Mod Toolkit</title>') && html.includes('/assets/app.ico'), 'renamed window and supplied favicon');
+  assert.equal(ids.shutdown, undefined, 'window close replaces the redundant Close Garage button');
+  assert.equal(ids.install, undefined, 'install action belongs only in Installation');
+  assert.ok(!calls.some(call => /\/api\/(build|build-install|install)$/.test(call.url)), 'normal setting edits never request a build or install');
+  fixture.packs = [{id:'garage', name:'Toolkit Essentials', features:['Audio','Camera']}, {id:'community', name:'Community Mods', features:['Physics','KartParameters']}];
+  await run('refresh(true)');
+  assert.equal(run("extraPackId({section:'MK.BoostTrainer'})"),'community','legacy extra settings route into the consolidated Community Mods pack');
   console.log(`Offline frontend state: ${assertions} assertions passed. Visual browser verification remains pending.`);
 })().catch(error => {console.error(error);process.exitCode = 1;});

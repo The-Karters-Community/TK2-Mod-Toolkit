@@ -50,6 +50,21 @@ class GarageTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.app.save_settings({"hash": digest, "values": {"Audio/Enabled": False}})
         self.assertEqual(len(list((self.root / "local/backups").glob("*/receipt.json"))), 1)
 
+    def test_live_setting_save_never_builds_deploys_or_requires_closed_game(self):
+        plugin = self.game / "BepInEx/plugins/TK2-Mod-Studio/TK2.Customization.dll"
+        plugin.parent.mkdir(parents=True)
+        plugin.write_bytes(b"running-plugin-unchanged")
+        digest = core.sha256(plugin)
+        self.app.config_path.parent.mkdir(parents=True)
+        self.app.config_path.write_text("[Camera]\nEnabled = false\nFieldOfView = 65\n", encoding="utf-8")
+        with patch.object(core, "build_plugin") as build, patch.object(core, "deploy_plugin") as deploy, patch.object(core, "require_game_stopped", side_effect=AssertionError("settings must work with a running game")) as stopped:
+            for edits in ({"Camera/Enabled": True}, {"Camera/FieldOfView": 80}, {"Camera/Enabled": False}):
+                state = self.app.config_data()
+                self.app.action("settings", {"hash": state["configHash"], "values": edits, "baseValues": {key:state["settings"][key] for key in edits}})
+        build.assert_not_called(); deploy.assert_not_called(); stopped.assert_not_called()
+        self.assertEqual(core.sha256(plugin), digest)
+        self.assertEqual(self.app.config_data()["settings"]["Camera/FieldOfView"], 80)
+
     def test_source_edit_conflict_and_backup(self):
         name = "plugins/TK2.Customization/Example.cs"
         p = self.sources / "Example.cs"

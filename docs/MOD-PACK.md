@@ -4,9 +4,8 @@ One physical plugin, TK2.Customization.dll, contains these logical packs. New mo
 
 | Pack | Modules |
 |---|---|
-| Garage Essentials | HUD size, HUD transparency, audio mixer, camera setup, graphics |
-| MK's Karters Mods | Custom laps, driving challenge, automatic drift boost, basic kart tuning, fast respawn, boost trainer, alternate reserves, Dash and Stash, portal tricks, mirror, Bobby Gang, nearby voice lines, CNK-style boost meter, air brake, kart/boost parameters, practice save states, reverse race, Nightmare AI |
-| The Karters Community | Both fast-fall input modes and optional dodge; health/reserve/elimination chat commands |
+| Toolkit Essentials | HUD size, HUD transparency, audio mixer, camera setup, graphics |
+| Community Mods | Custom laps, driving challenge, automatic drift boost, basic kart tuning, fast respawn, boost trainer, alternate reserves, Dash and Stash, portal tricks, mirror, Bobby Gang, nearby voice lines, CNK-style boost meter, air brake, kart/boost parameters, practice save states, reverse race, Nightmare AI, fast fall/dodge, health/reserve/elimination chat commands |
 | Your recipes | FrameLimiter and author-created modules in the same DLL |
 
 See MK-MIGRATION.md and COMMUNITY-MIGRATION.md for per-module signatures, settings and differences. NightmareAIs.dll from the MK folder is also recovered locally and ported in NightmareAI.cs; it is not omitted simply because its source was absent from TheKarters2Mods. Its ambiguous damage patches now resolve both current overloads by full signature, and its obsolete Harmony call is corrected for the installed version.

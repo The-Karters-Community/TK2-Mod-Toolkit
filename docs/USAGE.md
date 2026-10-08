@@ -1,8 +1,8 @@
-# Using Mod Garage
+# Using Mod Toolkit
 
 ## Player setup
 
-Unzip the portable distribution into a writable folder and open `TK2 Mod Garage.exe`. Keep the folder together; it includes Python, UI assets, readable author source, the plugin and the loader distribution. Steam/game files are not included.
+Unzip the portable distribution into a writable folder and open `TK2 Mod Toolkit.exe`. Keep the folder together; it includes Python, UI assets, readable author source, the plugin and the loader distribution. Steam/game files are not included.
 
 1. Game setup finds Steam's registered installation and all `libraryfolders.vdf` libraries. Select a detected folder or paste the folder containing TheKarters2.exe and GameAssembly.dll.
 2. Prepare BepInEx copies the included Unity IL2CPP x64 distribution, preserving plugins/configs and backing up replaced loader files.
@@ -15,9 +15,9 @@ The current test pack targets game 0.1.4.18, GameAssembly SHA-256 `e55fab2cdcbf3
 
 Choose a pack, expand a module and turn it on. Each setting shows its default and allowed values. Use search to find a parameter; large tuning modules contain collapsible groups. An advanced value remains inactive until its Override switch is on. Reset module/pack changes the controls to defaults and switches affected modules off. Save changes applies your edits; reset does not secretly write a file.
 
-Settings reload on the game's main thread, including the first detected change. Only edited keys are saved. BepInEx comment rewrites or unrelated external edits are merged; competing edits of the same key show specific conflicts. Reload conflicting settings keeps other unsaved changes. C# edits, builds and DLL updates require a game restart.
+Settings reload on the game's main thread within about half a second. Content fingerprints detect edits even with identical file timestamps. Toggling, resetting or adjusting an existing module writes only the config, never compiles or replaces the DLL. Only edited keys are saved. BepInEx comment rewrites or unrelated external edits are merged; competing edits of the same key show specific conflicts. Reload conflicting settings keeps other unsaved changes. New or changed C# code needs Build, a plugin update and one game restart; normal config changes do not.
 
-Camera setup contains FOV, Keep kart size, distance and height. Keep kart size compensates distance when FOV changes. Native camera intro/spectator behavior stays intact. A very narrow FOV can still reduce visibility around the kart; the geometry change needs manual feel/testing.
+Camera setup contains FOV, Keep kart size, distance, height, side offset, aim, target height, pitch/yaw/roll and smoothing. Press F8 during a local race to open the in-game editor; choose C or another hotkey in the panel settings. Sliders preview immediately and save changed camera keys after a 350 ms idle delay. +/- adjusts precisely; Shift reduces the step. Reset in the panel restores geometry defaults while keeping its current enable state and accessible hotkey. Toolkit module resets still switch the whole module off. Keep kart size compensates distance when FOV changes. Native camera intro/spectator behavior stays intact. A very narrow FOV can still reduce visibility around the kart; the geometry change needs manual feel/testing.
 
 ## Workshop
 
@@ -32,3 +32,5 @@ Custom recipes implement IModRecipe. Their typed BepInEx settings appear after a
 Game setup's checks distinguish loader readiness from the current plugin appearing in the latest log. Build output & diagnostics shows persistent compiler output and game log errors. Backups & restore is secondary; restore refuses files that were subsequently edited. Close the game before restoring DLL/loader files.
 
 The user-requested build has no leaderboard upload blocker. Gameplay controls apply to supported local/offline players. Start with one module at a time and record the current plugin version plus behavior; successful compilation does not verify native hooks or game transitions.
+
+See [application flow](APPLICATION-FLOW.md). Use the window X to close Toolkit.

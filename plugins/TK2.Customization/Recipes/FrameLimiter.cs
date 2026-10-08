@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-// A complete new mod recipe compiled into the pack. Edit here or in the Garage workshop.
+// A complete new mod recipe compiled into the pack. Edit here or in the Toolkit workshop.
 public sealed class FrameLimiter : IModRecipe
 {
     public string Name => "FrameLimiter";

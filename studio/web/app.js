@@ -52,7 +52,7 @@ function packsForState() {
   state.features.filter(feature => !included.has(feature.id)).forEach(feature => {
     const id = feature.pack || (feature.origin?.toLowerCase().includes('mk') ? 'mks' : 'garage');
     let pack = packs.find(item => item.id === id);
-    if (!pack) {pack = {id, name: id === 'mks' ? "MK’s Kart Pack" : 'Garage Essentials', description: '', features: []}; packs.push(pack);}
+    if (!pack) {pack = {id, name: id === 'mks' ? "Community Mods" : 'Toolkit Essentials', description: '', features: []}; packs.push(pack);}
     pack.features.push(feature);
   });
   return packs;
@@ -104,7 +104,7 @@ function featureSettings(feature, search) {
   const required = new Set(feature.settings.map(setting => setting[8]).filter(Boolean));
   const groups = new Map();
   feature.settings.filter(setting => !required.has(setting[0])).forEach(setting => {
-    const group = feature.settings.length >= 16 ? parameterGroup(feature, setting[0]) : '';
+    const group = feature.settingGroups?.[setting[0]] || (feature.settings.length >= 16 ? parameterGroup(feature, setting[0]) : '');
     if (!groups.has(group)) groups.set(group, []); groups.get(group).push(setting);
   });
   groups.forEach((settings, name) => {
@@ -131,6 +131,10 @@ function featureSettings(feature, search) {
   if (!feature.settings.length && feature.available !== false) container.append(el('p', 'module-note', 'This module has no additional settings.'));
   return container;
 }
+function extraPackId(entry) {
+  const id = entry.pack || state.extraPacks?.[entry.section] || (/^(MK\.|Alternate|AutoBoost|BoostTrainer|Bobby|Boring|CNK|CustomPhysics|Dash|FastRespawn|Mirror|Reverse|Proximity|SaveState|Supra|Teleport)/.test(entry.section) ? 'mks' : 'community');
+  return id === 'mks' && !state.packs?.some(pack => pack.id === 'mks') ? 'community' : id;
+}
 function renderFeatures() {
   const list = $('feature-list'); list.replaceChildren();
   const search = $('mod-search').value.toLowerCase().trim(); let count = 0;
@@ -139,7 +143,7 @@ function renderFeatures() {
       const matches = category === 'All' || category === 'Enabled' && state.settings[feature.id + '/Enabled'] || category === featureGroup(feature);
       return matches && [pack.name, feature.name, feature.description, ...feature.settings.map(setting => setting[1])].join(' ').toLowerCase().includes(search);
     });
-    const extras = (state.extraSettings || []).filter(entry => (entry.pack || state.extraPacks?.[entry.section] || (/^(MK\.|Alternate|AutoBoost|BoostTrainer|Bobby|Boring|CNK|CustomPhysics|Dash|FastRespawn|Mirror|Reverse|Proximity|SaveState|Supra|Teleport)/.test(entry.section) ? 'mks' : 'community')) === pack.id);
+    const extras = (state.extraSettings || []).filter(entry => extraPackId(entry) === pack.id);
     const extraGroups = extraGroupsForFilter(extras, search, pack.name);
     if (!features.length && !extraGroups.size) return;
     count += features.length + extraGroups.size;
@@ -230,18 +234,18 @@ function renderInstallation() {
   $('prepare-loader').disabled = busy || !state.game || !ready.loaderSource;
   $('prepare-loader').textContent = ready.stage === 'install-loader' ? 'Prepare BepInEx' : 'Repair BepInEx files';
   $('loader-help').textContent = ready.loaderSource ? 'Loader distribution included. Existing mods and settings are preserved.' : 'Loader bundle not available. Add the Unity IL2CPP x64 distribution to vendor/BepInEx.';
-  $('installation-install').disabled = busy || !ready.ready;
+  $('installation-install').disabled = busy || !ready.ready || state.packCurrent;
+  $('installation-install').textContent = state.packCurrent ? 'Plugin up to date' : state.installed ? 'Update plugin (restart required)' : 'Install plugin';
   $('open-game-folder').disabled = busy || !state.game;
-  $('runtime-errors').textContent = (ready.runtimeErrors || []).join('\n') || 'No errors found in the available BepInEx log.';
+  $('runtime-errors').textContent = [...(ready.runtimeErrors || []), ...(ready.runtimeWarnings || [])].join('\n') || 'No errors or warnings found in the available BepInEx log.';
   $('install-state').textContent = !ready.ready ? 'Setup needed' : state.installed ? (state.packCurrent ? 'Plugin installed' : 'Plugin update available') : 'Ready to install';
-  $('install').textContent = !ready.ready ? 'Set up game' : state.installed ? 'Update plugin' : 'Install plugin';
   const list = $('backups'); list.replaceChildren();
   state.backups.forEach(backup => {
     const row = el('div', 'backup-row'), info = el('div'); info.append(el('p', '', backup.file), el('small', '', `${backup.id} · ${backup.existed ? 'restore previous contents' : 'remove newly installed file'}`));
     const button = el('button', 'secondary', 'Restore'); button.disabled = busy; button.onclick = () => runAction('restore', {id: backup.id}); row.append(info, button); list.append(row);
   });
   if (!state.backups.length) list.append(el('p', 'empty-state', 'Changes create backups here.'));
-  $('logs').textContent = state.logs.join('\n') || 'No build run in this session. Player installation uses the bundled plugin.';
+  $('logs').textContent = state.buildLog || state.logs.join('\n') || 'No build run in this session. Player installation uses the bundled plugin.';
 }
 function resetFeatures(features) {
   features.forEach(feature => {changeSetting(feature.id + '/Enabled', false); feature.settings.forEach(setting => changeSetting(feature.id + '/' + setting[0], setting[3]));});
@@ -292,7 +296,7 @@ async function loadSource(file, discard = false) {
   } catch (error) {notice(error.message, true);}
 }
 function setBusy(value) {
-  busy = value; ['install', 'workshop-install', 'build', 'create-recipe', 'diagnose', 'prepare-loader', 'installation-install', 'scan-games', 'select-game', 'browse-game'].forEach(id => {$(id).disabled = value;});
+  busy = value; ['workshop-install', 'build', 'create-recipe', 'diagnose', 'prepare-loader', 'installation-install', 'scan-games', 'select-game', 'browse-game'].forEach(id => {$(id).disabled = value;});
   $('save-source').disabled = value || !sourceDirty; $('code').readOnly = value || !source; $('reload-source').disabled = value || !source; updateSaveState();
   // Keep controls mounted and editable during a settings save.
   document.querySelectorAll('[data-setting], [data-recipe], [data-extra]').forEach(input => {const feature = state?.features.find(item => item.id === input.dataset.setting?.split('/')[0]); input.disabled = value && actionInFlight !== 'settings' || feature?.available === false || !state?.game;});
@@ -306,7 +310,7 @@ function settingsError(error) {
 }
 async function runAction(action, body = {}, snapshot) {
   if (busy) return; actionInFlight = action; setBusy(true);
-  if (action !== 'settings') notice(action === 'install' || action === 'build' ? 'Compiling your plugin…' : 'Working…');
+  if (action !== 'settings') notice(action === 'build' || action === 'build-install' ? 'Compiling your plugin…' : action === 'install' ? 'Installing the bundled plugin…' : 'Working…');
   try {
     if (action === 'build' || action === 'build-install') await saveSource();
     const result = await api(action, body);
@@ -325,7 +329,7 @@ async function runAction(action, body = {}, snapshot) {
 function showView(name) {
   document.querySelectorAll('.view').forEach(view => {view.hidden = view.id !== name;});
   document.querySelectorAll('.nav').forEach(button => {button.classList.toggle('active', button.dataset.view === name); button.setAttribute('aria-current', button.dataset.view === name ? 'page' : 'false');});
-  $('breadcrumb').textContent = 'GARAGE / ' + ({mods: 'MOD PACKS', workshop: 'WORKSHOP', installation: 'INSTALLATION'}[name]); history.replaceState(null, '', '#' + name);
+  $('breadcrumb').textContent = 'TOOLKIT / ' + ({mods: 'MOD PACKS', workshop: 'WORKSHOP', installation: 'INSTALLATION'}[name]); history.replaceState(null, '', '#' + name);
   if (name === 'workshop' && state && !source) loadSource('src/Reconstructed/KartLogic.cs');
   if (name === 'workshop') searchFunctions().catch(error => notice(error.message, true));
 }
@@ -333,7 +337,6 @@ document.querySelectorAll('.nav').forEach(button => button.onclick = () => showV
 document.querySelector('.brand').onclick = event => {event.preventDefault(); showView('mods');};
 document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => {category = button.dataset.category; document.querySelectorAll('[data-category]').forEach(b => b.classList.toggle('selected', b === button)); renderFeatures(); renderRecipes();});
 $('mod-search').oninput = () => {renderFeatures(); renderRecipes();};
-$('install').onclick = () => state.setup?.ready ? runAction('install') : showView('installation');
 $('workshop-install').onclick = () => runAction('build-install');
 $('installation-install').onclick = () => runAction('install'); $('build').onclick = () => runAction('build');
 $('create-recipe').onclick = () => {if (sourceDirty) {notice('Save the current C# before creating another recipe.', true); return;} runAction('create-recipe', {name: $('recipe-name').value.trim()});};
@@ -362,10 +365,9 @@ $('reload-source').onclick = () => {if (sourceDirty && !confirm('Discard unsaved
 $('code').onkeydown = event => {if (event.key === 'Tab') {event.preventDefault(); const node = event.target; node.setRangeText('    ', node.selectionStart, node.selectionEnd, 'end'); node.dispatchEvent(new Event('input'));}};
 document.addEventListener('keydown', event => {if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {event.preventDefault(); if (location.hash === '#workshop' && sourceDirty && !busy) $('save-source').click(); else if (settingsDirty && !busy) $('save-settings').click();}});
 window.addEventListener('beforeunload', event => {if (sourceDirty || settingsDirty || busy) {event.preventDefault(); event.returnValue = '';}});
-$('shutdown').onclick = async () => {if (sourceDirty || settingsDirty || busy) {notice('Save your changes and let the current action finish before closing.', true); return;} try {notice((await api('shutdown', {})).message);} catch (error) {notice(error.message, true);}};
 $('native-search').onclick = async () => {try {$('native-results').textContent = JSON.stringify(await api('native?q=' + encodeURIComponent($('native-query').value)), null, 2);} catch (error) {notice(error.message, true);}};
 showView(['mods', 'workshop', 'installation'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'mods');
-refresh().then(() => {if (!state.setup?.ready && !state.game) showView('installation'); if (location.hash === '#workshop' && !source) loadSource('src/Reconstructed/KartLogic.cs');}).catch(error => {notice('Garage could not load: ' + error.message, true);});
+refresh().then(() => {if (!state.setup?.ready && !state.game) showView('installation'); if (location.hash === '#workshop' && !source) loadSource('src/Reconstructed/KartLogic.cs');}).catch(error => {notice('Toolkit could not load: ' + error.message, true);});
 setInterval(() => {if (state && !busy && !document.hidden) refresh(true, true).catch(() => {});}, 5000);
 
 async function searchFunctions(more = false) {

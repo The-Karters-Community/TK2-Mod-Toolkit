@@ -15,7 +15,7 @@ from . import core
 class Studio(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("TK2 Mod Studio — local authoring workspace")
+        self.title("TK2 Mod Toolkit — analysis workspace")
         self.geometry("1200x820")
         self.minsize(960, 680)
         self.option_add("*Font", "{Segoe UI} 10")

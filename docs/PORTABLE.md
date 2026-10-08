@@ -1,6 +1,6 @@
 # Portable Windows distribution
 
-The build is a self-contained Windows x64 folder with TK2 Mod Garage.exe. Python is bundled; player installation uses the compiled DLL and needs no .NET SDK. The app uses Edge app mode when available and a default-browser fallback. Author builds still need the .NET SDK. Unzip into a writable location and keep the folder together.
+The build is a self-contained Windows x64 folder with TK2 Mod Toolkit.exe. Python is bundled; player installation uses the compiled DLL and needs no .NET SDK. The app uses Edge app mode when available and a default-browser fallback. Author builds still need the .NET SDK. Unzip into a writable location and keep the folder together.
 
 Build tooling is isolated in local/portable-build-env. To reproduce:
 
@@ -17,3 +17,5 @@ PyInstaller's one-folder/windowed settings follow [its official usage documentat
 Steam discovery checks registry paths and all libraryfolders.vdf entries, then the game's app manifest. Saved selection is project-local preferences, never a baked user-name path. No-game startup still opens setup. BepInEx readiness checks critical/bundled runtime files, enabled Doorstop target, generated managed interop and chainloader evidence. DLL replacement is blocked while the game runs. Missing/broken loader files can be prepared from the bundle, with backups and preserved user mods/configs.
 
 Unsigned executable distribution, loader license notices, clean-PC installation/uninstallation and updated Steam branches need a release review before treating this as a broadly certified public release. That is separate from the completed local build.
+
+Version 0.4.0 packages TK2 Mod Toolkit.exe with assets/TheKartersLogoModified.ico via --icon. The same ICO is the app-window favicon. Defaults remain compatible with local.tk2.customization.cfg. Each cold launch uses a free loopback port; reopening the same copy reuses its authenticated service.

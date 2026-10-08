@@ -1,4 +1,4 @@
-# Mod Garage design
+# Mod Toolkit design
 
 A compact racing garage for everyday players. Both light and dark themes use the supplied logo, orange actions and restrained cool surfaces. Packs contain expandable modules; advanced parameters use paired override switches and custom values under collapsible groups. Every setting shows its mod default and allowed values. Reset actions stage defaults and require Save to apply.
 

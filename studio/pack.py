@@ -32,6 +32,28 @@ for feature in FEATURES:
     feature["name"] = {"UI": "HUD size", "HudOpacity": "HUD transparency", "Rendering": "Graphics"}.get(feature["id"], feature["name"])
 
 
+_CAMERA = next(f for f in FEATURES if f["id"] == "Camera")
+_CAMERA["description"] = "Live camera framing, aim and rotation. Press F8 in a local race for the camera panel; choose another key below."
+_CAMERA["settings"] = [
+    ("FieldOfView", "Field of view", "float", 65, 35, 110),
+    ("PreserveKartFraming", "Keep kart size", "bool", True, None, None),
+    ("DistanceMultiplier", "Camera distance", "float", 1, .25, 4),
+    ("HeightOffset", "Camera height", "float", 0, -5, 8),
+    ("LateralOffset", "Side offset", "float", 0, -4, 4),
+    ("AimAtKart", "Aim toward kart", "bool", False, None, None),
+    ("TargetHeight", "Look-at target height", "float", .5, -1, 3, "Used when Aim toward kart is on."),
+    ("PitchOffset", "Pitch offset", "float", 0, -45, 45),
+    ("YawOffset", "Yaw offset", "float", 0, -90, 90),
+    ("RollOffset", "Roll offset", "float", 0, -30, 30),
+    ("SmoothingSeconds", "Smoothing seconds", "float", .12, 0, 2, "Zero applies adjustments instantly."),
+    ("PanelEnabled", "Enable in-race panel", "bool", True, None, None, "The panel can open even when camera overrides are off."),
+    ("PanelHotkey", "Panel hotkey", "text", "F8", None, None, "Press during a local race. Escape also closes the panel.",
+     ["F" + str(i) for i in range(1,13)] + list("ABCDEFGHIJKLMNOPQRSTUVWXYZ") + ["Insert", "Home", "End", "BackQuote", "None"]),
+    ("PanelScale", "In-race panel scale", "float", 1, .7, 1.6, "Automatically fitted to the screen."),
+]
+_CAMERA["settingGroups"] = {"AimAtKart":"Aim & rotation", "TargetHeight":"Aim & rotation", "PitchOffset":"Aim & rotation", "YawOffset":"Aim & rotation", "RollOffset":"Aim & rotation", "SmoothingSeconds":"Transitions", "PanelEnabled":"In-race panel", "PanelHotkey":"In-race panel", "PanelScale":"In-race panel"}
+
+
 def schema():
     result = {}
     for feature in FEATURES:
@@ -74,15 +96,14 @@ def defaults():
 
 
 PACKS = [
-    {"id": "garage", "name": "Garage Essentials", "description": "Camera, interface, audio and graphics controls.", "features": ["UI", "HudOpacity", "Audio", "Camera", "Rendering"]},
-    {"id": "mks", "name": "MK's Karters Mods", "description": "Race rules, driving challenges, practice and advanced tuning.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY if f["id"] == "NightmareAI"]},
-    {"id": "community", "name": "The Karters Community", "description": "Fast fall and chat commands.", "features": ["Physics"] + [f["id"] for f in _COMMUNITY if f["id"] != "NightmareAI"]},
+    {"id": "garage", "name": "Toolkit Essentials", "description": "Camera, interface, audio and graphics controls.", "features": ["UI", "HudOpacity", "Audio", "Camera", "Rendering"]},
+    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
 
 def initial_config():
     values = validate(defaults())
-    text = core.update_cfg("# TK2 Mod Garage Pack\n", values)
+    text = core.update_cfg("# TK2 Mod Toolkit Pack\n", values)
     return text + """
 [Recipe.FrameLimiter]
 ## Target frame rate; VSync is disabled while this recipe is enabled.
@@ -102,7 +123,7 @@ def seed_config(text):
     """Add missing definitions without changing any existing player settings."""
     present = {(e["section"], e["key"]) for e in core.parse_cfg_settings(text)}
     missing = {pair: value for pair, value in validate(defaults()).items() if pair not in present}
-    return core.update_cfg(text or "# TK2 Mod Garage Pack\n", missing) if missing else text
+    return core.update_cfg(text or "# TK2 Mod Toolkit Pack\n", missing) if missing else text
 
 
 def source_files():

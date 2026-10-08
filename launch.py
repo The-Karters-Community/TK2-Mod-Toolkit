@@ -8,5 +8,5 @@ if __name__ == "__main__":
         from tkinter import Tk, messagebox
         root = Tk()
         root.withdraw()
-        messagebox.showerror("Mod Garage could not start", str(error), parent=root)
+        messagebox.showerror("Mod Toolkit could not start", str(error), parent=root)
         root.destroy()

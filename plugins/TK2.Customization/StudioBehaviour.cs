@@ -12,8 +12,8 @@ public sealed class StudioBehaviour : MonoBehaviour
     private readonly Dictionary<int, (Canvas Item, float Original)> _canvases = new();
     private readonly Dictionary<int, (CanvasGroup Item, float Original)> _opacity = new();
     private float? _originalShadowDistance;
-    private DateTime _configTime;
-    private float _nextScan, _nextConfig;
+    private float _nextScan;
+    private string? _configError;
     private bool _uiFaulted, _audioFaulted;
     private bool _mkFaulted, _communityFaulted, _nightmareFaulted;
 
@@ -21,24 +21,24 @@ public sealed class StudioBehaviour : MonoBehaviour
     {
         var p = Plugin.Instance;
         if (p == null) return;
-        // File polling and reload are performed on the Unity main thread, never FileSystemWatcher callbacks.
-        if (Time.unscaledTime >= _nextConfig)
+        // Config saves/reloads and camera UI updates stay on Unity's main thread.
+        try
         {
-            _nextConfig = Time.unscaledTime + 1f;
-            try
+            if (LiveConfig.Tick(p, Time.unscaledTime))
             {
-                var modified = File.GetLastWriteTimeUtc(p.Config.ConfigFilePath);
-                if (modified != _configTime)
-                {
-                    p.Config.Reload();
-                    _uiFaulted = _audioFaulted = false;
-                    _mkFaulted = _communityFaulted = _nightmareFaulted = false;
-                    p.PhysicsFaulted = false;
-                }
-                _configTime = modified;
+                _uiFaulted = _audioFaulted = false;
+                _mkFaulted = _communityFaulted = _nightmareFaulted = false;
+                p.PhysicsFaulted = false;
             }
-            catch (Exception ex) { p.Log.LogWarning($"Config reload failed: {ex.Message}"); }
+            _configError = null;
         }
+        catch (Exception ex)
+        {
+            LiveConfig.Status = $"Config reload/save failed: {ex.Message}";
+            if (_configError != ex.Message) p.Log.LogWarning(LiveConfig.Status);
+            _configError = ex.Message;
+        }
+        CameraPanel.Tick(p);
         RunFeature(ref _audioFaulted, "audio", () => AudioFeature.Tick(p));
         RecipeHost.Tick();
         RunFeature(ref _mkFaulted, "MK modules", LegacyMK.Tick);
@@ -147,6 +147,12 @@ public sealed class StudioBehaviour : MonoBehaviour
         _originalShadowDistance = null;
     }
 
+    public void OnGUI()
+    {
+        var p = Plugin.Instance;
+        if (p != null) CameraPanel.Draw(p);
+    }
+
     public void RestoreAll() { RestoreHud(); RestoreVisualPack(); }
-    public void OnDestroy() { RestoreAll(); }
+    public void OnDestroy() { if (Plugin.Instance != null) CameraPanel.Close(Plugin.Instance); RestoreAll(); }
 }

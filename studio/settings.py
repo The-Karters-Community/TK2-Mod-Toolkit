@@ -72,4 +72,4 @@ def merge(data, body):
         elif body.get("hash") != current["configHash"]:
             conflicts.append(compound)
     if conflicts: raise SettingsConflict(conflicts)
-    return core.update_cfg(data.decode("utf-8-sig") or "# TK2 Mod Garage Pack\n", updates).encode("utf-8")
+    return core.update_cfg(data.decode("utf-8-sig") or "# TK2 Mod Toolkit Pack\n", updates).encode("utf-8")
