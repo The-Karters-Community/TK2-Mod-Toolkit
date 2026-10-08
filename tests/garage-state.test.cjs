@@ -1,7 +1,11 @@
 // Offline UI state tests using an in-memory DOM stub. No browser or network access.
 const fs = require('node:fs');
 const vm = require('node:vm');
-const assert = require('node:assert/strict');
+let assertions = 0;
+const assert = new Proxy(require('node:assert/strict'), {get(target, key) {
+  const value = Reflect.get(target, key);
+  return typeof value === 'function' ? (...args) => {assertions++; return value(...args);} : value;
+}});
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 class Node {
@@ -77,5 +81,5 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
   assert.equal(run('sourceDirty'), false);
   assert.equal(run('source.hash'), 'saved-hash');
   assert.ok(calls.every(call => call.options.headers['X-TK2-Token'] === 'test-token'));
-  console.log('Offline frontend state: 17 assertions passed. Visual browser verification remains pending.');
+  console.log(`Offline frontend state: ${assertions} assertions passed. Visual browser verification remains pending.`);
 })().catch(error => {console.error(error); process.exitCode = 1;});

@@ -25,7 +25,7 @@ internal void AddVelocity(Vector3 velocity)
 }
 ```
 
-This explains why velocity accumulation is a candidate mod seam. The starter uses the controller's existing `AddVelocity` API, following the old fast-fall mod; it does not replace the game's physics implementation.
+This initial example has now become actual compiled, editable code in `src/Reconstructed/KartLogic.cs` and `plugins/TK2.Customization/ReadableGame.cs`. The pack's fast-fall path calls that reconstructed accumulator when gameplay validation is eventually opened. Seven native methods now have semantic C# implementations; see [readable source](READABLE-SOURCE.md) for provenance, executable tests and limits. The game's physics implementation as a whole is not replaced.
 
 The current `JumpInput(bool)` at `0x1805e0270` is more involved: it ignores false input, handles extra jump effects, resets the pre-ground input history, considers replay grounding state, buffers airborne clicks, and supports a grace interval after leaving ground. This evidence makes a direct rename of the old jump hook unsafe without testing its event timing.
 

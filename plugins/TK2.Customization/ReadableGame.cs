@@ -41,4 +41,23 @@ public static class ReadableGame
         int? index = CameraLogic.GetCameraIndex((int)player.ePlayerType, (int)player.eAntPlayerNr, camera.bIsSpectatorCamera);
         return index.HasValue ? PixelSDK.pixelSdkCamerasManager.playersCameras[index.Value] : null;
     }
+
+    public static bool IsSpectator(PixelGameKartCamera camera) => CameraLogic.IsSpectator(camera.bIsSpectatorCamera);
+
+    public static bool IsIntroActive(PixelGameKartCamera camera) => CameraLogic.IsIntroActive(camera.fRacingCameraStrength);
+
+    public static void EnableTribune(PixelGameKartCamera camera, bool requested)
+    {
+        bool enabled = camera.bIsTribuneCameraEnabled;
+        CameraLogic.EnableTribune(ref enabled, requested);
+        camera.bIsTribuneCameraEnabled = enabled;
+    }
+
+    public static void ForceInstantTeleport(PixelGameKartCamera camera)
+    {
+        bool forced = camera.bInstantTeleportForced, tribune = camera.bIsTribuneCameraEnabled;
+        CameraLogic.ForceInstantTeleport(ref forced, ref tribune);
+        camera.bInstantTeleportForced = forced;
+        camera.bIsTribuneCameraEnabled = tribune;
+    }
 }

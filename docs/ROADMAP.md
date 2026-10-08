@@ -28,7 +28,7 @@ Create dump.cs catalog (assembly, namespace, class, members, RVA), selected Ghid
 
 ### M2 — Usable authoring and management GUI
 
-Provide game path selection, installation diagnostics, plugin inventory, enable/disable with dependency caveat, backup/restore of overwritten files, C# editing, build and managed deployment, existing config editing, structured starter controls, and log viewer. Gate: test path containment, config round trips, deployment receipt/hash checks, rollback and no accidental game execution. Native tkinter keeps this first release dependency-free on this machine; polished packaged Windows UI and richer code completion are later milestones.
+Provide game path selection, installation diagnostics, plugin inventory, enable/disable with dependency caveat, backup/restore of overwritten files, C# editing, build and managed deployment, existing config editing, structured starter controls, and log viewer. Gate: test path containment, config round trips, deployment receipt/hash checks, rollback and no accidental game execution. The default GUI is now a modern loopback web app in an Edge app window with browser fallback, light/dark themes, game artwork and a player-first layout. The earlier tkinter analysis interface remains explicitly accessible. Packaged Windows distribution and richer code completion remain later milestones.
 
 ### M3 — Starter customization plugin
 
@@ -62,9 +62,20 @@ Finish local analysis and executable first slice before expanding. Then manual r
 
 - M0 evidence and Git bootstrap: delivered.
 - M1 metadata/native index, targeted pseudocode, address-specific export and managed recovery: delivered; full-game semantic reconstruction remains ongoing research.
-- M2 initial GUI authoring, typed existing settings, build/deploy/toggle/backup workflows: delivered with core tests and off-screen smoke checks; visible interaction and distribution packaging remain.
-- M3 starter source and build: delivered; in-game acceptance remains unverified.
-- M4–M7 facades, migration UI, visual recipes, live bridge, richer assets, profiles and distribution: planned. They are not represented as working features in this release.
+- M2 modern player GUI, light/dark themes, artwork, authoring, single-pack installation and backup workflows: implemented; API and offline frontend-state tests pass. Browser permission rejection prevented visible layout verification. Distribution packaging remains.
+- M3 ten built-in modules and FrameLimiter recipe: compiled and installed as one DLL, with all toggles off. Five gameplay modules remain runtime-locked pending leaderboard acceptance. No in-game compatibility certification is claimed.
+- M4 begun: seven native methods have editable semantic C# implementations, adapters, provenance and behavior tests. Broad facade coverage and update migration UI remain planned.
+- M5 begun: recipe creation and editing compile into the same pack; typed runtime recipe config controls are supported. Visual recipe generation, completion and compiler navigation remain planned.
+- M6–M7 live bridge, richer assets, profiles and distribution: planned.
+
+## Immediate next acceptance work
+
+1. Inspect the new Garage in light and dark modes at desktop and narrow-window sizes. Confirm controls remain readable and keyboard reachable.
+2. Start the game manually with all features off. Record pack load, registration and patch-probe outcomes from the fresh log.
+3. Test each presentation module and FrameLimiter in menu, race, pause, scene change and disable transitions. Record the actual HUD canvas names and Wwise behavior.
+4. Audit every leaderboard/upload route, including callback behavior. Gameplay stays locked until full offline/online transition and upload-suppression tests pass.
+5. Reconstruct full jump motion and boost/reserve state machines with the same provenance and branch-testing procedure. Use those adapters to port remaining legacy features from MOD-PACK.md.
+6. Add no-code recipe controls, diagnostics linked to editor lines, source completion and an authenticated main-thread inspector.
 
 ## Loader options
 

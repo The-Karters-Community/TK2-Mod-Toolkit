@@ -152,7 +152,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.authorized(): return self.reply(403, {"error": "Invalid session"})
                 app = self.server.app
                 with app.lock:
-                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Garage", "pid": os.getpid()})
+                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Garage", "pid": os.getpid(), "game": str(app.game)})
                     if parsed.path == "/api/state": return self.reply(200, app.state())
                     if parsed.path == "/api/source":
                         name = parse_qs(parsed.query).get("file", [""])[0]
@@ -184,8 +184,10 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length))
             action = urlsplit(self.path).path.removeprefix("/api/")
             if action == "shutdown":
-                self.reply(200, {"message": "Garage closed. You can close this window."})
-                threading.Thread(target=self.server.shutdown, daemon=True).start()
+                # Another window must not stop the process halfway through a build/install.
+                with self.server.app.lock:
+                    self.reply(200, {"message": "Garage closed. You can close this window."})
+                    threading.Thread(target=self.server.shutdown, daemon=True).start()
                 return
             result = self.server.app.action(action, body)
             self.reply(200, result)
@@ -222,7 +224,10 @@ def main():
         if saved["origin"] != expected: raise RuntimeError("Garage port is occupied by another service")
         request = urllib.request.Request(expected + "/api/health", headers={"X-TK2-Token": saved["token"]})
         with urllib.request.urlopen(request, timeout=3) as response:
-            if json.load(response).get("app") != "TK2 Mod Garage": raise RuntimeError("Unexpected service on Garage port")
+            health = json.load(response)
+            if health.get("app") != "TK2 Mod Garage": raise RuntimeError("Unexpected service on Garage port")
+            if health.get("game") != str(core.validate_game(args.game)):
+                raise RuntimeError("Close the existing Garage before switching game installations")
         if not args.no_browser: open_window(expected)
         return
     core.write_json(session, {"origin": server.origin, "token": server.app.token})
