@@ -253,19 +253,40 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-browser", action="store_true")
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--port", type=int)
     parser.add_argument("--game", type=Path)
     args = parser.parse_args()
     session = core.ROOT / "local/garage-session.json"
+    if args.port is None and session.is_file():
+        # Reopen our live instance; a closed Windows exclusive socket can remain
+        # in TIME_WAIT, so cold launches use an OS-assigned free loopback port.
+        import urllib.request
+        try:
+            saved = json.loads(session.read_text(encoding="utf-8"))
+            parsed = urlsplit(saved["origin"])
+            if parsed.hostname != "127.0.0.1" or parsed.scheme != "http": raise ValueError("Invalid saved Garage address")
+            request = urllib.request.Request(saved["origin"] + "/api/health", headers={"X-TK2-Token": saved["token"]})
+            with urllib.request.urlopen(request, timeout=2) as response: health = json.load(response)
+            if health.get("app") == "TK2 Mod Garage":
+                if args.game is not None and health.get("game") != str(core.validate_game(args.game)):
+                    raise RuntimeError("Close the existing Garage before switching game installations")
+                if health.get("version") == "0.3.0":
+                    if not args.no_browser: open_window(saved["origin"])
+                    return
+                request = urllib.request.Request(saved["origin"] + "/api/shutdown", data=b"{}", headers={"X-TK2-Token": saved["token"], "Content-Type": "application/json"})
+                with urllib.request.urlopen(request, timeout=3) as response: response.read()
+        except (OSError, ValueError, KeyError):
+            pass  # Stale or unavailable saved session: start on a fresh port.
+    requested_port = args.port if args.port is not None else 0
     try:
-        server = Server(Application(args.game), args.port)
+        server = Server(Application(args.game), requested_port)
     except OSError:
         # Reuse only our authenticated instance; never open an unrelated service occupying the port.
         import urllib.request
         if not session.is_file():
             raise RuntimeError("Another Garage copy is already open on this port. Close it before launching this copy.")
         saved = json.loads(session.read_text(encoding="utf-8"))
-        expected = f"http://127.0.0.1:{args.port}"
+        expected = f"http://127.0.0.1:{requested_port}"
         if saved["origin"] != expected: raise RuntimeError("Garage port is occupied by another service")
         request = urllib.request.Request(expected + "/api/health", headers={"X-TK2-Token": saved["token"]})
         with urllib.request.urlopen(request, timeout=3) as response:
@@ -283,7 +304,7 @@ def main():
         import time
         for attempt in range(40):
             try:
-                server = Server(Application(args.game), args.port)
+                server = Server(Application(args.game), requested_port)
                 break
             except OSError:
                 if attempt == 39: raise RuntimeError("The old Garage is still closing. Try launching again.")
