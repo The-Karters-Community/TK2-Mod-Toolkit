@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace TK2.Customization;
 
@@ -27,10 +28,17 @@ internal static class OnlineProtectionPolicy
         IEnumerable<(string Section, string Key, bool Enabled)> settings,
         IEnumerable<string> pluginGuids)
     {
-        foreach (var setting in settings)
+        var snapshot = settings.ToArray();
+        bool replaySettingPresent = snapshot.Any(setting => setting.Section == "GamepadOverlay" && setting.Key == "ShowReplayInputs");
+        bool replayInputInspection = !replaySettingPresent || snapshot.Any(setting => setting.Section == "GamepadOverlay" &&
+            setting.Key == "ShowReplayInputs" && setting.Enabled);
+        foreach (var setting in snapshot)
         {
             if (!setting.Enabled || !string.Equals(setting.Key, "Enabled", StringComparison.Ordinal)) continue;
             if (string.Equals(setting.Section, ProtectionSection, StringComparison.Ordinal) || IsWhitelistedModule(setting.Section)) continue;
+            // The local-only live meter is presentation. Showing recorded opponent/leaderboard
+            // actions adds racing information and remains protected until the user turns it off.
+            if (setting.Section == "GamepadOverlay" && !replayInputInspection) continue;
             return true;
         }
 

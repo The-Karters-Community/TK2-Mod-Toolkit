@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.21")]
+[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.22")]
 public sealed partial class Plugin : BasePlugin
 {
     internal static Plugin? Instance;
@@ -63,10 +63,11 @@ public sealed partial class Plugin : BasePlugin
         TryFeature("native performance", () => PerformanceFeature.Install(this));
         TryFeature("performance diagnostics", () => PerformanceDiagnostics.Install(this));
         TryFeature("track boundaries", () => TrackBoundaries.Install(this));
+        TryFeature("gamepad input overlay", () => GamepadOverlay.Install(this));
         _behaviour = AddComponent<StudioBehaviour>();
         Config.Save();
         LiveConfig.Initialize(this);
-        Log.LogInfo("TK2 Mod Toolkit 0.6.21: offline test features available; mandatory online protection active.");
+        Log.LogInfo("TK2 Mod Toolkit 0.6.22: offline test features available; mandatory online protection active.");
     }
 
     private void TryFeature(string name, Action install)
@@ -132,6 +133,7 @@ public sealed partial class Plugin : BasePlugin
         PerformanceFeature.Restore();
         PerformanceDiagnostics.Stop();
         TrackBoundaries.Restore();
+        GamepadOverlay.Restore();
         Harmony.UnpatchSelf();
         Instance = null;
         return true;

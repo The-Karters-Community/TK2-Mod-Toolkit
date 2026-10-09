@@ -13,6 +13,7 @@ The built-in allowlist is an explicit list of local presentation and accessibili
 | Camera setup (`Camera`) | Allow | Changes local camera framing and rotation. |
 | Character names (`BobbyGang`) | Allow | Replaces visible text in the local UI only. |
 | Performance diagnostics (`PerformanceDiagnostics`) | Allow | Measures local runtime counters; does not alter game state. |
+| Gamepad viewer (`GamepadOverlay`) | Conditional | Live local input display is allowed when **Show leaderboard ghost inputs** is off. Showing recorded ghost actions reveals extra racing information and blocks leaderboard uploads and online-room actions while enabled. |
 
 Everything else is unapproved by default. Shadow-distance overrides can change visibility; track boundaries reveal collision and respawn information; boost training, proximity voice cues, and boost meters expose timing or positional information. Race performance includes an AI-physics cadence option, so the entire module stays protected. Physics, AI, race rules, items, respawn, teleportation, rewinds, and custom recipes can change gameplay directly. These remain blocked even if a particular setting looks cosmetic or is currently inactive inside its enabled module. Unknown modules and other BepInEx plugin IDs also require protection.
 

@@ -79,6 +79,7 @@ public sealed class StudioBehaviour : MonoBehaviour
             _configError = ex.Message;
         }
         CameraPanel.Tick(p);
+        GamepadOverlay.Tick(p);
         RunFeature(ref _audioFaulted, "audio", () => AudioFeature.Tick(p));
         RecipeHost.Tick();
         PerformanceFeature.Tick();
@@ -196,6 +197,7 @@ public sealed class StudioBehaviour : MonoBehaviour
     {
         var p = Plugin.Instance;
         if (p != null) CameraPanel.Draw(p);
+        GamepadOverlay.Draw();
         TrackBoundaries.Draw();
     }
 

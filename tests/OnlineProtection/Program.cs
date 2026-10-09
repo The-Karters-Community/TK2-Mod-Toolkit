@@ -11,12 +11,16 @@ Check(OnlineProtectionPolicy.IsWhitelistedModule("Audio"), "audio mix is allowli
 Check(OnlineProtectionPolicy.IsWhitelistedModule("Camera"), "local camera setup is allowlisted");
 Check(OnlineProtectionPolicy.IsWhitelistedModule("BobbyGang"), "local visible character-name replacement is allowlisted");
 Check(OnlineProtectionPolicy.IsWhitelistedModule("PerformanceDiagnostics"), "diagnostics are allowlisted");
+Check(!OnlineProtectionPolicy.IsWhitelistedModule("GamepadOverlay"), "ghost input inspection is not globally allowlisted");
 Check(!OnlineProtectionPolicy.IsWhitelistedModule("Rendering"), "shadow-distance changes are not allowlisted");
 Check(!OnlineProtectionPolicy.IsWhitelistedModule("TrackBoundaries"), "track-boundary information is not allowlisted");
 Check(!OnlineProtectionPolicy.IsWhitelistedModule("BoostTrainer"), "boost coaching is not allowlisted");
 Check(!OnlineProtectionPolicy.IsWhitelistedModule("Physics"), "physics changes are not allowlisted");
 Check(!OnlineProtectionPolicy.IsWhitelistedModule("DashAndStash"), "item-changing modules are not allowlisted");
 Check(!OnlineProtectionPolicy.RequiresBlocking(new[] { ("UI", "Enabled", true), ("HudOpacity", "Enabled", true), ("DisableVignette", "Enabled", true), ("Audio", "Enabled", true), ("Camera", "Enabled", true), ("BobbyGang", "Enabled", true), ("PerformanceDiagnostics", "Enabled", true) }, noPlugins), "presentation, audio, camera and measurement modules are allowlisted");
+Check(!OnlineProtectionPolicy.RequiresBlocking(new[] { ("GamepadOverlay", "Enabled", true), ("GamepadOverlay", "ShowReplayInputs", false) }, noPlugins), "live-only input viewer is allowlisted when replay inspection is off");
+Check(OnlineProtectionPolicy.RequiresBlocking(new[] { ("GamepadOverlay", "Enabled", true), ("GamepadOverlay", "ShowReplayInputs", true) }, noPlugins), "leaderboard ghost input inspection triggers online protection");
+Check(OnlineProtectionPolicy.RequiresBlocking(new[] { ("GamepadOverlay", "Enabled", true) }, noPlugins), "missing replay-inspection setting fails closed");
 Check(OnlineProtectionPolicy.RequiresBlocking(new[] { ("UI", "Enabled", true), ("Rendering", "Enabled", true) }, noPlugins), "shadow-distance module requires protection");
 Check(OnlineProtectionPolicy.RequiresBlocking(new[] { ("UI", "Enabled", true), ("TrackBoundaries", "Enabled", true) }, noPlugins), "track-boundary module requires protection");
 Check(OnlineProtectionPolicy.RequiresBlocking(new[] { ("Physics", "Enabled", true) }, noPlugins), "physics module requires protection");

@@ -32,6 +32,14 @@ FEATURES = [
         ("ToggleKey", "Visibility key", "text", "F10", None, None, "Toggle while this module is enabled.", ["F" + str(i) for i in range(1,13)] + ["None"]),
         ("InspectKey", "Pin collider key", "text", "F8", None, None, "Select a displayed boundary under the screen center and show its details. This does not affect physics.", ["F" + str(i) for i in range(1,13)] + ["None"]),
     ]},
+    {"id": "GamepadOverlay", "name": "Gamepad viewer", "category": "Interface", "description": "Show live local racing controls or the action values recorded on a playing leaderboard ghost. Uses the game's Rewired mappings, so supported controllers and keyboard input share the same action-aware display.", "origin": "New", "settings": [
+        ("StartVisible", "Show automatically", "bool", True, None, None, "Show while local race or replay input is available."),
+        ("ShowReplayInputs", "Show leaderboard ghost inputs", "bool", True, None, None, "Display recorded actions during replay. This reveals extra racing information, so online protection blocks uploads and online-room actions until this option is off."),
+        ("ToggleKey", "Toggle hotkey", "text", "F9", None, None, "Toggle the in-game input card. Choose None to disable the hotkey.", ["F" + str(i) for i in range(1,13)] + ["None"]),
+        ("Corner", "Screen position", "text", "TopCenter", None, None, "Choose a HUD-safe corner or top-center position.", ["TopCenter", "TopLeft", "TopRight", "BottomLeft", "BottomRight"]),
+        ("Scale", "Overlay scale", "float", 1, .7, 1.4),
+        ("Opacity", "Background opacity", "float", .92, .45, 1),
+    ]},
     {"id": "Physics", "name": "Fast fall", "category": "Driving", "description": "Press Down Arrow or the mapped controller button after the minimum air time. Includes the legacy press, directional input and optional dodge modes.", "origin": "Community legacy port", "gameplay": True, "settings": [("FastFallAcceleration", "Downward acceleration", "float", 100, 0, 500), ("MinimumAirTime", "Air time before activation", "float", .4, 0, 3), ("UseSinglePressInput", "Press once per jump", "bool", True, None, None), ("ControllerAction", "Controller action", "text", "MenuTriangle", None, None), ("ShouldDodgeOnPress", "Dodge on fast fall", "bool", False, None, None), ("DodgeDurationAfterPress", "Dodge duration", "float", .5, .1, 1), ("MinimumJoystickInputBeforeFastFall", "Directional deadzone", "float", .1, 0, 1)]},
     {"id": "Laps", "name": "Custom lap count", "category": "Race rules", "description": "Choose how many laps an offline race requires. Port of the legacy custom-laps idea.", "origin": "Legacy port", "gameplay": True, "settings": [("Count", "Laps", "int", 3, 1, 99)]},
     {"id": "SimpleDriving", "name": "Driving challenge", "category": "Driving", "description": "Disable local jump and drift inputs. Fresh port of the legacy BoringMode idea.", "origin": "Legacy port", "gameplay": True, "settings": [("DisableJump", "Disable jumping", "bool", True, None, None), ("DisableDrift", "Disable drifting", "bool", True, None, None)]},
@@ -129,7 +137,7 @@ def defaults():
 
 
 PACKS = [
-    {"id": "garage", "name": "Toolkit Essentials", "description": "Online protection, camera, interface, audio, graphics and race performance controls.", "features": ["OnlineProtection", "UI", "HudOpacity", "DisableVignette", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
+    {"id": "garage", "name": "Toolkit Essentials", "description": "Online protection, camera, interface, audio, graphics and race performance controls.", "features": ["OnlineProtection", "UI", "HudOpacity", "DisableVignette", "GamepadOverlay", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
     {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
@@ -182,6 +190,7 @@ def module_sources():
         "Performance": ["PerformanceFeature.cs"],
         "PerformanceDiagnostics": ["PerformanceDiagnostics.cs", "PerformanceSamples.cs", "PerformanceEngineSamples.cs", "PerformanceFeature.cs"],
         "TrackBoundaries": ["TrackBoundaries.cs", "BoundarySelection.cs", "BoundaryGeometry.cs", "StudioBehaviour.cs"],
+        "GamepadOverlay": ["GamepadOverlay.cs", "InputOverlayModel.cs", "StudioBehaviour.cs", "Plugin.cs"],
         "Audio": ["AudioFeature.cs", "Plugin.cs"],
         "Camera": ["CameraFeature.cs", "CameraSettings.cs", "CameraPanel.cs"],
         "Physics": ["FastFallFeature.cs", "Plugin.cs"],
