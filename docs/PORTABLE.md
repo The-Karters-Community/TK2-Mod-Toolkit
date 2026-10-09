@@ -1,24 +1,42 @@
-# Portable Windows distribution
+# Portable Windows package
 
-The build is a self-contained Windows x64 folder with TK2 Mod Toolkit.exe. Python is bundled; player installation uses the compiled DLL and needs no .NET SDK. The app uses Edge app mode when available and a default-browser fallback. Author builds still need the .NET SDK. Unzip into a writable location and keep the folder together.
+The portable package runs the Toolkit on Windows x64 without installing Python. It includes the app's Python runtime, web UI, Toolkit source used for Workshop editing, prebuilt plugin, catalogs and update helper. It does not include The Karters 2 or generated game interop assemblies.
 
-Build tooling is isolated in local/portable-build-env. Install Python 3.10+ x64, then double-click **Build Toolkit.cmd** or run:
+## Player prerequisites
 
-```
+- The Karters 2 Turbo Charged **0.1.4.18**, Windows x64.
+- BepInEx Unity IL2CPP x64 **6.0.0-be.788**, commit `5b766a3b7f6c164d4798924a93f3acf4db769d06` for the validated prebuilt plugin.
+- A browser. Edge app mode is used when available, with a normal browser fallback.
+
+The default ZIP does not bundle BepInEx. The Installation page can prepare the loader only when its distribution is available in `vendor/BepInEx`; `-IncludeLoader` adds it to the package. The larger package still preserves the user's existing plugins/configs when installed. See [README player setup](../README.md#install-and-use-the-application).
+
+## Build
+
+On the maintainer machine, install Python 3.10+ x64 and a .NET SDK. For plugin compilation, also install the supported loader, start the game once to generate interop assemblies, and close the game. Then run:
+
+```powershell
+# Reuse an existing compiled plugin if present
 .\tools\build_toolkit.ps1
+
+# Recompile plugin source before packaging
 .\tools\build_toolkit.ps1 -RebuildPlugin
+
+# Optional loader-included package
+.\tools\build_toolkit.ps1 -IncludeLoader
 ```
 
-Packaging includes the provided BepInEx IL2CPP x64 distribution, editable SDK source/templates, UI assets, compiled plugin and a function-signature catalog. Original game binaries, generated interop assemblies, local recovered third-party sources, credentials, logs and session tokens are excluded. Build/packaging output stays ignored in artifacts/. The bundled build receipt has local provenance paths, but player deployment compares relative binary/loader hashes so a different installation path works.
+The build script creates an isolated packaging environment at ignored `local/portable-build-env/`, unpacks a runnable folder under `artifacts/portable/TK2 Mod Toolkit <version>/`, and creates `artifacts/portable/TK2-Mod-Toolkit-<version>-win-x64.zip`. Build/packaging never deploys to the game. Close a running portable app before replacing that app folder. Build details and release checks are in [RELEASING.md](RELEASING.md).
 
-PyInstaller's one-folder/windowed settings follow [its official usage documentation](https://pyinstaller.org/en/stable/usage.html). This build is not yet tested on another PC; relocated executable and HTTP smoke checks are recorded in local/portable-smoke.json. The browser layout and game feature behavior still require manual acceptance.
+## What the app validates
 
-Steam discovery checks registry paths and all libraryfolders.vdf entries, then the game's app manifest. Saved selection is project-local preferences, never a baked user-name path. No-game startup still opens setup. BepInEx readiness checks critical/bundled runtime files, enabled Doorstop target, generated managed interop and chainloader evidence. DLL replacement is blocked while the game runs. Missing/broken loader files can be prepared from the bundle, with backups and preserved user mods/configs.
+The Installation page detects Steam libraries and checks the game, loader fingerprint, Doorstop configuration, generated interop and BepInEx startup evidence. It backs up files before preparing or replacing them, preserves existing plugin/config files, and blocks DLL replacement while the game runs. Candidate plugin/config conflicts are not assumed to be definite conflicts: the player can disable one candidate reversibly and retest.
 
-Unsigned executable distribution, loader license notices, clean-PC installation/uninstallation and updated Steam branches need a release review before treating this as a broadly certified public release. That is separate from the completed local build.
+The bundled prebuilt plugin is fingerprinted against the supported game and loader. An unknown/older loader does not get treated as compatible merely because its version string looks close. Use the exact supported BepInEx build or rebuild and validate the plugin against a different installation before distributing it.
 
-The script installs pinned PyInstaller, discovers Steam, accepts optional `-GamePath` and `-LoaderPath`, and exports ten native icon sizes from the supplied PNG. A missing plugin artifact is built automatically; `-RebuildPlugin` includes later C# changes. An application-only build reuses the existing artifact. The packaging script never deploys to the game. See README for full examples.
+## Package contents and exclusions
 
-Version 0.5.0 outputs `artifacts/portable/TK2 Mod Toolkit 0.5.0/TK2 Mod Toolkit.exe` and a versioned ZIP. A running executable cannot be replaced. Repeated builds retain the entire previous output in `local/portable-backups/` so edited sources and preferences can be recovered. Build failures preserve previous output, and detailed packaging output is written to `local/portable-build.log`. Copy portable source edits into the checkout before using its packaging script if you want them in the new distribution.
+The package includes the Toolkit UI and authoring sources, module templates, function-signature catalog, compiled Toolkit plugin, app runtime, version manifest, and a rollback-safe update script. The optional loader-included package adds the supported BepInEx distribution but omits user `plugins`, `config`, interop and cache folders.
 
-The executable and favicon share assets/TheKartersLogoModified.ico, with 16, 20, 24, 32, 40, 48, 64, 96, 128 and 256 pixel frames exported directly from the supplied PNG. The bundled runtime plugin is 0.4.1, with the current parameterless Auto boost drift-stop hook. Packaging does not deploy it; Installation → Update plugin installs it with the game closed. Config remains local.tk2.customization.cfg. Each cold launch uses a free loopback port; reopening a copy reuses its authenticated service.
+Original game binaries, saves, generated interop, Ghidra project databases, raw game dumps, local logs, session tokens and recovered third-party plugin sources are excluded. Maintainer-local Ghidra data stays under ignored `local/` or `exports/`; see [readable-source limits](READABLE-SOURCE.md).
+
+Unsigned distribution, third-party license notices, clean-machine setup/uninstall, and game/loader changes still need release acceptance. A local build or relocated-folder smoke check alone is not broad public compatibility certification.
