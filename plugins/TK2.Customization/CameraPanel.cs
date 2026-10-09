@@ -17,7 +17,7 @@ internal static class CameraPanel
     {
         try
         {
-            if (!p.CameraPanelEnabled.Value || !CameraFeature.RaceAvailable)
+            if (!p.CameraEnabled.Value || !p.CameraPanelEnabled.Value || !CameraFeature.RaceAvailable)
             { if (_open) Close(p); return; }
             if (Enum.TryParse(p.CameraPanelKey.Value, out KeyCode key) && key != KeyCode.None && Input.GetKeyDown(key))
             {

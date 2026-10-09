@@ -32,7 +32,7 @@ def read(data):
         if schema:
             values[compound] = normalized(entry["value"], schema[0])
     return {"settings": values, "configHash": hashlib.sha256(data).hexdigest(),
-            "recipes": [e for e in entries if e["section"].startswith("Recipe.") and e["section"] not in pack.RETIRED_MODULES and (e["section"], e["key"]) not in known],
+            "recipes": [e for e in entries if e["section"].startswith("Recipe.") and e["section"] not in pack.RETIRED_MODULES and (e["section"], e["key"]) not in known and (e["section"], e["key"]) not in pack.RETIRED_SETTINGS],
             "extraSettings": [e for e in entries if (e["section"], e["key"]) not in known and not e["section"].startswith("Recipe.") and e["section"] not in pack.RETIRED_MODULES],
             "entries": entries}
 
@@ -48,7 +48,8 @@ def merge(data, body):
     if body.get("hash") != current["configHash"] and not any(k in body for k in ("baseValues", "baseRecipes", "baseExtraSettings")):
         raise SettingsConflict(list(dirty) + list(recipe_dirty) + list(extra_dirty))
     updates = pack.validate(dirty)
-    definitions = {e["section"] + "/" + e["key"]: e for e in current["entries"]}
+    definitions = {e["section"] + "/" + e["key"]: e for e in current["entries"]
+                   if (e["section"], e["key"]) not in pack.RETIRED_SETTINGS}
     kinds = {s + "/" + k: definition[0] for (s, k), definition in pack.schema().items()}
     current_values = dict(current["settings"])
     for compound, entry in definitions.items():

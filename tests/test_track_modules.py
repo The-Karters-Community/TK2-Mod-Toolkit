@@ -22,32 +22,34 @@ class TrackModuleIntegrationTests(unittest.TestCase):
     def test_inspector_uses_native_trigger_debug_path(self):
         source = (pack.PROJECT.parent / 'Recipes/TrackInspector.cs').read_text(encoding='utf-8')
         self.assertIn('bForceDebugShowTriggerCollisionMeshes', source)
-        self.assertIn('mapPhysicsTriggerColliderList', source)
+        self.assertIn('GetComponentsInChildren<Collider>(true)', source)
+        self.assertIn('GetComponent<MeshRenderer>()', source)
         self.assertIn('PatchTriggerSetup(harmony, "Init")', source)
         self.assertIn('PatchTriggerSetup(harmony, "Start")', source)
         self.assertIn('ShouldShowNativeMeshes', source)
-        self.assertIn('module.CaptureDefault(map);', source)
+        self.assertIn('module.CaptureTriggerDefaults(__instance);', source)
         self.assertIn('OriginalFlag', source)
-        self.assertIn('if (_map != null) RestoreMap();', source)
-        self.assertIn('_lastApplied = _mapDefault;', source)
-        self.assertIn('native debug flag, but the map currently exposes no trigger MeshRenderers', source)
-        self.assertNotIn('FindObjectsOfType<Collider>', source)
+        self.assertIn('no trigger mesh renderers', source)
+        self.assertNotIn('mapPhysicsTriggerColliderList', source)
         self.assertNotIn('Graphics.DrawMeshNow', source)
         self.assertNotIn('ClassInjector', source)
 
     def test_mirror_flips_clip_space_and_reverses_local_steering(self):
         source = (pack.PROJECT.parent / 'Recipes/MirrorRace.cs').read_text(encoding='utf-8')
-        self.assertIn('camera.projectionMatrix = flipX * state.Projection;', source)
-        self.assertNotIn('state.Projection * flipX', source)
+        effect = (pack.PROJECT.parent / 'Recipes/MirrorRace.ImageEffect.cs').read_text(encoding='utf-8')
+        self.assertIn('Graphics.Blit(source, destination, new Vector2(-1f, 1f), new Vector2(1f, 0f));', effect)
+        self.assertNotIn('projectionMatrix', source)
+        self.assertNotIn('GL.invertCulling', source)
+        self.assertNotIn('ERaceState', source)
+        self.assertNotIn('BeforeRacingCameraFraming', source)
+        self.assertNotIn('AfterRacingCameraFraming', source)
         self.assertIn('BeforeSteerInput', source)
         self.assertIn('E_HUMAN_LOCAL', source)
-        self.assertIn('BeforeRacingCameraFraming', source)
-        self.assertIn('bUseRotateTowardsNoLateralVelocity = false', source)
-        self.assertIn('Mirror Race applied to local camera', source)
+        self.assertIn('active before countdown', source)
 
     def test_export_includes_only_active_recipe_helpers(self):
         features = {f['id']: f for f in pack.catalog_features()}
-        for name, helpers in [('MirrorRace', []), ('TrackInspector', [])]:
+        for name, helpers in [('MirrorRace', ['MirrorRace.ImageEffect.cs']), ('TrackInspector', [])]:
             identity = 'Recipe.' + name
             paths = module_packages._source_dependencies([features[identity]])
             for helper in helpers:
@@ -56,6 +58,18 @@ class TrackModuleIntegrationTests(unittest.TestCase):
                               pack.module_sources()[identity])
             self.assertFalse(any('/Models/' in path for path in paths))
             self.assertNotIn('Enabled', [s[0] for s in features[identity]['settings']])
+
+    def test_camera_panel_requires_camera_module(self):
+        source = (pack.PROJECT.parent / 'CameraPanel.cs').read_text(encoding='utf-8')
+        self.assertIn('!p.CameraEnabled.Value || !p.CameraPanelEnabled.Value', source)
+        camera = next(f for f in pack.catalog_features() if f['id'] == 'Camera')
+        panel = next(setting for setting in camera['settings'] if setting[0] == 'PanelEnabled')
+        self.assertIn('only while the Camera setup module is enabled', panel[6])
+
+    def test_track_inspector_is_not_duplicated_under_user_recipes(self):
+        packs = pack.catalog_packs()
+        memberships = [p['id'] for p in packs if 'Recipe.TrackInspector' in p['features']]
+        self.assertEqual(memberships, ['garage'])
 
 
 if __name__ == '__main__':

@@ -33,7 +33,7 @@ for feature in FEATURES:
 
 
 _CAMERA = next(f for f in FEATURES if f["id"] == "Camera")
-_CAMERA["description"] = "Live camera framing, aim and rotation. Press F8 in a local race for the camera panel; choose another key below."
+_CAMERA["description"] = "Live camera framing, aim and rotation. Enable Camera setup to use its in-race panel; press F8 in a local race or choose another key below."
 _CAMERA["settings"] = [
     ("FieldOfView", "Field of view", "float", 65, 35, 110),
     ("PreserveKartFraming", "Keep kart size", "bool", True, None, None),
@@ -46,8 +46,8 @@ _CAMERA["settings"] = [
     ("YawOffset", "Yaw offset", "float", 0, -90, 90),
     ("RollOffset", "Roll offset", "float", 0, -30, 30),
     ("SmoothingSeconds", "Smoothing seconds", "float", .12, 0, 2, "Zero applies adjustments instantly."),
-    ("PanelEnabled", "Enable in-race panel", "bool", True, None, None, "The panel can open even when camera overrides are off."),
-    ("PanelHotkey", "Panel hotkey", "text", "F8", None, None, "Press during a local race. Escape also closes the panel.",
+    ("PanelEnabled", "Enable in-race panel", "bool", True, None, None, "Available only while the Camera setup module is enabled."),
+    ("PanelHotkey", "Panel hotkey", "text", "F8", None, None, "Press during a local race with Camera setup enabled. Escape also closes the panel.",
      ["F" + str(i) for i in range(1,13)] + list("ABCDEFGHIJKLMNOPQRSTUVWXYZ") + ["Insert", "Home", "End", "BackQuote", "None"]),
     ("PanelScale", "In-race panel scale", "float", 1, .7, 1.6, "Automatically fitted to the screen."),
 ]
@@ -57,6 +57,11 @@ _CAMERA["settingGroups"] = {"AimAtKart":"Aim & rotation", "TargetHeight":"Aim & 
 RETIRED_MODULES = frozenset({'MirrorMode'} | {'Recipe.' + name for name in (
     'AirGlider','DriftCapacitor','EchoRewind','GravitySurf','LandingCombo',
     'RepulsorPulse','SlipstreamSling','CosmeticModel')})
+RETIRED_SETTINGS = frozenset(
+    ('Recipe.TrackInspector', key) for key in (
+        'ShowWalls', 'ShowRespawn', 'ShowKillTriggers', 'ShowOtherTriggers', 'DrawDistance',
+        'Opacity', 'ShowThroughTrack', 'ShowLabels', 'ColliderSampleResolution', 'LineWidth',
+        'ShowBoundsFallback'))
 
 
 def schema(features=None):

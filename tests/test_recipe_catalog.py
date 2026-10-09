@@ -76,6 +76,24 @@ class RecipeCatalogTests(unittest.TestCase):
         self.assertIs(after['settings']['Camera/PanelEnabled'],False)
         self.assertEqual(after['settings']['Camera/PanelHotkey'],'C')
 
+    def test_retired_track_inspector_overlay_settings_are_hidden(self):
+        source = '''public sealed class TrackInspector : IModRecipe {
+ public string Name => "TrackInspector";
+ public bool ChangesGameplay => false;
+ void Configure(ConfigFile config) {
+  config.Bind("Recipe." + Name, "Enabled", false, "Enable inspector");
+  config.Bind("Recipe." + Name, "ToggleKey", KeyCode.F10, "Toggle meshes");
+ }
+}'''
+        (self.sources / 'TrackInspector.cs').write_text(source)
+        data = b'[Recipe.TrackInspector]\nEnabled = true\nToggleKey = F10\nShowWalls = true\nDrawDistance = 1000\n'
+        result = settings.read(data)
+        self.assertIs(result['settings']['Recipe.TrackInspector/Enabled'], True)
+        self.assertEqual(result['settings']['Recipe.TrackInspector/ToggleKey'], 'F10')
+        self.assertFalse(result['recipes'])
+        with self.assertRaises(ValueError):
+            settings.merge(data, {'hash': result['configHash'], 'recipes': {'Recipe.TrackInspector/ShowWalls': 'false'}})
+
     def test_host_enabled_binding_has_one_header_toggle(self):
         (self.sources / 'ToyKart.cs').write_text(RECIPE.replace('void Configure(ConfigFile config) {', 'void Configure(ConfigFile config) { config.Bind("Recipe." + Name, "Enabled", false, "Next load");'))
         feature = recipe_catalog.features()[0]

@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-/// <summary>Uses the game's own trigger-collision debug meshes; no custom renderer or scene scan.</summary>
+/// <summary>Uses the same trigger-child mesh path as the game's native debug flag.</summary>
 public sealed class TrackInspector : IModRecipe
 {
     public string Name => "TrackInspector";
@@ -16,6 +16,7 @@ public sealed class TrackInspector : IModRecipe
     private ConfigEntry<bool> _enabled = null!;
     private static TrackInspector? _instance;
     private readonly Dictionary<int, (Ant_MapData Map, bool OriginalFlag)> _mapDefaults = new();
+    private readonly Dictionary<int, (MeshRenderer Renderer, bool OriginalEnabled)> _rendererDefaults = new();
     private Ant_MapData? _map;
     private bool _mapDefault;
     private bool _lastApplied;
@@ -25,17 +26,17 @@ public sealed class TrackInspector : IModRecipe
     {
         _instance = this;
         _enabled = config.Bind("Recipe." + Name, "Enabled", false,
-            "Show the game's trigger collision meshes in local offline sessions. Toggle visibility with the configured key.");
+            "Show the game's own trigger collision meshes in a local offline session. Toggle with the configured key.");
         _key = config.Bind("Recipe." + Name, "ToggleKey", KeyCode.F10,
-            "Show or hide the game's native trigger collision meshes. Works before or during a local offline race.");
+            "Show or hide the game's native trigger meshes. Applies in the current race without restarting.");
 
-        // Native Init/Start are the game's own debug-mesh path. Set the native flag before
-        // those methods run, then use the map list below for a toggle made mid-race.
+        // The game reads this map flag in PhysicsTrigger.Init and Start. Set it before
+        // those methods run, then use their own child-collider/MeshRenderer shape mid-race.
         var harmony = Plugin.Instance!.Harmony;
         PatchTriggerSetup(harmony, "Init");
         PatchTriggerSetup(harmony, "Start");
 
-        // Remove settings used by the retired sampled-mesh overlay.
+        // Retire options from the old sampled-mesh overlay.
         foreach (string key in new[] { "ShowWalls", "ShowRespawn", "ShowKillTriggers", "ShowOtherTriggers", "DrawDistance",
                      "Opacity", "ShowThroughTrack", "ShowLabels", "ColliderSampleResolution", "LineWidth", "ShowBoundsFallback" })
             config.Remove(new ConfigDefinition("Recipe.TrackInspector", key));
@@ -43,27 +44,48 @@ public sealed class TrackInspector : IModRecipe
 
     private static void PatchTriggerSetup(Harmony harmony, string method)
     {
-        var target = AccessTools.DeclaredMethod(typeof(PTK_ModTKLogic_PhysicsTrigger), method, Type.EmptyTypes)
+        var target = AccessTools.DeclaredMethod(typeof(PTK_ModTKLogic_PhysicsTrigger), method, System.Type.EmptyTypes)
             ?? throw new MissingMethodException(typeof(PTK_ModTKLogic_PhysicsTrigger).FullName, method + "()");
         harmony.Patch(target, prefix: new HarmonyMethod(typeof(TrackInspector), nameof(BeforeTriggerSetup)));
     }
 
-    private static void BeforeTriggerSetup()
+    private static void BeforeTriggerSetup(PTK_ModTKLogic_PhysicsTrigger __instance)
     {
         var module = _instance;
         if (module == null || !module.ShouldShowNativeMeshes) return;
+
         var map = Ant_MapData.instance;
         if (map != null)
         {
-            module.CaptureDefault(map);
-            map.bForceDebugShowTriggerCollisionMeshes = true;
+            bool original = module.CaptureMap(map);
+            map.bForceDebugShowTriggerCollisionMeshes = original || module.ShouldShowNativeMeshes;
         }
+        module.CaptureTriggerDefaults(__instance);
     }
 
-    private void CaptureDefault(Ant_MapData map)
+    private bool CaptureMap(Ant_MapData map)
     {
         int id = map.GetInstanceID();
-        if (!_mapDefaults.ContainsKey(id)) _mapDefaults[id] = (map, map.bForceDebugShowTriggerCollisionMeshes);
+        if (!_mapDefaults.TryGetValue(id, out var saved))
+        {
+            saved = (map, map.bForceDebugShowTriggerCollisionMeshes);
+            _mapDefaults[id] = saved;
+        }
+        return saved.OriginalFlag;
+    }
+
+    private void CaptureTriggerDefaults(PTK_ModTKLogic_PhysicsTrigger trigger)
+    {
+        if (trigger == null) return;
+        var colliders = trigger.GetComponentsInChildren<Collider>(true);
+        if (colliders == null) return;
+        foreach (var collider in colliders)
+        {
+            var renderer = collider == null ? null : collider.GetComponent<MeshRenderer>();
+            if (renderer == null) continue;
+            int id = renderer.GetInstanceID();
+            if (!_rendererDefaults.ContainsKey(id)) _rendererDefaults[id] = (renderer, renderer.enabled);
+        }
     }
 
     private bool ShouldShowNativeMeshes => _enabled.Value && _visible && Plugin.OfflineLabAllowed;
@@ -73,70 +95,102 @@ public sealed class TrackInspector : IModRecipe
         if (Plugin.OfflineLabAllowed && Input.GetKeyDown(_key.Value)) _visible = !_visible;
 
         var map = Ant_MapData.instance;
-        if (map == null) { RestoreMap(); return; }
+        if (map == null)
+        {
+            if (_map != null || _mapDefaults.Count != 0 || _rendererDefaults.Count != 0) Restore();
+            return;
+        }
         if (map != _map)
         {
-            if (_map != null) RestoreMap();
+            if (_map != null) RestoreMapSnapshot(_map);
             _map = map;
-            CaptureDefault(map);
-            _mapDefault = _mapDefaults[map.GetInstanceID()].OriginalFlag;
+            _mapDefault = CaptureMap(map);
             _lastApplied = _mapDefault;
         }
 
-        // Keep this enabled while the local session loads so the game's own trigger
-        // Init/Start code can expose meshes as they are created.
         bool show = ShouldShowNativeMeshes;
         bool force = _mapDefault || show;
-        if (force == _lastApplied) return;
-        var result = SetGameDebugMeshes(map, force);
+        if (force == _lastApplied && map.bForceDebugShowTriggerCollisionMeshes == force) return;
+
+        var counts = SetTriggerMeshes(map, force);
         _lastApplied = force;
-        if (force && result.Renderers == 0)
-            Plugin.Instance?.Log.LogWarning($"Track Inspector enabled the native debug flag, but the map currently exposes no trigger MeshRenderers (trigger entries: {result.Entries}).");
+        if (show && counts.Renderers == 0)
+            Plugin.Instance?.Log.LogWarning($"Track Inspector enabled the native trigger flag, but found no trigger mesh renderers ({counts.Triggers} triggers, {counts.Colliders} colliders).");
         else
-            Plugin.Instance?.Log.LogInfo($"Track Inspector {(force ? "showing" : "hiding")} native trigger meshes ({result.Renderers} renderers across {result.Entries} entries).");
+            Plugin.Instance?.Log.LogInfo($"Track Inspector {(force ? "showing" : "hiding")} native trigger meshes ({counts.Renderers} renderers across {counts.Triggers} triggers).");
     }
 
-    private static (int Entries, int Renderers) SetGameDebugMeshes(Ant_MapData map, bool visible)
+    private (int Triggers, int Colliders, int Renderers) SetTriggerMeshes(Ant_MapData map, bool visible)
     {
         map.bForceDebugShowTriggerCollisionMeshes = visible;
-        var colliders = map.mapPhysicsTriggerColliderList;
-        if (colliders == null) return (0, 0);
-        int entries = 0;
-        int renderers = 0;
-        foreach (var entry in colliders)
+        int triggers = 0, collidersSeen = 0, renderers = 0;
+        foreach (var trigger in UnityEngine.Object.FindObjectsOfType<PTK_ModTKLogic_PhysicsTrigger>())
         {
-            entries++;
-            var collider = entry == null ? null : entry.collider;
-            var renderer = collider == null ? null : collider.GetComponent<MeshRenderer>();
-            if (renderer != null)
+            if (trigger == null) continue;
+            triggers++;
+            var colliders = trigger.GetComponentsInChildren<Collider>(true);
+            if (colliders == null) continue;
+            foreach (var collider in colliders)
             {
-                renderer.enabled = visible;
+                if (collider == null) continue;
+                collidersSeen++;
+                var renderer = collider.GetComponent<MeshRenderer>();
+                if (renderer == null) continue;
+                CaptureRendererDefault(renderer);
+                bool original = _rendererDefaults[renderer.GetInstanceID()].OriginalEnabled;
+                renderer.enabled = visible || original;
                 renderers++;
             }
         }
-        return (entries, renderers);
+        PruneDestroyedRenderers();
+        return (triggers, collidersSeen, renderers);
     }
 
-    private void RestoreMap()
+    private void CaptureRendererDefault(MeshRenderer renderer)
     {
-        var map = _map ?? Ant_MapData.instance;
-        _map = null;
-        if (map == null)
-        {
-            _mapDefaults.Clear();
-            _lastApplied = false;
-            return;
-        }
+        int id = renderer.GetInstanceID();
+        if (!_rendererDefaults.ContainsKey(id)) _rendererDefaults[id] = (renderer, renderer.enabled);
+    }
+
+    private void RestoreMapSnapshot(Ant_MapData map)
+    {
         int id = map.GetInstanceID();
-        bool originalFlag = _mapDefaults.TryGetValue(id, out var saved) ? saved.OriginalFlag : _mapDefault;
-        SetGameDebugMeshes(map, originalFlag);
-        _mapDefaults.Remove(id);
+        if (_mapDefaults.TryGetValue(id, out var saved))
+        {
+            if (saved.Map != null) saved.Map.bForceDebugShowTriggerCollisionMeshes = saved.OriginalFlag;
+            _mapDefaults.Remove(id);
+        }
+        RestoreRenderers(clear: false);
+        _map = null;
+        _mapDefault = false;
         _lastApplied = false;
+    }
+
+    private void RestoreRenderers(bool clear)
+    {
+        foreach (var saved in _rendererDefaults.Values)
+            if (saved.Renderer != null) saved.Renderer.enabled = saved.OriginalEnabled;
+        if (clear) _rendererDefaults.Clear();
+        else PruneDestroyedRenderers();
+    }
+
+    private void PruneDestroyedRenderers()
+    {
+        var stale = new List<int>();
+        foreach (var item in _rendererDefaults)
+            if (item.Value.Renderer == null) stale.Add(item.Key);
+        foreach (int id in stale) _rendererDefaults.Remove(id);
     }
 
     public void Restore()
     {
         _visible = true;
-        RestoreMap();
+        foreach (var saved in _mapDefaults.Values)
+            if (saved.Map != null) saved.Map.bForceDebugShowTriggerCollisionMeshes = saved.OriginalFlag;
+        _mapDefaults.Clear();
+        RestoreRenderers(clear: true);
+        _map = null;
+        _mapDefault = false;
+        _lastApplied = false;
     }
 }
