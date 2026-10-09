@@ -19,7 +19,7 @@ class TrackModuleIntegrationTests(unittest.TestCase):
         self.assertEqual(values[('Recipe.TrackInspector', 'Enabled')], 'true')
         self.assertEqual(values[('Recipe.TrackInspector', 'ToggleKey')], 'C')
 
-    def test_inspector_uses_native_trigger_debug_path(self):
+    def test_inspector_toggles_and_draws_track_collision_layers(self):
         source = (pack.PROJECT.parent / 'Recipes/TrackInspector.cs').read_text(encoding='utf-8')
         self.assertIn('bForceDebugShowTriggerCollisionMeshes', source)
         self.assertIn('GetComponentsInChildren<Collider>(true)', source)
@@ -29,14 +29,18 @@ class TrackModuleIntegrationTests(unittest.TestCase):
         self.assertIn('PatchMapSetup(harmony)', source)
         self.assertIn('Patch(target,', source)
         self.assertIn('AfterMapSetup', source)
-        self.assertIn('ShouldShowNativeMeshes', source)
+        self.assertIn('Input.GetKeyDown(_key.Value)', source)
+        self.assertIn('Track Inspector: {_key.Value} pressed', source)
         self.assertIn('module.CaptureTriggerDefaults(__instance);', source)
         self.assertIn('OriginalFlag', source)
-        self.assertIn('FindObjectsOfType<PTK_ModTKLogic_PhysicsTrigger>(true)', source)
-        self.assertIn('including inactive objects', source)
-        self.assertIn('no trigger mesh renderers', source)
-        self.assertNotIn('mapPhysicsTriggerColliderList', source)
-        self.assertNotIn('Graphics.DrawMeshNow', source)
+        self.assertIn('wallLayerToCollDetect.value', source)
+        self.assertIn('wallRespawn_Flat_ColliderLayer.value', source)
+        self.assertIn('wallRespawn_Always_ColliderLayer.value', source)
+        self.assertIn('MaxShown = 48', source)
+        self.assertIn('RefreshInterval = 2f', source)
+        self.assertIn('FindObjectsOfType<Collider>(true)', source)
+        self.assertIn('collider is MeshCollider meshCollider ? meshCollider.sharedMesh', source)
+        self.assertIn('TrackInspector.DrawStatus()', (pack.PROJECT.parent / 'StudioBehaviour.cs').read_text(encoding='utf-8'))
         self.assertNotIn('ClassInjector', source)
 
     def test_mirror_flips_clip_space_and_reverses_local_steering(self):

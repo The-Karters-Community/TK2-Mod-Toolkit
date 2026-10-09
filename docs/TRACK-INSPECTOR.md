@@ -1,8 +1,8 @@
 # Track Inspector
 
-Enable **Track Inspector** for a local offline race or time trial. Press **F10** to show or hide the game's existing physics-trigger meshes. The key is configurable. The Toolkit sets the native debug flag before map setup, then updates the trigger renderers after the game's setup completes. Mid-race scans happen only when the visibility setting changes.
+Enable **Track Inspector** for a local offline race or time trial. Press **F10** to show or hide nearby wall colliders; the key is configurable. The overlay uses the current kart's collision-layer masks, shows exact `MeshCollider` shapes plus exact box-collider volumes, and colors wall and respawn layers differently. It draws at most 48 colliders within 150 m and refreshes its collider scan every two seconds. The overlay is hidden until F10 is pressed.
 
-This uses the game's `bForceDebugShowTriggerCollisionMeshes` path. It only exposes trigger meshes that the loaded track provides; it does not visualize every ordinary kart wall or arbitrary collider. It leaves collision and trigger behavior unchanged.
+The game's `bForceDebugShowTriggerCollisionMeshes` path remains enabled for tracks that provide mod-trigger markers. That native path only exposes markers authored by the loaded track; it does not cover ordinary kart wall layers. The Toolkit overlay adds those wall and respawn collider layers without changing collision behavior. Unsupported collider shapes are skipped rather than replaced with misleading bounds.
 
 ## Current-build evidence
 
@@ -15,4 +15,4 @@ Read-only Ghidra analysis matches the installed `GameAssembly.dll` SHA-256 `e55f
 | `PTK_ModTKLogic_PhysicsTrigger.Init()` | `0x1805E9CE0` | If the active map's flag is true, enables the collider object's existing `MeshRenderer`. |
 | `PTK_ModTKLogic_PhysicsTrigger.Start()` | `0x1805EAB40` | Applies the same debug-visibility check during trigger startup. |
 
-The previous implementation searched only active `PTK_ModTKLogic_PhysicsTrigger` objects and could scan before `Ant_MapData.Start()` had finished creating them, producing zero triggers. The Toolkit now sets the flag in the map-start prefix, applies visibility after native map setup, and includes inactive trigger components when toggling mid-race. Existing Ghidra pseudocode is analysis output, not recovered original C#. In-game appearance still needs a manual check; the game is not launched automatically.
+The previous implementation searched only native mod-trigger components. Official track walls use the kart controller's wall and respawn collision layers instead, so the trigger query could return zero even when the track had death barriers. F10 now toggles a separate low-cost collider overlay, and the in-game panel/log reports whether the key was received and how many shapes were found. Ghidra pseudocode is analysis output, not recovered original C#. In-game appearance still needs a manual check; the game is not launched automatically.

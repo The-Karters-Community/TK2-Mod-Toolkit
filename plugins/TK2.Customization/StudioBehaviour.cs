@@ -151,6 +151,7 @@ public sealed class StudioBehaviour : MonoBehaviour
     {
         var p = Plugin.Instance;
         if (p != null) CameraPanel.Draw(p);
+        TrackInspector.DrawStatus();
     }
 
     public void RestoreAll() { RestoreHud(); RestoreVisualPack(); }
