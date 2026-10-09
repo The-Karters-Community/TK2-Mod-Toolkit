@@ -12,6 +12,8 @@ Save unsaved C# before exporting. The package is for another **TK2 Mod Toolkit 0
 
 Packages containing **Race performance** require runtime **0.6.9+** and a Studio catalog that includes Performance (source-app 0.6.4+). The exported helper relies on the recipient's Plugin and StudioBehaviour integration; older installations cannot import this new built-in module.
 
+**Performance diagnostics** requires runtime **0.6.10+** and source-app **0.6.5+**. Its exported helpers include the PerformanceFeature settings snapshot dependency; Plugin.Install and StudioBehaviour.Tick integration is required. Disable diagnostics before an uninstrumented performance benchmark.
+
 Built-in modules share implementation files. Their package may contain code for other built-in modules, but only selected config sections are exported. Game binaries, interop DLLs, the loader and unrelated custom recipes are excluded.
 
 ## Import

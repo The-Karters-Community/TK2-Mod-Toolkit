@@ -218,4 +218,78 @@ foreach (string fault in new[] { "controller", "motor-cadence", "motor-quality",
     if (fault == "controller")
         Check(broken.Motor!.iLowerQualityPhysicsUpdateEveryOnlyX == 3, "controller restoration failure still attempts same record motor restoration");
 }
-Console.WriteLine($"Production performance feature: {assertions} assertions passed (stub APIs; no engine/game runtime proof).");
+var sample = new PerformanceSamples(2);
+Check(sample.FrameP95Ms() == null, "empty percentile unavailable");
+sample.Frame(double.NaN); sample.Frame(double.PositiveInfinity); sample.Frame(-1); sample.Frame(0);
+Check(sample.Frames == 0, "invalid frame samples excluded");
+for (int i = 0; i < 95; i++) sample.Frame(.01);
+for (int i = 0; i < 5; i++) sample.Frame(.1);
+Check(sample.Frames == 100 && sample.FrameP95Ms() == 10.25, "p95 uses exact histogram rank with upper bound");
+Check(Math.Abs(sample.MaxFrameMs - 100) < .001, "raw maximum retained");
+sample.Method(0, 10); sample.Method(0, 30); sample.Method(1, -1);
+Check(sample.Calls[0] == 2 && sample.Ticks[0] == 40 && sample.MaxTicks[0] == 30 && sample.Calls[1] == 0, "method aggregation independent and ignores invalid elapsed");
+sample.Reset(); sample.Frame(.201);
+Check(sample.FrameP95Ms() == null && sample.MaxFrameMs == 201, "overflow percentile is not reported as false exact value");
+sample.Reset(); Check(sample.Frames == 0 && sample.Ticks[0] == 0 && sample.MaxFrameMs == 0, "window reset clears all metrics");
+
+Type diagnostic = typeof(PerformanceDiagnostics);
+object? DField(string name) => diagnostic.GetField(name, BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null);
+void DSet(string name, object? value) => diagnostic.GetField(name, BindingFlags.NonPublic | BindingFlags.Static)!.SetValue(null, value);
+object? DCall(string name, params object?[] args) => diagnostic.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, args);
+var hooks = (HarmonyLib.Harmony)DField("Hooks")!;
+var metrics = (PerformanceSamples)DField("Samples")!;
+Plugin ResetDiagnostic()
+{
+    PerformanceDiagnostics.Stop();
+    foreach (string field in new[] { "_inRace", "_hooked", "_recording", "_completed", "_faulted" }) DSet(field, false);
+    DSet("_file", null); hooks.FailAt = 0;
+    var plugin = Reset(); Time.timeScale = 1; Application.isFocused = true;
+    PerformanceDiagnostics.Install(plugin); return plugin;
+}
+void BeginCapture(Plugin plugin)
+{
+    plugin.Config.Entry<bool>("PerformanceDiagnostics", "Enabled").Value = true;
+    PerformanceDiagnostics.Tick(); DSet("_warmUntil", -1d); PerformanceDiagnostics.Tick();
+}
+p = ResetDiagnostic(); PerformanceDiagnostics.Tick();
+Check(hooks.Targets.Count == 0, "disabled diagnostics have no timing detours");
+Check(!p.Config.Entry<bool>("PerformanceDiagnostics", "Enabled").Value, "diagnostics default off");
+BeginCapture(p);
+Check(hooks.Targets.Count == 10 && (bool)DField("_recording")!, "capture arms all exact native targets after warmup");
+Check(!p.Config.Entry<bool>("Enabled").Value && !p.SessionModified && !Ant_CurrentGameConfiguration.bLowerPhysicsQualityOnAIVehicles, "diagnostics do not enable optimization or change simulation");
+var target = typeof(PixelEasyCharMoveKartController).GetMethod("FixedUpdate")!;
+object?[] state = { 0L }; DCall("Before", state);
+DCall("After", target, (long)state[0]!);
+Check(metrics.Calls[0] == 1, "production callbacks aggregate a dispatched target");
+metrics.Calls[0] = 126;
+var observed = Kart(Ant_Player.EPlayerType.E_AI_LOCAL); observed.Motor!.bLowerPhysicsQualityForAI = true; observed.Motor.iLowerQualityPhysicsUpdateEveryOnlyX = 4;
+DCall("ControllerAfter", observed, target, System.Diagnostics.Stopwatch.GetTimestamp());
+Check((int)DField("_aiSamples")! == 1 && (int)DField("_lowerAiSamples")! == 1 && (int)DField("_observedInterval")! == 4, "samples read actual post-native AI motor flags");
+metrics.Frame(.01); metrics.Frame(.02);
+DSet("_windowStart", System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency - 10);
+DSet("_captureUntil", -1d); PerformanceDiagnostics.Tick();
+string output = (string)DField("_file")!;
+using (var json = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadLines(output).First()))
+{
+    var root = json.RootElement;
+    Check(root.GetProperty("methods").GetArrayLength() == 10 && root.GetProperty("frames").GetInt32() >= 2, "report is parseable and contains method and frame evidence");
+    Check(root.GetProperty("observedLowerAiMotorSamples").GetInt32() == 1 && root.GetProperty("lastObservedAiMotorInterval").GetInt32() == 4, "report includes observed cadence rather than selected setting only");
+}
+Check(hooks.Targets.Count == 0 && (bool)DField("_completed")!, "bounded capture removes detours");
+PerformanceDiagnostics.Tick(); Check(hooks.Targets.Count == 0, "completed race does not rearm every frame");
+MenuManager.Instance = new(); PerformanceDiagnostics.Tick(); MenuManager.Instance = null;
+PerformanceDiagnostics.Tick(); DSet("_warmUntil", -1d); PerformanceDiagnostics.Tick();
+Check(hooks.Targets.Count == 10, "next race can capture without relaunch");
+Plugin.OfflineLabAllowed = false; PerformanceDiagnostics.Tick();
+Check(hooks.Targets.Count == 0 && !(bool)DField("_recording")!, "online transition stops capture and detours");
+p = ResetDiagnostic(); BeginCapture(p); Application.isFocused = false; PerformanceDiagnostics.Tick();
+Check(hooks.Targets.Count == 0, "unfocused window not mistaken for race slowdown");
+p = ResetDiagnostic(); BeginCapture(p); p.Config.Entry<bool>("PerformanceDiagnostics", "Enabled").Value = false; PerformanceDiagnostics.Tick();
+Check(hooks.Targets.Count == 0, "live disable removes only diagnostic hooks");
+p = ResetDiagnostic(); hooks.FailAt = 3; BeginCapture(p);
+Check(hooks.Targets.Count == 0 && (bool)DField("_faulted")! && p.Log.Warnings.Count != 0, "partial hook installation cleans up and fails safely");
+p = ResetDiagnostic(); BeginCapture(p); metrics.Frame(.01);
+DSet("_file", BepInEx.Paths.BepInExRootPath); // directory cannot be opened as a report file
+PerformanceDiagnostics.Stop();
+Check(hooks.Targets.Count == 0 && (bool)DField("_faulted")!, "report write failure does not escape shutdown or retain hot hooks");
+Console.WriteLine($"Production performance and diagnostics: {assertions} assertions passed (stub APIs; no engine/game runtime proof).");

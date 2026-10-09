@@ -1,5 +1,13 @@
 # Validation
 
+## Performance diagnostic follow-up (2026-10-09)
+
+The player reports no noticeable FPS/RAM improvement from 0.6.9, including AI interval 4. Activation is confirmed by the latest log; the dominant subsystem is still unmeasured. Runtime 0.6.10 adds bounded offline timing/memory capture, not a further performance claim. [Capture instructions and limitations](PERFORMANCE-DIAGNOSTICS.md).
+
+Validation: 88 Python tests, 133 frontend assertions, 96-control static UI smoke and 102 production-source performance/diagnostic assertions pass. The plugin builds with zero warnings/errors against the installed game. The ten exact native timing targets have unique instance parameterless void interop signatures and matching current Ghidra exports. Stub captures are not actual game traces. No visual browser or game run was performed.
+
+Installed DLL SHA-256 matches the artifact: `8bc3ef5f964d8d53634a20899cff0f46af3be81602b2645ba7f852d7384823db`. DLL/config rollback transactions are `local/backups/1791521202449016500` and `local/backups/1791521202455764400`; receipt is `local/performance-diagnostics-deployment.json`. Diagnostics is enabled at 60 seconds; the player's other saved settings were preserved, including re-enabled Performance with AI interval 4. Turn Performance off for the baseline. No original game binary/save, portable executable or ZIP was changed/built, and the game was not launched automatically.
+
 ## Race performance module (2026-10-09)
 
 Runtime 0.6.9 builds with zero warnings/errors against current installed interop. All 86 Python tests, 133 frontend assertions, 96-control static UI smoke and 79 production performance-feature assertions pass. The latter use stub engine APIs and cover graphics buffer reuse, AI/offline guards, policy restoration and cleanup failures; they are not in-game verification. All four hook targets were checked as unique exact parameterless void signatures in current Assembly-CSharp.dll.

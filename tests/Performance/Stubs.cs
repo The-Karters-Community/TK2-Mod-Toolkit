@@ -17,7 +17,12 @@ namespace BepInEx.Configuration
             return entry;
         }
         public ConfigEntry<T> Entry<T>(string name) => (ConfigEntry<T>)Entries["Performance/" + name];
+        public ConfigEntry<T> Entry<T>(string section, string name) => (ConfigEntry<T>)Entries[section + "/" + name];
     }
+}
+namespace BepInEx
+{
+    public static class Paths { public static string BepInExRootPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "tk2-diagnostic-test-" + Guid.NewGuid().ToString("N")); }
 }
 namespace HarmonyLib
 {
@@ -25,8 +30,12 @@ namespace HarmonyLib
     public sealed class HarmonyMethod { public HarmonyMethod(Type type, string name) { } }
     public sealed class Harmony
     {
+        public Harmony(string? owner = null) { }
         public readonly List<MethodInfo> Targets = new();
-        public void Patch(MethodInfo target, HarmonyMethod? prefix = null, HarmonyMethod? postfix = null) => Targets.Add(target);
+        public int FailAt;
+        public void Patch(MethodInfo target, HarmonyMethod? prefix = null, HarmonyMethod? postfix = null)
+        { if (FailAt == Targets.Count + 1) throw new InvalidOperationException("patch failed"); Targets.Add(target); }
+        public void UnpatchSelf() => Targets.Clear();
     }
 }
 namespace Il2CppInterop.Runtime.InteropTypes.Arrays
@@ -83,7 +92,18 @@ namespace UnityEngine
             return Cameras.Count;
         }
     }
-    public static class Time { public static float unscaledTime; }
+    public static class Time { public static float unscaledTime, timeScale = 1, fixedDeltaTime = .00833f; }
+    public static class Application { public static bool isFocused = true; }
+}
+namespace UnityEngine.Profiling
+{
+    public static class Profiler
+    {
+        public static long GetTotalAllocatedMemoryLong() => 100;
+        public static long GetTotalReservedMemoryLong() => 200;
+        public static long GetMonoUsedSizeLong() => 300;
+        public static long GetMonoHeapSizeLong() => 400;
+    }
 }
 namespace UnityEngine.Scripting
 {
@@ -95,6 +115,7 @@ namespace UnityEngine.Scripting
 }
 namespace KinematicCharacterController
 {
+    public sealed class KinematicCharacterSystem { public void FixedUpdate() { } }
     public sealed class KinematicCharacterMotor : UnityEngine.MonoBehaviour
     {
         public bool ThrowQualitySet, ThrowIntervalSet;
@@ -121,9 +142,21 @@ public sealed class PixelEasyCharMoveKartController : UnityEngine.MonoBehaviour
     public int iAILowerQualityPhysicsUpdateEveryOnlyX
     { get => _interval; set { if (ThrowIntervalSet) throw new InvalidOperationException("controller cadence unavailable"); _interval = value; } }
     public void FixedUpdate() { }
+    public void Update() { }
+    public void UpdatePlayerPlayerCollision() { }
 }
+public sealed class AILogicController { public void Update() { } }
+public sealed class AIWeaponLogicController { public void Update() { } }
+public sealed class AIDistToTargetBehavController { public void Update() { } }
+public sealed class PlayerBezierFollower { public void Update() { } }
+public sealed class PixelKartPhysics { public void Update() { } }
+public sealed class MapConfig { public int iConfigID = 1; }
+public sealed class ModeConfig { public bool bDisablePlayerPlayerCollisionForTT; }
 public static class Ant_CurrentGameConfiguration
 {
+    public static string eGameModeType = "Race";
+    public static MapConfig? GetFinalChoosedMapConfig(int id) => new();
+    public static ModeConfig? GetFinalChoosedGameModeConfig(int id) => new();
     public enum ERaceState { E_RACE_NOT_STARTED, E_RACE_RUNNING, E_RACE_FINISHED }
     public static ERaceState eCurrentRaceState;
     public static bool bLowerPhysicsQualityOnAIVehicles;
@@ -155,7 +188,8 @@ namespace TK2.Customization
     public sealed class LogStub
     {
         public readonly List<string> Errors = new();
-        public void LogWarning(string message) { }
+        public readonly List<string> Warnings = new();
+        public void LogWarning(string message) => Warnings.Add(message);
         public void LogInfo(string message) { }
         public void LogError(string message) => Errors.Add(message);
     }

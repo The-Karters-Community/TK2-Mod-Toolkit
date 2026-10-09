@@ -84,6 +84,25 @@ class SettingsMergeTests(unittest.TestCase):
             self.assertEqual(pack.validate({"Performance/AIPhysicsInterval": interval}),
                              {("Performance", "AIPhysicsInterval"): str(interval)})
 
+    def test_diagnostics_independent_defaults_and_bounds(self):
+        data = settings.read(pack.seed_config("[Performance]\nEnabled = false\n").encode())["settings"]
+        self.assertFalse(data["Performance/Enabled"])
+        self.assertFalse(data["PerformanceDiagnostics/Enabled"])
+        self.assertEqual(data["PerformanceDiagnostics/CaptureSeconds"], 60)
+        for value in (9, 181, True, 10.5):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                pack.validate({"PerformanceDiagnostics/CaptureSeconds": value})
+        self.assertEqual(pack.validate({"PerformanceDiagnostics/CaptureSeconds": 10}),
+                         {("PerformanceDiagnostics", "CaptureSeconds"): "10"})
+
+    def test_diagnostics_catalog_and_source_ownership(self):
+        feature = next(f for f in pack.catalog_features() if f["id"] == "PerformanceDiagnostics")
+        self.assertFalse(feature.get("gameplay", False))
+        self.assertIn("PerformanceDiagnostics", next(p for p in pack.catalog_packs() if p["id"] == "garage")["features"])
+        self.assertEqual(set(pack.module_sources()["PerformanceDiagnostics"]), {
+            "plugins/TK2.Customization/PerformanceDiagnostics.cs", "plugins/TK2.Customization/PerformanceSamples.cs",
+            "plugins/TK2.Customization/PerformanceFeature.cs"})
+
     def test_performance_module_has_pack_membership_and_source_ownership(self):
         from unittest.mock import patch
         feature = next(f for f in pack.catalog_features() if f["id"] == "Performance")

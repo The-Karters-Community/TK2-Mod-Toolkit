@@ -49,6 +49,8 @@ internal static class PerformanceFeature
     }
 
     private static bool Active => _installed && !_faulted && Enabled != null && Enabled.Value && Plugin.Instance?.GameplayReady == true;
+    internal static object DiagnosticSettings() => new { active = Active, cacheDraw = CacheDraw?.Value,
+        raceGc = RaceGc?.Value, lowerAi = LowerAi?.Value, aiInterval = AiInterval?.Value };
     private static bool Offline => Plugin.OfflineLabAllowed;
     private static bool OfflineRunning => Offline && MenuManager.Instance == null &&
         Ant_CurrentGameConfiguration.eCurrentRaceState == Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING;
