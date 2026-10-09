@@ -33,7 +33,7 @@ function query(selector) {
   const names = selector.split(',').map(part => /^\[data-([^\]]+)\]$/.exec(part.trim())?.[1]?.replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase())).filter(Boolean);
   return Object.values(ids).flatMap(descendants).filter(node => names.some(name => node.dataset[name] !== undefined));
 }
-const document = {documentElement: new Node(), getElementById: id => ids[id], createElement: tag => new Node(tag), createElementNS: (_namespace, tag) => new Node(tag), querySelector: selector => selector.startsWith('meta') ? meta : brand, querySelectorAll: query, addEventListener(){}};
+const document = {documentElement: new Node(), getElementById: id => ids[id] || Object.values(ids).flatMap(descendants).find(node => node.id === id), createElement: tag => new Node(tag), createElementNS: (_namespace, tag) => new Node(tag), querySelector: selector => selector.startsWith('meta') ? meta : brand, querySelectorAll: query, addEventListener(){}};
 const fixture = {installed: false, packCurrent: false, pluginCount: 0, game: 'test game', logs: [], backups: [],
   recipes: [{section: 'Recipe.FrameLimiter', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Limit FPS'}],
   extraSettings: [{section: 'MK.BoostTrainer', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Trainer'}],
@@ -100,6 +100,13 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   assert.equal(chevron.getAttribute('viewBox'), '0 0 24 24');
   assert.match(chevron.children[0].getAttribute('d'), /M16\.59 8\.59/);
   accordion.click(); assert.equal(accordion.getAttribute('aria-expanded'), 'true'); assert.equal(accordionPanel.hidden, false, 'module accordion opens and updates its accessible state');
+  assert.equal(run("document.querySelectorAll('[data-accordion-key]').length"), 5, 'all current accordion controls can be selected');
+  ids['expand-all-accordions'].click();
+  const accordions = [...descendants(ids['feature-list']), ...descendants(ids['recipe-controls'])].filter(node => node.dataset.accordionKey);
+  assert.ok(accordions.length > 2, 'all module and recipe accordions are included');
+  assert.ok(accordions.every(node => node.tagName === 'DETAILS' ? node.open : node.getAttribute('aria-expanded') === 'true'), 'Expand all opens visible module and recipe sections');
+  ids['collapse-all-accordions'].click();
+  assert.ok(accordions.every(node => node.tagName === 'DETAILS' ? !node.open : node.getAttribute('aria-expanded') === 'false'), 'Collapse all closes visible module and recipe sections');
   assert.equal(document.documentElement.dataset.theme, 'light'); ids.theme.click();
   assert.equal(document.documentElement.dataset.theme, 'dark'); assert.equal(context.localStorage.data['tk2-theme'], 'dark');
   assert.equal(control('Physics/Enabled').disabled, false, 'requested gameplay testing must not be blanket locked');
@@ -215,6 +222,10 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   const groups = descendants(ids['feature-list']).filter(node => node.classes.has('parameter-group'));
   assert.ok(groups.length >= 4,'large parameter modules need meaningful subsections');
   assert.ok(groups.every(node => !node.open),'large parameter subsections begin collapsed');
+  ids['expand-all-accordions'].click();
+  assert.ok(groups.every(node => node.open),'Expand all includes nested parameter accordions');
+  ids['collapse-all-accordions'].click();
+  assert.ok(groups.every(node => !node.open),'Collapse all includes nested parameter accordions');
   parameterToggle.checked = true; parameterToggle.onchange();
   assert.equal(parameterValue.disabled,false,'switch immediately enables its custom value');
   assert.equal(control('KartParameters/GroundFrictionFactor').disabled,true,'unrelated override stays disabled');

@@ -51,6 +51,7 @@ function switchControl(label, value, disabled, change) {
 }
 function bindAccordion(trigger, panel, key, expanded) {
   panel.hidden = !expanded;
+  trigger.dataset.accordionKey = key;
   trigger.setAttribute('aria-expanded', String(expanded));
   trigger.setAttribute('aria-controls', panel.id);
   trigger.onclick = () => {
@@ -59,6 +60,17 @@ function bindAccordion(trigger, panel, key, expanded) {
     trigger.setAttribute('aria-expanded', String(open));
     if (open) expandedModules.add(key); else expandedModules.delete(key);
   };
+}
+function setAllAccordions(expanded) {
+  document.querySelectorAll('[data-accordion-key]').forEach(accordion => {
+    const key = accordion.dataset.accordionKey;
+    if (expanded) expandedModules.add(key); else expandedModules.delete(key);
+    if (accordion.tagName === 'DETAILS') {accordion.open = expanded; return;}
+    const panel = $(accordion.getAttribute('aria-controls'));
+    if (!panel) return;
+    panel.hidden = !expanded;
+    accordion.setAttribute('aria-expanded', String(expanded));
+  });
 }
 function chevronIcon() {
   const namespace = 'http://www.w3.org/2000/svg';
@@ -170,6 +182,7 @@ function featureSettings(feature, search) {
     });
     if (name) {
       const details = el('details', 'parameter-group'), identity = feature.id + ':' + name;
+      details.dataset.accordionKey = identity;
       details.open = expandedModules.has(identity) || Boolean(search && settings.some(setting => [name, setting[0], setting[1], setting[6], setting[8], setting[8] ? 'Override ' + setting[1] : ''].join(' ').toLowerCase().includes(search)));
       details.ontoggle = () => {if (details.open) expandedModules.add(identity); else expandedModules.delete(identity);};
       details.append(el('summary', '', name), controls); container.append(details);
@@ -426,6 +439,8 @@ document.querySelectorAll('.nav').forEach(button => button.onclick = () => showV
 document.querySelector('.brand').onclick = event => {event.preventDefault(); showView('mods');};
 document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => {category = button.dataset.category; document.querySelectorAll('[data-category]').forEach(b => b.classList.toggle('selected', b === button)); renderFeatures(); renderRecipes();});
 $('mod-search').oninput = () => {renderFeatures(); renderRecipes();};
+$('expand-all-accordions').onclick = () => setAllAccordions(true);
+$('collapse-all-accordions').onclick = () => setAllAccordions(false);
 $('workshop-install').onclick = () => runAction('build-install');
 $('installation-install').onclick = () => runAction('install'); $('build').onclick = () => runAction('build');
 $('plugin-update-top').onclick = () => runAction('install');

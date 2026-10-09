@@ -29,6 +29,9 @@ assert ".module-expand" in components and ".topbar-update" in components
 assert '/components.css' in (web / "index.html").read_text(encoding="utf-8")
 assert "max-width:1450px" not in css and "min-height:100vh" in css
 assert "__APP_VERSION__" in (web / "index.html").read_text(encoding="utf-8")
+html = (web / "index.html").read_text(encoding="utf-8")
+assert 'id="expand-all-accordions"' in html and 'id="collapse-all-accordions"' in html
+assert ":root[data-theme=dark] .module-expand[aria-expanded=true] .expand-arrow{color:oklch(84% .16 72)}" in components
 assert all((core.ROOT / "assets" / name).exists() for name in ("Logo.png", "library_600x900_2x.jpg"))
 subprocess.run(["node", "--check", str(web / "app.js")], check=True, creationflags=core.CREATE_NO_WINDOW)
 result = {"uniqueControls": len(page.ids), "views": page.targets, "themeTokens": True, "assetsPresent": True,

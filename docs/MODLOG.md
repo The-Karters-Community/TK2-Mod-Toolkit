@@ -25,3 +25,8 @@
 - Added the default-off `DisableVignette` visual module. It suppresses `Vignette.IsEnabledAndSupported` while active and leaves profile intensities untouched, so the game's aspect-adaptive vignette settings resume when disabled.
 - Native evidence: read-only Ghidra 12.1.4 analysis of the existing `GameAssembly.dll` program found `Ant_MapData$$RefreshAspectAdaptiveVignette` at `0x1805d3e80`, which finds `PostProcessVolume` instances, retrieves `Vignette` settings from their profiles, and caches intensity values. `UnityEngine.Rendering.PostProcessing.Vignette$$IsEnabledAndSupported` at `0x1830aae30` takes a `PostProcessRenderContext` and checks the effect's enabled state and mode parameters. The mod prefixes that exact method signature; source and interop build validation is separate from runtime verification.
 - Plugin built against the installed interop references with 0 warnings and 0 errors. No live game was launched, so vignette rendering and UI appearance still need an in-game check before installing this DLL.
+
+## Accordion visibility and bulk controls (2026-10-09)
+
+- Expanded accordion chevrons now use a bright amber in dark mode for stronger contrast.
+- Added Expand all and Collapse all controls for displayed module and recipe panels plus nested parameter sections. The state also stays consistent with individual accordion toggles.
