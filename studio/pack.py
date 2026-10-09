@@ -56,12 +56,8 @@ _CAMERA["settingGroups"] = {"AimAtKart":"Aim & rotation", "TargetHeight":"Aim & 
 
 RETIRED_MODULES = frozenset({'MirrorMode'} | {'Recipe.' + name for name in (
     'AirGlider','DriftCapacitor','EchoRewind','GravitySurf','LandingCombo',
-    'RepulsorPulse','SlipstreamSling','CosmeticModel')})
-RETIRED_SETTINGS = frozenset(
-    ('Recipe.TrackInspector', key) for key in (
-        'ShowWalls', 'ShowRespawn', 'ShowKillTriggers', 'ShowOtherTriggers', 'DrawDistance',
-        'Opacity', 'ShowThroughTrack', 'ShowLabels', 'ColliderSampleResolution', 'LineWidth',
-        'ShowBoundsFallback'))
+    'RepulsorPulse','SlipstreamSling','CosmeticModel','TrackInspector')})
+RETIRED_SETTINGS = frozenset()
 
 
 def schema(features=None):

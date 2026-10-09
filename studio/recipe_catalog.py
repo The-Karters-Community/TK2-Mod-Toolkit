@@ -5,7 +5,6 @@ from . import core
 
 INFO = {
     'MirrorRace': ('Mirror race', 'Flip the local race camera and steering in offline races and time trials. Applies immediately and works without rewriting track assets.', 'community'),
-    'TrackInspector': ('Track inspector', 'Show the game-authored trigger collision meshes in an offline race. Press the configured key to show or hide them.', 'garage'),
 }
 
 KEYS = ['F' + str(i) for i in range(1, 13)] + list('ABCDEFGHIJKLMNOPQRSTUVWXYZ') + ['Alpha' + str(i) for i in range(10)] + ['Space','LeftShift','RightShift','LeftControl','RightControl','UpArrow','DownArrow','LeftArrow','RightArrow','None']
@@ -74,7 +73,7 @@ def source_features(source_root=None):
                 desc = literal(match[1]) if match else ''
             choices = list(dict.fromkeys([str(default), *KEYS])) if args[2].startswith('KeyCode.') else None
             settings.append((key, re.sub(r'(?<=[a-z0-9])(?=[A-Z])', ' ', key), kind, default, low, high, desc, choices, None))
-        features.append({'id':'Recipe.' + name, 'name':title, 'category':'Graphics' if name == 'TrackInspector' else 'Driving',
+        features.append({'id':'Recipe.' + name, 'name':title, 'category':'Driving',
                          'description':description, 'pack':pack, 'gameplay':bool(re.search(r'ChangesGameplay\s*=>\s*true', text)),
                          'origin':'Native-evidence implementation' if name in INFO else 'New recipe', 'settings':settings, 'source':str(file.relative_to(root)).replace('\\','/'),
                          'status': 'Manual in-game validation required.' if name in INFO else '',

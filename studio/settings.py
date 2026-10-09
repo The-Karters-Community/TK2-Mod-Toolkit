@@ -1,6 +1,7 @@
 """Merge edited settings by value, preserving BepInEx metadata and unrelated edits."""
 import hashlib
 import math
+import re
 from . import core, pack
 
 
@@ -75,4 +76,16 @@ def merge(data, body):
         elif body.get("hash") != current["configHash"]:
             conflicts.append(compound)
     if conflicts: raise SettingsConflict(conflicts)
-    return core.update_cfg(data.decode("utf-8-sig") or "# TK2 Mod Toolkit Pack\n", updates).encode("utf-8")
+    updated = core.update_cfg(data.decode("utf-8-sig") or "# TK2 Mod Toolkit Pack\n", updates)
+    # Old module sections must not reappear in the game's config after a save.
+    output, section = [], ""
+    for line in updated.splitlines():
+        header = re.match(r"^\s*\[([^]]+)\]\s*$", line)
+        if header:
+            section = header[1]
+            if section in pack.RETIRED_MODULES:
+                continue
+        if section not in pack.RETIRED_MODULES:
+            output.append(line)
+    newline = "\r\n" if "\r\n" in updated else "\n"
+    return (newline.join(output) + newline).encode("utf-8")

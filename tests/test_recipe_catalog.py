@@ -71,28 +71,23 @@ class RecipeCatalogTests(unittest.TestCase):
         self.assertFalse(any(k.startswith(('Recipe.AirGlider/','Recipe.CosmeticModel/')) for k in result['settings']))
         with self.assertRaises(ValueError): settings.merge(data,{'hash':result['configHash'],'recipes':{'Recipe.AirGlider/Enabled':'false'}})
         saved = settings.merge(data,{'hash':result['configHash'],'values':{'Camera/PanelEnabled':False,'Camera/PanelHotkey':'C'}})
-        self.assertIn(b'ModelPath = old/model.obj',saved)
+        self.assertNotIn(b'ModelPath = old/model.obj',saved)
         after = settings.read(saved)
         self.assertIs(after['settings']['Camera/PanelEnabled'],False)
         self.assertEqual(after['settings']['Camera/PanelHotkey'],'C')
 
-    def test_retired_track_inspector_overlay_settings_are_hidden(self):
-        source = '''public sealed class TrackInspector : IModRecipe {
- public string Name => "TrackInspector";
- public bool ChangesGameplay => false;
- void Configure(ConfigFile config) {
-  config.Bind("Recipe." + Name, "Enabled", false, "Enable inspector");
-  config.Bind("Recipe." + Name, "ToggleKey", KeyCode.F10, "Toggle meshes");
- }
-}'''
-        (self.sources / 'TrackInspector.cs').write_text(source)
-        data = b'[Recipe.TrackInspector]\nEnabled = true\nToggleKey = F10\nShowWalls = true\nDrawDistance = 1000\n'
+    def test_removed_track_inspector_config_is_hidden_and_pruned_on_save(self):
+        data = b'[Recipe.TrackInspector]\nEnabled = true\nToggleKey = F10\nShowWalls = true\nDrawDistance = 1000\n[Audio]\nMasterVolume = 1\n'
         result = settings.read(data)
-        self.assertIs(result['settings']['Recipe.TrackInspector/Enabled'], True)
-        self.assertEqual(result['settings']['Recipe.TrackInspector/ToggleKey'], 'F10')
+        self.assertNotIn('Recipe.TrackInspector/Enabled', result['settings'])
+        self.assertNotIn('Recipe.TrackInspector/ToggleKey', result['settings'])
         self.assertFalse(result['recipes'])
+        self.assertFalse(result['extraSettings'])
         with self.assertRaises(ValueError):
             settings.merge(data, {'hash': result['configHash'], 'recipes': {'Recipe.TrackInspector/ShowWalls': 'false'}})
+        saved = settings.merge(data, {'hash': result['configHash'], 'values': {'Audio/MasterVolume': .8}})
+        self.assertNotIn(b'[Recipe.TrackInspector]', saved)
+        self.assertIn(b'[Audio]\nMasterVolume = 0.8', saved)
 
     def test_host_enabled_binding_has_one_header_toggle(self):
         (self.sources / 'ToyKart.cs').write_text(RECIPE.replace('void Configure(ConfigFile config) {', 'void Configure(ConfigFile config) { config.Bind("Recipe." + Name, "Enabled", false, "Next load");'))
@@ -100,9 +95,6 @@ class RecipeCatalogTests(unittest.TestCase):
         self.assertNotIn('Enabled', [s[0] for s in feature['settings']])
         self.assertIs(pack.defaults()['Recipe.ToyKart/Enabled'], False)
 
-    def test_builtin_recipes_join_appropriate_pack_without_duplicate_members(self):
-        (self.sources / 'ToyKart.cs').write_text(RECIPE.replace('ToyKart', 'TrackInspector'))
-        packs = pack.catalog_packs()
-        self.assertIn('Recipe.TrackInspector', next(p for p in packs if p['id'] == 'garage')['features'])
-        self.assertEqual(sum(p['features'].count('Recipe.TrackInspector') for p in packs), 1)
+    def test_retired_modules_are_absent_from_catalog(self):
+        self.assertNotIn('Recipe.TrackInspector', [f['id'] for f in pack.catalog_features()])
         self.assertNotIn('MirrorMode', [f['id'] for f in pack.catalog_features()])
