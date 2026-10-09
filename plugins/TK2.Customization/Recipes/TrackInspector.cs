@@ -32,8 +32,8 @@ public sealed class TrackInspector : IModRecipe
     private readonly Dictionary<int, (MeshRenderer Renderer, bool OriginalEnabled)> _rendererDefaults = new();
     private readonly Dictionary<int, Overlay> _overlays = new();
     private readonly Dictionary<WallKind, Material> _materials = new();
+    private readonly Dictionary<PrimitiveType, Mesh> _primitiveMeshes = new();
     private Ant_MapData? _map;
-    private GameObject? _root;
     private Mesh? _boxMesh;
     private bool _mapDefault;
     private bool _visible;
@@ -227,6 +227,7 @@ public sealed class TrackInspector : IModRecipe
 
         candidates.Sort((a, b) => a.Distance.CompareTo(b.Distance));
         int count = Math.Min(MaxShown, candidates.Count);
+        int visualized = 0;
         for (int i = 0; i < count; i++)
         {
             var candidate = candidates[i];
@@ -238,15 +239,19 @@ public sealed class TrackInspector : IModRecipe
                 overlay = CreateOverlay(candidate.Collider, candidate.Kind);
                 if (overlay != null) _overlays[id] = overlay;
             }
-            if (overlay != null) overlay.Object.SetActive(true);
+            if (overlay != null)
+            {
+                overlay.Object.SetActive(true);
+                visualized++;
+            }
         }
 
         foreach (var pair in _overlays)
             if (!activeIds.Contains(pair.Key) && pair.Value.Object != null) pair.Value.Object.SetActive(false);
 
-        _status = count == 0
+        _status = candidates.Count == 0
             ? "No wall colliders found on the kart's collision layers in this track scene"
-            : $"Showing {count} nearby wall/respawn colliders (of {candidates.Count})";
+            : $"Showing {visualized} wall/respawn shapes (of {candidates.Count} nearby; {Math.Max(0, candidates.Count - count)} beyond view limit)";
         Plugin.Instance?.Log.LogInfo("Track Inspector: " + _status + ".");
     }
 
@@ -269,13 +274,40 @@ public sealed class TrackInspector : IModRecipe
 
     private Overlay? CreateOverlay(Collider collider, WallKind kind)
     {
-        Mesh? mesh = collider is MeshCollider meshCollider ? meshCollider.sharedMesh : collider is BoxCollider ? BoxMesh() : null;
+        Mesh? mesh;
+        Vector3 position;
+        Vector3 scale;
+        Quaternion rotation;
+        switch (collider)
+        {
+            case MeshCollider meshCollider:
+                mesh = meshCollider.sharedMesh;
+                position = Vector3.zero; scale = Vector3.one; rotation = Quaternion.identity;
+                break;
+            case BoxCollider box:
+                mesh = BoxMesh(); position = box.center; scale = box.size; rotation = Quaternion.identity;
+                break;
+            case SphereCollider sphere:
+                mesh = PrimitiveMesh(PrimitiveType.Sphere); position = sphere.center;
+                scale = Vector3.one * (sphere.radius * 2f); rotation = Quaternion.identity;
+                break;
+            case CapsuleCollider capsule:
+                mesh = PrimitiveMesh(PrimitiveType.Capsule); position = capsule.center;
+                scale = new Vector3(capsule.radius * 2f, capsule.height * .5f, capsule.radius * 2f);
+                rotation = capsule.direction == 0 ? Quaternion.Euler(0, 0, 90) :
+                    capsule.direction == 2 ? Quaternion.Euler(90, 0, 0) : Quaternion.identity;
+                break;
+            default:
+                return null;
+        }
         if (mesh == null) return null;
-        EnsureRoot();
         var obj = new GameObject("TK2 track wall overlay");
         obj.hideFlags = HideFlags.DontSave;
         obj.transform.SetParent(collider.transform, false);
-        if (collider is BoxCollider box) obj.transform.localPosition = box.center;
+        obj.layer = 0;
+        obj.transform.localPosition = position;
+        obj.transform.localRotation = rotation;
+        obj.transform.localScale = scale;
         var filter = obj.AddComponent<MeshFilter>();
         filter.sharedMesh = mesh;
         var renderer = obj.AddComponent<MeshRenderer>();
@@ -283,20 +315,19 @@ public sealed class TrackInspector : IModRecipe
         renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         renderer.receiveShadows = false;
         renderer.enabled = true;
-        obj.transform.SetParent(_root!.transform, true);
-        // Preserve the collider's world transform after reparenting into the overlay root.
-        obj.transform.position = collider.transform.TransformPoint(collider is BoxCollider b ? b.center : Vector3.zero);
-        obj.transform.rotation = collider.transform.rotation;
-        obj.transform.localScale = collider.transform.lossyScale;
-        if (collider is BoxCollider boxCollider) obj.transform.localScale = Vector3.Scale(collider.transform.lossyScale, boxCollider.size);
         return new Overlay { Collider = collider, Object = obj, Mesh = mesh, Renderer = renderer, Kind = kind };
     }
 
-    private void EnsureRoot()
+    private Mesh PrimitiveMesh(PrimitiveType primitive)
     {
-        if (_root != null) return;
-        _root = new GameObject("TK2 Track Inspector");
-        _root.hideFlags = HideFlags.DontSave;
+        if (_primitiveMeshes.TryGetValue(primitive, out var cached) && cached != null) return cached;
+        var temporary = GameObject.CreatePrimitive(primitive);
+        var filter = temporary.GetComponent<MeshFilter>();
+        var mesh = filter != null ? filter.sharedMesh : null;
+        UnityEngine.Object.Destroy(temporary);
+        if (mesh == null) throw new InvalidOperationException("Unity did not provide a primitive collider mesh.");
+        _primitiveMeshes[primitive] = mesh;
+        return mesh;
     }
 
     private Material MaterialFor(WallKind kind)
@@ -385,12 +416,11 @@ public sealed class TrackInspector : IModRecipe
             if (saved.Renderer != null) saved.Renderer.enabled = saved.OriginalEnabled;
         _rendererDefaults.Clear();
         foreach (int id in new List<int>(_overlays.Keys)) RemoveOverlay(id);
-        if (_root != null) UnityEngine.Object.Destroy(_root);
-        _root = null;
         foreach (var material in _materials.Values) if (material != null) UnityEngine.Object.Destroy(material);
         _materials.Clear();
         if (_boxMesh != null) UnityEngine.Object.Destroy(_boxMesh);
         _boxMesh = null;
+        _primitiveMeshes.Clear();
         _map = null;
         _mapDefault = false;
         _nativeVisible = false;

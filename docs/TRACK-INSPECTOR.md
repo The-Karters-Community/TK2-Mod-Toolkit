@@ -1,6 +1,6 @@
 # Track Inspector
 
-Enable **Track Inspector** for a local offline race or time trial. Press **F10** to show or hide nearby wall colliders; the key is configurable. The overlay uses the current kart's collision-layer masks, shows exact `MeshCollider` shapes plus exact box-collider volumes, and colors wall and respawn layers differently. It draws at most 48 colliders within 150 m and refreshes its collider scan every two seconds. The overlay is hidden until F10 is pressed.
+Enable **Track Inspector** for a local offline race or time trial. Press **F10** to show or hide nearby wall colliders; the key is configurable. The overlay uses the current kart's collision-layer masks, shows mesh, box, sphere, and capsule collider shapes, and colors wall and respawn layers differently. It draws at most 48 colliders within 150 m and refreshes its collider scan every two seconds. The overlay is hidden until F10 is pressed.
 
 The game's `bForceDebugShowTriggerCollisionMeshes` path remains enabled for tracks that provide mod-trigger markers. That native path only exposes markers authored by the loaded track; it does not cover ordinary kart wall layers. The Toolkit overlay adds those wall and respawn collider layers without changing collision behavior. Unsupported collider shapes are skipped rather than replaced with misleading bounds.
 

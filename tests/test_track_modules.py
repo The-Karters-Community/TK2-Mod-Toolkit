@@ -39,7 +39,10 @@ class TrackModuleIntegrationTests(unittest.TestCase):
         self.assertIn('MaxShown = 48', source)
         self.assertIn('RefreshInterval = 2f', source)
         self.assertIn('FindObjectsOfType<Collider>(true)', source)
-        self.assertIn('collider is MeshCollider meshCollider ? meshCollider.sharedMesh', source)
+        self.assertIn('case MeshCollider meshCollider:', source)
+        self.assertIn('case SphereCollider sphere:', source)
+        self.assertIn('case CapsuleCollider capsule:', source)
+        self.assertIn('Showing {visualized} wall/respawn shapes', source)
         self.assertIn('TrackInspector.DrawStatus()', (pack.PROJECT.parent / 'StudioBehaviour.cs').read_text(encoding='utf-8'))
         self.assertNotIn('ClassInjector', source)
 
