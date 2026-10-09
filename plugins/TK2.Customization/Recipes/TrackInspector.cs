@@ -30,9 +30,10 @@ public sealed class TrackInspector : IModRecipe
         _key = config.Bind("Recipe." + Name, "ToggleKey", KeyCode.F10,
             "Show or hide the game's native trigger meshes. Applies in the current race without restarting.");
 
-        // The game reads this map flag in PhysicsTrigger.Init and Start. Set it before
-        // those methods run, then use their own child-collider/MeshRenderer shape mid-race.
+        // The game creates its physics trigger components in Ant_MapData.Start. Set the
+        // native flag before that method, then inspect the results once setup finishes.
         var harmony = Plugin.Instance!.Harmony;
+        PatchMapSetup(harmony);
         PatchTriggerSetup(harmony, "Init");
         PatchTriggerSetup(harmony, "Start");
 
@@ -40,6 +41,29 @@ public sealed class TrackInspector : IModRecipe
         foreach (string key in new[] { "ShowWalls", "ShowRespawn", "ShowKillTriggers", "ShowOtherTriggers", "DrawDistance",
                      "Opacity", "ShowThroughTrack", "ShowLabels", "ColliderSampleResolution", "LineWidth", "ShowBoundsFallback" })
             config.Remove(new ConfigDefinition("Recipe.TrackInspector", key));
+    }
+
+    private static void PatchMapSetup(Harmony harmony)
+    {
+        var target = AccessTools.DeclaredMethod(typeof(Ant_MapData), "Start", Type.EmptyTypes)
+            ?? throw new MissingMethodException(typeof(Ant_MapData).FullName, "Start()");
+        harmony.Patch(target,
+            prefix: new HarmonyMethod(typeof(TrackInspector), nameof(BeforeMapSetup)),
+            postfix: new HarmonyMethod(typeof(TrackInspector), nameof(AfterMapSetup)));
+    }
+
+    private static void BeforeMapSetup(Ant_MapData __instance)
+    {
+        var module = _instance;
+        if (module == null || !module.ShouldShowNativeMeshes || __instance == null) return;
+        module.PrepareMap(__instance);
+    }
+
+    private static void AfterMapSetup(Ant_MapData __instance)
+    {
+        var module = _instance;
+        if (module == null || !module.ShouldShowNativeMeshes || __instance == null) return;
+        module.ApplyMapMeshes(__instance);
     }
 
     private static void PatchTriggerSetup(Harmony harmony, string method)
@@ -57,10 +81,28 @@ public sealed class TrackInspector : IModRecipe
         var map = Ant_MapData.instance;
         if (map != null)
         {
-            bool original = module.CaptureMap(map);
-            map.bForceDebugShowTriggerCollisionMeshes = original || module.ShouldShowNativeMeshes;
+            module.PrepareMap(map);
         }
         module.CaptureTriggerDefaults(__instance);
+    }
+
+    private void PrepareMap(Ant_MapData map)
+    {
+        if (_map != null && _map != map) RestoreMapSnapshot(_map);
+        _map = map;
+        _mapDefault = CaptureMap(map);
+        bool force = _mapDefault || ShouldShowNativeMeshes;
+        map.bForceDebugShowTriggerCollisionMeshes = force;
+        _lastApplied = force;
+    }
+
+    private void ApplyMapMeshes(Ant_MapData map)
+    {
+        PrepareMap(map);
+        bool force = _mapDefault || ShouldShowNativeMeshes;
+        var counts = SetTriggerMeshes(map, force);
+        _lastApplied = force;
+        LogMeshCounts(force, counts);
     }
 
     private bool CaptureMap(Ant_MapData map)
@@ -100,13 +142,7 @@ public sealed class TrackInspector : IModRecipe
             if (_map != null || _mapDefaults.Count != 0 || _rendererDefaults.Count != 0) Restore();
             return;
         }
-        if (map != _map)
-        {
-            if (_map != null) RestoreMapSnapshot(_map);
-            _map = map;
-            _mapDefault = CaptureMap(map);
-            _lastApplied = _mapDefault;
-        }
+        if (map != _map) PrepareMap(map);
 
         bool show = ShouldShowNativeMeshes;
         bool force = _mapDefault || show;
@@ -114,17 +150,24 @@ public sealed class TrackInspector : IModRecipe
 
         var counts = SetTriggerMeshes(map, force);
         _lastApplied = force;
-        if (show && counts.Renderers == 0)
-            Plugin.Instance?.Log.LogWarning($"Track Inspector enabled the native trigger flag, but found no trigger mesh renderers ({counts.Triggers} triggers, {counts.Colliders} colliders).");
+        LogMeshCounts(force, counts);
+    }
+
+    private void LogMeshCounts(bool visible, (int Triggers, int Colliders, int Renderers) counts)
+    {
+        if (visible && counts.Renderers == 0)
+            Plugin.Instance?.Log.LogWarning($"Track Inspector enabled the native trigger flag, but found no trigger mesh renderers ({counts.Triggers} triggers, {counts.Colliders} colliders; including inactive objects).");
         else
-            Plugin.Instance?.Log.LogInfo($"Track Inspector {(force ? "showing" : "hiding")} native trigger meshes ({counts.Renderers} renderers across {counts.Triggers} triggers).");
+            Plugin.Instance?.Log.LogInfo($"Track Inspector {(visible ? "showing" : "hiding")} native trigger meshes ({counts.Renderers} renderers across {counts.Triggers} triggers).");
     }
 
     private (int Triggers, int Colliders, int Renderers) SetTriggerMeshes(Ant_MapData map, bool visible)
     {
         map.bForceDebugShowTriggerCollisionMeshes = visible;
         int triggers = 0, collidersSeen = 0, renderers = 0;
-        foreach (var trigger in UnityEngine.Object.FindObjectsOfType<PTK_ModTKLogic_PhysicsTrigger>())
+        // Match Ant_MapData.Start: the game discovers its trigger marker components
+        // with includeInactive=true, so these generated logic objects may be inactive.
+        foreach (var trigger in UnityEngine.Object.FindObjectsOfType<PTK_ModTKLogic_PhysicsTrigger>(true))
         {
             if (trigger == null) continue;
             triggers++;
