@@ -131,6 +131,9 @@ internal static class TrackBoundaries
                     view.AddComponent<MeshFilter>().sharedMesh = geometry.Mesh;
                     var visual = view.AddComponent<MeshRenderer>();
                     SetMaterials(visual, geometry.Mesh, tint);
+                    // Automatic MeshRenderer drawing would fill the entire volume.
+                    // Render() draws this mesh explicitly with scoped wireframe state.
+                    visual.enabled = false;
                     visual.shadowCastingMode = ShadowCastingMode.Off; visual.receiveShadows = false;
                     saved = new Snapshot { Collider = collider, Geometry = geometry, ViewObject = view, ViewRenderer = visual, Kind = kind };
                     Saved[id] = saved;
@@ -149,7 +152,7 @@ internal static class TrackBoundaries
                 }
                 SetMaterials(saved.ViewRenderer, saved.Geometry.Mesh, Palette[kind]);
             }
-            saved.ViewRenderer.enabled = true;
+            saved.ViewRenderer.enabled = false;
             if (kind == BoundaryKind.Wall) walls++; else respawn++;
         }
         Stale.Clear(); foreach (var pair in Saved) if (!Selected.Contains(pair.Key)) Stale.Add(pair.Key);
@@ -195,7 +198,7 @@ internal static class TrackBoundaries
         }
         if (material == null) return null;
         material.hideFlags = HideFlags.DontSave;
-        var color = kind == BoundaryKind.Wall ? new Color(.08f, .82f, 1f, .22f) : new Color(1f, .35f, .08f, .26f);
+        var color = kind == BoundaryKind.Wall ? new Color(.08f, .82f, 1f, .85f) : new Color(1f, .35f, .08f, .85f);
         bool colored = false;
         if (material.HasProperty("_Color")) { material.SetColor("_Color", color); colored = true; }
         if (material.HasProperty("_BaseColor")) { material.SetColor("_BaseColor", color); colored = true; }
@@ -203,10 +206,38 @@ internal static class TrackBoundaries
         if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
         if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
         if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
-        if (material.HasProperty("_ZTest")) material.SetInt("_ZTest", (int)CompareFunction.Always);
+        if (material.HasProperty("_ZTest")) material.SetInt("_ZTest", (int)CompareFunction.LessEqual);
         if (material.HasProperty("_Cull")) material.SetInt("_Cull", (int)CullMode.Off);
         material.renderQueue = 3100;
         Palette[kind] = material; return material;
+    }
+    internal static void Render()
+    {
+        if (_enabled == null || !_enabled.Value || !_visible || _faulted || !Allowed || Saved.Count == 0) return;
+        var camera = Camera.current;
+        if (camera == null || camera.cameraType != CameraType.Game || (camera.cullingMask & 1) == 0) return;
+        bool wireframe = GL.wireframe;
+        try
+        {
+            // Never leave wireframe enabled for the native scene or HUD, including
+            // when material binding/drawing throws. Native GPU meshes stay shared.
+            GL.wireframe = true;
+            foreach (var saved in Saved.Values)
+            {
+                if (saved.Collider == null || !saved.Collider.enabled || !saved.Collider.gameObject.activeInHierarchy ||
+                    saved.ViewObject == null || !saved.ViewObject.activeInHierarchy || saved.Geometry.Mesh == null) continue;
+                if (!Palette[saved.Kind].SetPass(0)) continue;
+                for (int i = 0; i < saved.Geometry.Mesh.subMeshCount; i++)
+                    Graphics.DrawMeshNow(saved.Geometry.Mesh, saved.ViewObject.transform.localToWorldMatrix, i);
+            }
+        }
+        catch (Exception ex)
+        {
+            _faulted = true;
+            Plugin.Instance?.Log.LogWarning("Boundary outline rendering unavailable: " + ex.Message);
+        }
+        finally { GL.wireframe = wireframe; }
+        if (_faulted) ClearTrack();
     }
     internal static void Draw()
     {

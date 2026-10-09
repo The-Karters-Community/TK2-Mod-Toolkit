@@ -82,6 +82,7 @@ namespace UnityEngine
         public Vector3 position { get => parent == null ? localPosition : parent.TransformPoint(localPosition); set => localPosition = value; }
         public Quaternion rotation { get => parent == null ? localRotation : parent.rotation * localRotation; set => localRotation = value; }
         public Vector3 lossyScale => parent == null ? localScale : Vector3.Product(parent.lossyScale, localScale);
+        public Matrix4x4 localToWorldMatrix => new();
         public Transform(GameObject owner) => gameObject = owner;
         public void SetParent(Transform parent, bool worldPositionStays) => this.parent = parent;
         public Vector3 TransformPoint(Vector3 p) => position + rotation.Rotate(Vector3.Product(lossyScale, p));
@@ -139,10 +140,26 @@ namespace UnityEngine
         public Material(Material source) => shader = source.shader;
         public bool HasProperty(string property) => shader.Colored;
         public void SetColor(string property, Color color) => Color = color;
-        public void SetInt(string property, int value) { }
+        public readonly Dictionary<string, int> Ints = new();
+        public void SetInt(string property, int value) => Ints[property] = value;
+        public bool BindPass = true;
+        public bool SetPass(int index) => BindPass;
     }
     public sealed class Camera : Component
-    { public int cullingMask; public static Camera[] allCameras => FindObjectsOfType<Camera>(); }
+    { public int cullingMask; public CameraType cameraType = CameraType.Game; public static Camera? current; public static Camera[] allCameras => FindObjectsOfType<Camera>(); }
+    public enum CameraType { Game, Reflection, Preview }
+    public struct Matrix4x4 { }
+    public static class GL { public static bool wireframe; }
+    public static class Graphics
+    {
+        public static int Draws; public static bool ThrowOnDraw; public static readonly List<int> Submeshes = new();
+        public static void DrawMeshNow(Mesh mesh, Matrix4x4 matrix, int submesh)
+        {
+            if (!GL.wireframe) throw new Exception("Filled triangles were drawn");
+            if (ThrowOnDraw) throw new Exception("Injected draw failure");
+            Draws++; Submeshes.Add(submesh);
+        }
+    }
     public enum KeyCode { None, F10 }
     public static class Input { public static bool Pressed; public static bool GetKeyDown(KeyCode key) { bool p = Pressed; Pressed = false; return p; } }
     public static class Time { public static float unscaledTime; }

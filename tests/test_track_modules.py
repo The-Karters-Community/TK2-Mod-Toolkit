@@ -50,5 +50,12 @@ class TrackModuleIntegrationTests(unittest.TestCase):
         panel = next(setting for setting in camera['settings'] if setting[0] == 'PanelEnabled')
         self.assertIn('only while the Camera setup module is enabled', panel[6])
 
+    def test_boundary_export_includes_render_callback_host(self):
+        feature = next(f for f in pack.catalog_features() if f['id'] == 'TrackBoundaries')
+        paths = module_packages._source_dependencies([feature])
+        self.assertIn('plugins/TK2.Customization/StudioBehaviour.cs', paths)
+        source = (pack.PROJECT.parent / 'StudioBehaviour.cs').read_text(encoding='utf-8')
+        self.assertIn('public void OnRenderObject() => TrackBoundaries.Render();', source)
+
 if __name__ == '__main__':
     unittest.main()

@@ -1,5 +1,13 @@
 # Validation
 
+## Boundary outline readability correction (2026-10-09)
+
+The player's 0.6.12 screenshots verify nonzero boundary detection on two tracks and show an unreadable cyan/orange wash from overlapping filled volumes. Runtime 0.6.13 disables automatic filled rendering and draws collider mesh edges with scene depth testing. Immediate draws use a scoped wireframe state restored in finally, including on failure. Current Player.log reports Direct3D 11. Native selection, geometry, cameras, scene rendering and physics remain unchanged. [Drawing behavior and engine references](TRACK-BOUNDARIES.md).
+
+Validation: 90 Python tests, 133 frontend assertions, 96-control static GUI smoke, 88 production-linked boundary assertions and 49 mirror assertions pass. Build against installed references has zero warnings/errors. Regression proof covers outline-only drawing, scene-depth settings, all submeshes, render-context guards, preservation of prior raster state and failure cleanup. These tests use stub graphics APIs; 0.6.13's live appearance and callback scheduling remain unverified.
+
+Deployed with the game stopped. Installed DLL matches the artifact SHA-256 `d92f5bdc855427d14f13dbd58e781d8d13e18188339d86df82d67edeacc8f3e6`; both existing config files remained byte-identical. Rollback transaction: `local/backups/1791542850824803800`; receipt: `local/boundary-regression/deployment-outline.json`. No game was launched automatically and no portable executable/ZIP was built.
+
 ## Boundary selection and Mirror Race menu correction (2026-10-09)
 
 Runtime 0.6.12 selects boundary colliders directly instead of requiring debug renderers. Read-only metadata from a sampled built-in track confirms 165 self-active/enabled wall/respawn colliders with only Transform + collider components. MeshCollider source meshes are shared; box/sphere/capsule visualizations use collider dimensions. Native hit masks remain the selection authority. The view does not modify native renderers, cameras, physics or scene transforms. [Evidence and limitations](TRACK-BOUNDARIES.md).

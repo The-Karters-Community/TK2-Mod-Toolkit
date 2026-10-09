@@ -111,7 +111,7 @@ class SettingsMergeTests(unittest.TestCase):
         self.assertEqual(sum(p["features"].count("TrackBoundaries") for p in pack.catalog_packs()), 1)
         self.assertEqual(set(pack.module_sources()["TrackBoundaries"]), {
             "plugins/TK2.Customization/TrackBoundaries.cs", "plugins/TK2.Customization/BoundarySelection.cs",
-            "plugins/TK2.Customization/BoundaryGeometry.cs"})
+            "plugins/TK2.Customization/BoundaryGeometry.cs", "plugins/TK2.Customization/StudioBehaviour.cs"})
         self.assertEqual(pack.validate({"TrackBoundaries/DrawDistance": 1000}), {("TrackBoundaries", "DrawDistance"): "1000"})
         for value in (24, 1001, True):
             with self.subTest(value=value), self.assertRaises(ValueError):

@@ -150,6 +150,8 @@ public sealed class StudioBehaviour : MonoBehaviour
         _originalShadowDistance = null;
     }
 
+    public void OnRenderObject() => TrackBoundaries.Render();
+
     public void OnGUI()
     {
         var p = Plugin.Instance;
