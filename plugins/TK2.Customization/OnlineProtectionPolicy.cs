@@ -7,10 +7,21 @@ internal static class OnlineProtectionPolicy
 {
     private const string ProtectionSection = "OnlineProtection";
     private const string PluginGuid = "local.tk2.customization";
+    // These modules change only local presentation, sound mix, camera framing,
+    // or measurement. Keep this explicit: module IDs with unknown behavior
+    // must continue to require online protection.
+    private static readonly HashSet<string> WhitelistedModules = new(StringComparer.Ordinal)
+    {
+        "UI",
+        "HudOpacity",
+        "DisableVignette",
+        "Audio",
+        "Camera",
+        "BobbyGang",
+        "PerformanceDiagnostics",
+    };
 
-    internal static bool IsWhitelistedModule(string section) =>
-        string.Equals(section, "UI", StringComparison.Ordinal) ||
-        string.Equals(section, "HudOpacity", StringComparison.Ordinal);
+    internal static bool IsWhitelistedModule(string section) => WhitelistedModules.Contains(section);
 
     internal static bool RequiresBlocking(
         IEnumerable<(string Section, string Key, bool Enabled)> settings,

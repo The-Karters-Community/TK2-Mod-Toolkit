@@ -2,14 +2,19 @@
 
 The global **Online protection** module is mandatory and locked on. Users cannot disable the module or either protection rule in the toolkit. The plugin enforces both rules regardless of config-file values, and the toolkit repairs attempts to turn them off. An action is blocked while an unapproved Toolkit module, enabled recipe, or non-Toolkit BepInEx plugin is loaded. With no unapproved code active, normal leaderboard and online-room behavior continues.
 
-The fixed built-in allowlist is deliberately small:
+The built-in allowlist is an explicit list of local presentation and accessibility tools. New modules remain protected until their behavior has been reviewed:
 
 | Module | Decision | Reason |
 |---|---|---|
 | HUD size (`UI`) | Allow | Changes matching HUD canvas scale only. |
 | HUD transparency (`HudOpacity`) | Allow | Changes alpha on existing HUD CanvasGroups only. |
+| Disable vignette (`DisableVignette`) | Allow | Removes a screen-edge effect without changing race state. |
+| Audio mixer (`Audio`) | Allow | Changes local audio mix levels only. |
+| Camera setup (`Camera`) | Allow | Changes local camera framing and rotation. |
+| Character names (`BobbyGang`) | Allow | Replaces visible text in the local UI only. |
+| Performance diagnostics (`PerformanceDiagnostics`) | Allow | Measures local runtime counters; does not alter game state. |
 
-Everything else is unapproved by default. Camera FOV/position, vignette removal, track boundaries, audio changes, boost training, performance settings, and player-name changes can affect visibility, cues, timing, or information. Physics, AI, race rules, items, respawn, teleportation, rewinds, and custom recipes can change gameplay directly. They remain blocked even when a particular setting looks cosmetic or is currently inactive inside its enabled module. Unknown recipes and other BepInEx plugin IDs also require protection.
+Everything else is unapproved by default. Shadow-distance overrides can change visibility; track boundaries reveal collision and respawn information; boost training, proximity voice cues, and boost meters expose timing or positional information. Race performance includes an AI-physics cadence option, so the entire module stays protected. Physics, AI, race rules, items, respawn, teleportation, rewinds, and custom recipes can change gameplay directly. These remain blocked even if a particular setting looks cosmetic or is currently inactive inside its enabled module. Unknown modules and other BepInEx plugin IDs also require protection.
 
 ## Hook coverage
 

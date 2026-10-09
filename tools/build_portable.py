@@ -9,8 +9,9 @@ import time
 import zipfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from studio import core, pack, setup, symbols
+from studio.version import APP_VERSION
 
-VERSION = '0.6.5'
+VERSION = APP_VERSION
 
 
 def publish_directory(source, target):
@@ -68,6 +69,8 @@ def main():
     # binaries, generated interop assemblies, credentials, session tokens or logs.
     for directory in ('assets', 'studio/web', 'src/Reconstructed', 'templates', 'docs'):
         shutil.copytree(core.ROOT / directory, staging / directory, dirs_exist_ok=True)
+    (staging / 'tools').mkdir(parents=True, exist_ok=True)
+    shutil.copy2(core.ROOT / 'tools/update_portable.ps1', staging / 'tools/update_portable.ps1')
     for file in pack.source_files() + ['plugins/TK2.Customization/TK2.Customization.csproj', 'README.md']:
         target = staging / file; target.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(core.ROOT / file, target)
     for file in ('mk_catalog.json', 'community_catalog.json'):

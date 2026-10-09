@@ -9,21 +9,21 @@ from pathlib import Path
 import secrets
 import socket
 import subprocess
+import sys
 import threading
 import webbrowser
 from urllib.parse import urlsplit, parse_qs
-from . import core, pack, settings, setup, symbols
+from . import core, pack, settings, setup, symbols, releases
+from .version import APP_VERSION
 
 WEB = core.ROOT / "studio/web"
-APP_VERSION = "0.6.17"
-
-
 class Application:
     def __init__(self, game=None):
         found = setup.discover() if game is None else []
         self.game = core.validate_game(Path(game)) if game is not None else (found[0] if found else None)
         self.token = secrets.token_urlsafe(32)
         self.lock = threading.RLock()
+        self.release_checker = releases.ReleaseChecker(APP_VERSION, core.ROOT, bool(getattr(sys, "frozen", False)))
         previous_log = core.ROOT / "local/garage-build.log"
         self.logs = previous_log.read_text(encoding="utf-8", errors="replace").splitlines()[-80:] if previous_log.is_file() else []
 
@@ -61,7 +61,7 @@ class Application:
                 "prebuiltCompatibility": setup.prebuilt_compatibility(self.game) if self.game else {"compatible": False, "reason": "Choose a game installation first.", "mismatches": []},
                 "setup": setup.readiness(self.game),
                 "runtimeValidated": False, "packs": pack.catalog_packs(), "files": pack.source_files(), "moduleSources": pack.module_sources(), "sourceRoot": str(core.ROOT), "logs": self.logs,
-                "backups": backups[:30], "buildLog": self.latest_build(), **self.config_data()}
+                "backups": backups[:30], "buildLog": self.latest_build(), "release": self.release_checker.snapshot(), **self.config_data()}
 
     def latest_build(self):
         lines = "\n".join(self.logs).splitlines()
@@ -81,6 +81,11 @@ class Application:
 
     def action(self, action, body):
         with self.lock:
+            if action == "check-release": return self.release_checker.check()
+            if action == "open-release":
+                webbrowser.open(releases.RELEASE_PAGE)
+                return {"message": "Opened the Toolkit release page."}
+            if action == "update-toolkit": return self.release_checker.prepare_update()
             if action == 'browse-file':
                 from tkinter import Tk, filedialog
                 choices = {'package': ('Choose a module package', [('Toolkit modules','*.tk2mod')])}
@@ -236,6 +241,7 @@ class Handler(BaseHTTPRequestHandler):
                 with app.lock:
                     if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Toolkit", "version": APP_VERSION, "pid": os.getpid(), "game": str(app.game)})
                     if parsed.path == "/api/state": return self.reply(200, app.state())
+                    if parsed.path == "/api/release": return self.reply(200, app.release_checker.snapshot())
                     if parsed.path == '/api/download':
                         from . import module_packages
                         path = module_packages.download_path(parse_qs(parsed.query).get('id',[''])[0])
@@ -283,6 +289,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             result = self.server.app.action(action, body)
             self.reply(200, result)
+            if action == "update-toolkit":
+                threading.Timer(.35, self.server.shutdown).start()
         except Exception as exc:
             if isinstance(exc, PermissionError):
                 exc = ValueError("Windows denied access to the game folder. Close Toolkit, run the executable as administrator, then retry the installation.")
@@ -332,6 +340,7 @@ def main():
     requested_port = args.port if args.port is not None else 0
     try:
         server = Server(Application(args.game), requested_port)
+        server.app.release_checker.start()
     except OSError:
         # Reuse only our authenticated instance; never open an unrelated service occupying the port.
         import urllib.request
@@ -357,6 +366,7 @@ def main():
         for attempt in range(40):
             try:
                 server = Server(Application(args.game), requested_port)
+                server.app.release_checker.start()
                 break
             except OSError:
                 if attempt == 39: raise RuntimeError("The old Toolkit is still closing. Try launching again.")

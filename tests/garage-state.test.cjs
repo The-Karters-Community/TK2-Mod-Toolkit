@@ -24,13 +24,12 @@ const html = fs.readFileSync(path.join(root, 'studio/web/index.html'), 'utf8');
 const ids = Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(match => [match[1], new Node()]));
 const views = ['mods', 'workshop', 'installation'].map(id => {ids[id].id = id; return ids[id];});
 const nav = views.map(view => {const node = new Node('button'); node.dataset.view = view.id; return node;});
-const filters = ['All', 'Enabled', 'Visual', 'Audio', 'Gameplay'].map(category => {const node = new Node('button'); node.dataset.category = category; return node;});
 const brand = new Node('a'), meta = {content: 'test-token'};
 function descendants(node) {return [node, ...node.children.flatMap(descendants)];}
 function query(selector) {
   if (selector === '.view') return views;
   if (selector === '.nav') return nav;
-  if (selector === '[data-category]') return filters;
+  if (selector === '[data-category]') return descendants(ids.filters).filter(node => node.dataset.category !== undefined);
   const names = selector.split(',').map(part => /^\[data-([^\]]+)\]$/.exec(part.trim())?.[1]?.replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase())).filter(Boolean);
   return Object.values(ids).flatMap(descendants).filter(node => names.some(name => node.dataset[name] !== undefined));
 }
@@ -86,6 +85,12 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   await settle();
   assert.equal(ids['feature-list'].children.length, 2, 'modules must be grouped into packs');
   assert.equal(ids['feature-list'].children[0].dataset.pack, 'garage');
+  const categories = descendants(ids.filters).filter(node => node.dataset.category !== undefined).map(node => node.dataset.category);
+  assert.ok(categories.includes('Audio') && categories.includes('Camera') && categories.includes('Safety') && categories.includes('Gameplay'), 'module filters come from catalog categories plus gameplay');
+  assert.ok(!categories.includes('Visual'), 'legacy hard-coded categories are not retained');
+  assert.ok(descendants(ids['feature-list']).some(node => node.dataset.featureCategory === 'Audio'), 'modules are grouped into named category sections');
+  assert.equal(control('Audio/MasterVolume'), undefined, 'collapsed module controls are lazy-rendered for a large catalog');
+  descendants(ids['feature-list']).find(node => node.dataset.accordionKey === 'OnlineProtection').click();
   assert.equal(control('OnlineProtection/Enabled'), undefined, 'mandatory protection has no enable toggle');
   assert.equal(control('OnlineProtection/BlockLeaderboardUploads').disabled, true, 'leaderboard protection cannot be edited');
   assert.equal(control('OnlineProtection/BlockOnlineLobbyJoins').disabled, true, 'lobby protection cannot be edited');
@@ -102,7 +107,7 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   assert.equal(ids['install-state'].textContent, 'Plugin update available');
   run(`state.packCurrent=true;renderInstallation()`);
   assert.equal(ids['plugin-update-top'].hidden, true, 'up-to-date plugins do not show an update action');
-  const accordion = descendants(ids['feature-list']).find(node => node.classes.has('module-expand'));
+  const accordion = descendants(ids['feature-list']).find(node => node.classes.has('module-expand') && node.dataset.accordionKey !== 'OnlineProtection');
   const panelId = accordion.getAttribute('aria-controls'), accordionPanel = descendants(ids['feature-list']).find(node => node.id === panelId);
   const chevron = accordion.children.find(node => node.tagName === 'SVG');
   assert.equal(chevron.getAttribute('viewBox'), '0 0 24 24');
@@ -161,6 +166,7 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   settingsFailure = undefined; await ids['reload-settings'].click();
   assert.equal(run('state.settings["Audio/MasterVolume"]'), .8); assert.equal(run('state.settings["Camera/FieldOfView"]'), 80);
   assert.equal(run('settingEdits.size'), 1); await ids['save-settings'].click();
+  descendants(ids['feature-list']).find(node => node.dataset.accordionKey === 'Camera').click();
   edit('Camera/FieldOfView', '75'); settingsFailure = {error:'Temporary settings write failure.'}; await ids['save-settings'].click();
   assert.equal(ids['reload-settings'].hidden, true, 'transient errors should not suggest discarding edits');
   assert.equal(run('settingsDirty'), true); settingsFailure = undefined; await ids['save-settings'].click();
@@ -223,6 +229,7 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   fixture.packs[1].features.push('KartParameters');
   parameterNames.forEach(key => {fixture.settings['KartParameters/Override' + key] = false; fixture.settings['KartParameters/' + key] = 81;});
   fixture.settings['KartParameters/Enabled'] = false; await run('refresh(true)');
+  descendants(ids['feature-list']).find(node => node.dataset.accordionKey === 'KartParameters').click();
   const parameterValue = control('KartParameters/MaxAccelForward'), parameterToggle = control('KartParameters/OverrideMaxAccelForward');
   assert.equal(parameterValue.disabled,true,'custom value waits for its specific override switch');
   assert.equal(parameterValue.dataset.requires,'KartParameters/OverrideMaxAccelForward');
@@ -249,6 +256,7 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   assert.equal(run("state.settings['Camera/FieldOfView']"),65,'module reset restores its declared default');
   assert.equal(run("state.settings['Camera/Enabled']"),false,'module reset switches feature off');
   ids['mod-search'].value = ''; ids['mod-search'].oninput();
+  descendants(ids['feature-list']).find(node => node.dataset.accordionKey === 'Camera').click();
   const hints = descendants(ids['feature-list']).filter(node => node.classes.has('setting-hint'));
   assert.ok(hints.some(node => node.textContent.includes('Default: 65') && node.textContent.includes('35 to 110')),'default and allowed values remain visible');
   const optionCheckbox = control('Camera/AimAtKart');
@@ -269,6 +277,7 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   assert.equal(control('Camera/PanelHotkey').value,'C','poll preserves unsaved key edits');
   await ids['save-settings'].click();
   assert.equal(latestSave().values['Camera/PanelHotkey'],'C');
+  descendants(ids['feature-list']).find(node => node.dataset.accordionKey === 'Audio').click();
   const plainNumber = control('Audio/LargeCount');
   assert.equal(plainNumber.slider,undefined);
   assert.equal(typeof plainNumber.oninput,'function','number inputs without sliders need handlers');

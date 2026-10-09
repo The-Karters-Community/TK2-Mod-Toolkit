@@ -49,28 +49,36 @@ function switchControl(label, value, disabled, change) {
   const wrapper = el('label', 'switch'); const input = el('input'); input.type = 'checkbox'; input.checked = value; input.disabled = disabled; input.setAttribute('aria-label', label);
   input.onchange = () => change(input.checked); wrapper.append(input, el('span')); return wrapper;
 }
-function bindAccordion(trigger, panel, key, expanded) {
+function bindAccordion(trigger, panel, key, expanded, onOpen) {
   panel.hidden = !expanded;
   trigger.dataset.accordionKey = key;
   trigger.setAttribute('aria-expanded', String(expanded));
   trigger.setAttribute('aria-controls', panel.id);
+  trigger.onAccordionOpen = onOpen;
+  if (expanded) onOpen?.();
   trigger.onclick = () => {
     const open = panel.hidden;
     panel.hidden = !open;
     trigger.setAttribute('aria-expanded', String(open));
-    if (open) expandedModules.add(key); else expandedModules.delete(key);
+    if (open) {expandedModules.add(key); trigger.onAccordionOpen?.();} else expandedModules.delete(key);
   };
 }
 function setAllAccordions(expanded) {
-  document.querySelectorAll('[data-accordion-key]').forEach(accordion => {
-    const key = accordion.dataset.accordionKey;
-    if (expanded) expandedModules.add(key); else expandedModules.delete(key);
-    if (accordion.tagName === 'DETAILS') {accordion.open = expanded; return;}
-    const panel = $(accordion.getAttribute('aria-controls'));
-    if (!panel) return;
-    panel.hidden = !expanded;
-    accordion.setAttribute('aria-expanded', String(expanded));
-  });
+  let previousCount;
+  do {
+    const accordions = document.querySelectorAll('[data-accordion-key]');
+    previousCount = accordions.length;
+    accordions.forEach(accordion => {
+      const key = accordion.dataset.accordionKey;
+      if (expanded) expandedModules.add(key); else expandedModules.delete(key);
+      if (accordion.tagName === 'DETAILS') {accordion.open = expanded; return;}
+      const panel = $(accordion.getAttribute('aria-controls'));
+      if (!panel) return;
+      panel.hidden = !expanded;
+      accordion.setAttribute('aria-expanded', String(expanded));
+      if (expanded) accordion.onAccordionOpen?.();
+    });
+  } while (expanded && document.querySelectorAll('[data-accordion-key]').length > previousCount);
 }
 function chevronIcon() {
   const namespace = 'http://www.w3.org/2000/svg';
@@ -80,7 +88,20 @@ function chevronIcon() {
   path.setAttribute('d', 'M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z'); icon.append(path);
   return icon;
 }
-function featureGroup(feature) {return feature.category === 'Safety' || feature.gameplay ? 'Gameplay' : feature.category === 'Audio' ? 'Audio' : 'Visual';}
+function featureGroup(feature) {return feature.gameplay ? 'Gameplay' : feature.category || 'Other';}
+function renderCategoryFilters() {
+  if (!state) return;
+  const filters = $('filters'); filters.replaceChildren();
+  const enabledCount = state.features.filter(feature => feature.locked || state.settings[feature.id + '/Enabled']).length;
+  const categories = [...new Set(state.features.map(featureGroup))].sort((a, b) => a.localeCompare(b));
+  const options = [['All', `All · ${state.features.length}`], ['Enabled', `Enabled · ${enabledCount}`], ...categories.map(name => [name, name])];
+  options.forEach(([id, label]) => {
+    const button = el('button', 'chip', label); button.dataset.category = id;
+    button.classList.toggle('selected', category === id); button.setAttribute('aria-pressed', String(category === id));
+    button.onclick = () => {category = id; renderCategoryFilters(); renderFeatures(); renderRecipes();};
+    filters.append(button);
+  });
+}
 function packsForState() {
   const packs = (state.packs || []).map(pack => ({...pack, features: (pack.features || []).map(id => typeof id === 'object' ? id : state.features.find(feature => feature.id === id)).filter(Boolean)}));
   const included = new Set(packs.flatMap(pack => pack.features.map(feature => feature.id)));
@@ -192,13 +213,46 @@ function featureSettings(feature, search) {
   if (!feature.settings.length && feature.available !== false) container.append(el('p', 'module-note', 'This module has no additional settings.'));
   return container;
 }
+function populateFeaturePanel(panel, feature, search) {
+  if (!panel.dataset.lazyModule) return;
+  delete panel.dataset.lazyModule;
+  if (feature.available === false) panel.append(el('p', 'module-note', feature.reason || 'This module needs a compatibility update before it can be enabled.'));
+  if (feature.status && feature.status !== 'verified') panel.append(el('p', 'module-note', feature.status));
+  const moduleTools = el('div', 'module-tools');
+  moduleTools.append(el('small', '', feature.locked ? 'Mandatory protection stays on. Online actions are blocked while unapproved modules or plugins are active.' : 'Reset restores all defaults and switches this module off.'));
+  panel.append(moduleTools);
+  const edit = el('button', 'secondary', 'Edit code'); edit.dataset.editModule = feature.id;
+  edit.disabled = busy || !state.moduleSources?.[feature.id]?.length;
+  edit.onclick = () => editModule(feature.id); moduleTools.append(edit);
+  panel.append(featureSettings(feature, search));
+}
 function extraPackId(entry) {
   const id = entry.pack || state.extraPacks?.[entry.section] || (/^(MK\.|Alternate|AutoBoost|BoostTrainer|Bobby|Boring|CNK|CustomPhysics|Dash|FastRespawn|Mirror|Reverse|Proximity|SaveState|Supra|Teleport)/.test(entry.section) ? 'mks' : 'community');
   return id === 'mks' && !state.packs?.some(pack => pack.id === 'mks') ? 'community' : id;
 }
+function renderFeatureCard(feature, search) {
+  const unavailable = feature.available === false;
+  const row = el('article', 'module'); row.dataset.feature = feature.id;
+  const heading = el('div', 'module-heading'), expand = el('button', 'module-expand'), info = el('span', 'module-info');
+  info.append(el('span', 'module-name', feature.name));
+  if (feature.description) info.append(el('span', 'module-description', feature.description));
+  const enabled = feature.locked || Boolean(state.settings[feature.id + '/Enabled']);
+  const status = el('span', 'module-state', feature.locked ? 'Always on' : enabled ? 'On' : 'Off'); status.dataset.moduleState = feature.id;
+  const panel = el('div', 'module-body'); panel.id = 'module-' + feature.id; panel.hidden = !(expandedModules.has(feature.id) || Boolean(search));
+  panel.dataset.lazyModule = feature.id;
+  expand.append(info, status, chevronIcon());
+  bindAccordion(expand, panel, feature.id, !panel.hidden, () => populateFeaturePanel(panel, feature, search));
+  const toggle = feature.locked ? el('span', 'module-lock-badge', 'Locked') : switchControl('Enable ' + feature.name, enabled, unavailable || busy && actionInFlight !== 'settings', value => changeSetting(feature.id + '/Enabled', value));
+  if (!feature.locked) toggle.children[0].dataset.setting = feature.id + '/Enabled';
+  const headerReset = el('button', 'quiet module-reset', 'Reset');
+  headerReset.setAttribute('aria-label', 'Reset ' + feature.name + ' to defaults'); headerReset.hidden = Boolean(feature.locked);
+  headerReset.onclick = () => resetFeatures([feature]);
+  heading.append(expand, headerReset, toggle); row.append(heading, panel);
+  return row;
+}
 function renderFeatures() {
   const list = $('feature-list'); list.replaceChildren();
-  const search = $('mod-search').value.toLowerCase().trim(); let count = 0;
+  const search = $('mod-search').value.toLowerCase().trim(); let count = 0, moduleCount = 0;
   packsForState().forEach(pack => {
     const features = pack.features.filter(feature => {
       const matches = category === 'All' || category === 'Enabled' && state.settings[feature.id + '/Enabled'] || category === featureGroup(feature);
@@ -207,35 +261,24 @@ function renderFeatures() {
     const extras = (state.extraSettings || []).filter(entry => extraPackId(entry) === pack.id);
     const extraGroups = extraGroupsForFilter(extras, search, pack.name);
     if (!features.length && !extraGroups.size) return;
-    count += features.length + extraGroups.size;
+    count += features.length + extraGroups.size; moduleCount += features.length + extraGroups.size;
     const section = el('section', 'mod-pack'); section.dataset.pack = pack.id;
     const header = el('header', 'pack-heading'), copy = el('div'); copy.append(el('h2', '', pack.name));
     if (pack.description) copy.append(el('p', '', pack.description));
-    const size = features.length + extraGroups.size;
-    const packActions = el('div', 'pack-actions'), reset = el('button', 'quiet', 'Reset pack'); reset.onclick = () => resetFeatures(pack.features); packActions.append(el('small', '', `${size} modules`), reset); header.append(copy, packActions); section.append(header);
-    features.forEach(feature => {
-      const unavailable = feature.available === false;
-      const row = el('article', 'module'); row.dataset.feature = feature.id;
-      const heading = el('div', 'module-heading'), expand = el('button', 'module-expand'), info = el('span', 'module-info');
-      info.append(el('span', 'module-name', feature.name));
-      if (feature.description) info.append(el('span', 'module-description', feature.description));
-      const enabled = feature.locked || Boolean(state.settings[feature.id + '/Enabled']), status = el('span', 'module-state', feature.locked ? 'Always on' : enabled ? 'On' : 'Off'); status.dataset.moduleState = feature.id;
-      const panel = el('div', 'module-body'); panel.id = 'module-' + feature.id; panel.hidden = !(expandedModules.has(feature.id) || Boolean(search));
-      expand.append(info, status, chevronIcon());
-      bindAccordion(expand, panel, feature.id, !panel.hidden);
-      const toggle = feature.locked ? el('span', 'module-lock-badge', 'Locked') : switchControl('Enable ' + feature.name, enabled, unavailable || busy && actionInFlight !== 'settings', value => changeSetting(feature.id + '/Enabled', value));
-      if (!feature.locked) toggle.children[0].dataset.setting = feature.id + '/Enabled';
-      const headerReset = el('button', 'quiet module-reset', 'Reset'); headerReset.setAttribute('aria-label', 'Reset ' + feature.name + ' to defaults'); headerReset.hidden = Boolean(feature.locked); headerReset.onclick = () => resetFeatures([feature]);
-      heading.append(expand, headerReset, toggle); row.append(heading);
-      if (unavailable) panel.append(el('p', 'module-note', feature.reason || 'This module needs a compatibility update before it can be enabled.'));
-      if (feature.status && feature.status !== 'verified') panel.append(el('p', 'module-note', feature.status));
-      const moduleTools = el('div', 'module-tools'); moduleTools.append(el('small', '', feature.locked ? 'Mandatory protection stays on. Online actions are blocked while unapproved modules or plugins are active.' : 'Reset restores all defaults and switches this module off.')); panel.append(moduleTools);
-      const edit = el('button', 'secondary', 'Edit code'); edit.dataset.editModule = feature.id; edit.disabled = busy || !state.moduleSources?.[feature.id]?.length;
-      edit.onclick = () => editModule(feature.id); moduleTools.append(edit);
-      panel.append(featureSettings(feature, search)); row.append(panel); section.append(row);
+    const packActions = el('div', 'pack-actions'), reset = el('button', 'quiet', 'Reset pack'); reset.onclick = () => resetFeatures(pack.features); packActions.append(el('small', '', `${features.length + extraGroups.size} modules`), reset); header.append(copy, packActions); section.append(header);
+    const grouped = new Map();
+    features.forEach(feature => {const group = featureGroup(feature); if (!grouped.has(group)) grouped.set(group, []); grouped.get(group).push(feature);});
+    grouped.forEach((groupFeatures, groupName) => {
+      const categorySection = el('section', 'feature-category'); categorySection.dataset.featureCategory = groupName;
+      const categoryHeading = el('header', 'feature-category-heading');
+      categoryHeading.append(el('h3', '', groupName), el('small', '', `${groupFeatures.length} module${groupFeatures.length === 1 ? '' : 's'}`));
+      categorySection.append(categoryHeading);
+      groupFeatures.forEach(feature => categorySection.append(renderFeatureCard(feature, search)));
+      section.append(categorySection);
     });
     appendEntryGroups(section, extraGroups, true); list.append(section);
   });
+  $('module-count').textContent = `${moduleCount} module${moduleCount === 1 ? '' : 's'} shown${search ? ' for “' + $('mod-search').value.trim() + '”' : ''}.`;
   if (!count) list.append(el('p', 'empty-state', category === 'Enabled' ? 'No modules are enabled. Choose All to add one.' : 'No settings match. Try another search or filter.'));
 }
 function extraGroupsForFilter(entries, search, packName = '') {
@@ -318,6 +361,10 @@ function renderInstallation() {
   const updateAvailable = Boolean(ready.ready && state.installed && !state.packCurrent && compatibility?.compatible !== false);
   $('plugin-update-top').hidden = !updateAvailable;
   $('plugin-update-top').disabled = busy || !ready.ready;
+  const release = state.release || {}, toolkitUpdate = $('toolkit-update-top');
+  toolkitUpdate.hidden = release.state !== 'available';
+  toolkitUpdate.disabled = busy;
+  toolkitUpdate.textContent = release.canInstall ? `Update toolkit · ${release.version}` : `Toolkit ${release.version} available`;
   const plugins = state.plugins || [], others = plugins.filter(plugin => !plugin.toolkit);
   $('compatibility-summary').textContent = `Loader: ${ready.loaderVersion || 'not verified'} · ${ready.loaderCompatible ? 'supported build' : 'unsupported or not yet verified'}. ${others.length ? `${others.length} other plugin file${others.length === 1 ? '' : 's'} found; review them if the toolkit misbehaves.` : 'No other BepInEx plugins detected.'} Config files are never removed by this audit.`;
   const pluginList = $('plugin-audit-list'); pluginList.replaceChildren();
@@ -356,7 +403,7 @@ function resetFeatures(features) {
   features.filter(feature => !feature.locked).forEach(feature => {changeSetting(feature.id + '/Enabled', false); feature.settings.forEach(setting => changeSetting(feature.id + '/' + setting[0], setting[3]));});
   syncControls(); notice('Defaults restored. Save changes to apply.');
 }
-function render() {renderFeatures(); renderRecipes(); renderFiles(); renderInstallation(); renderSharing(); syncDependencies(); updateSaveState();}
+function render() {renderCategoryFilters(); renderFeatures(); renderRecipes(); renderFiles(); renderInstallation(); renderSharing(); syncDependencies(); updateSaveState();}
 function mergeState(next) {
   settingEdits.forEach((edit, key) => {next.settings[key] = edit.value;});
   [['recipes', recipeEdits], ['extraSettings', extraEdits]].forEach(([field, edits]) => {(next[field] || []).forEach(entry => {const edit = edits.get(entry.section + '/' + entry.key); if (edit) entry.value = edit.value;});});
@@ -422,7 +469,7 @@ function showWorkshopTab(name) {
   if (name === 'api' && functionSequence === 0) searchFunctions().catch(error => notice(error.message, true));
 }
 function setBusy(value) {
-  busy = value; ['workshop-install', 'build', 'create-recipe', 'diagnose', 'prepare-loader', 'installation-install', 'plugin-update-top', 'scan-games', 'select-game', 'browse-game', 'browse-package', 'preview-package'].forEach(id => {$(id).disabled = value;});
+  busy = value; ['workshop-install', 'build', 'create-recipe', 'diagnose', 'prepare-loader', 'installation-install', 'plugin-update-top', 'toolkit-update-top', 'scan-games', 'select-game', 'browse-game', 'browse-package', 'preview-package'].forEach(id => {$(id).disabled = value;});
   $('save-source').disabled = value || !sourceDirty; $('code').readOnly = value || !source; $('reload-source').disabled = value || !source; $('open-source-folder').disabled = value || !source; updateSaveState();
   document.querySelectorAll('[data-edit-module]').forEach(button => {button.disabled = value || !state?.moduleSources?.[button.dataset.editModule]?.length;});
   // Keep controls mounted and editable during a settings save.
@@ -461,13 +508,22 @@ function showView(name) {
 }
 document.querySelectorAll('.nav').forEach(button => button.onclick = () => showView(button.dataset.view));
 document.querySelector('.brand').onclick = event => {event.preventDefault(); showView('mods');};
-document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => {category = button.dataset.category; document.querySelectorAll('[data-category]').forEach(b => b.classList.toggle('selected', b === button)); renderFeatures(); renderRecipes();});
 $('mod-search').oninput = () => {renderFeatures(); renderRecipes();};
 $('expand-all-accordions').onclick = () => setAllAccordions(true);
 $('collapse-all-accordions').onclick = () => setAllAccordions(false);
 $('workshop-install').onclick = () => runAction('build-install');
 $('installation-install').onclick = () => runAction('install'); $('build').onclick = () => runAction('build');
 $('plugin-update-top').onclick = () => runAction('install');
+$('toolkit-update-top').onclick = async () => {
+  const release = state?.release || {};
+  if (release.canInstall) {
+    try {const result = await api('update-toolkit', {}); notice(result.message || 'Toolkit update is ready.');}
+    catch (error) {notice(error.message, true);}
+  } else {
+    try {const result = await api('open-release', {}); notice(result.message);}
+    catch (error) {notice(error.message, true);}
+  }
+};
 $('create-recipe').onclick = () => {if (sourceDirty) {notice('Save the current C# before creating another recipe.', true); return;} runAction('create-recipe', {name: $('recipe-name').value.trim()});};
 $('diagnose').onclick = () => runAction('diagnose');
 $('prepare-loader').onclick = () => runAction('install-loader');

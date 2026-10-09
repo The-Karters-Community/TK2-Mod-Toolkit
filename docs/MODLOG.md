@@ -1,5 +1,13 @@
 # Mod log
 
+## Scalable module library, fair-play allowlist and release updates 0.6.21 (2026-10-09)
+
+- Generated module filters from catalog metadata and grouped cards by their existing category inside each pack. Added per-category counts and moved expand/collapse controls into a separate responsive toolbar row so controls remain usable in narrow windows.
+- Expanded the explicit Online protection allowlist to HUD scale/opacity, vignette disable, audio mix, local camera setup, local visible character-name replacements and performance diagnostics. Shadow-distance changes, track boundaries, boost information, AI physics and recipes remain protected.
+- Unified the desktop and portable Toolkit version. Portable startup checks the latest stable GitHub Release in the background; updates require a newer semantic version, the exact expected archive name and GitHub's SHA-256 asset digest. Extraction is bounded and validates paths, manifest and executable. The updater keeps user data and a rollback folder.
+- Added a draft-first GitHub release helper. No release was published in this change; startup update detection will show an update after the first matching release is published.
+- Validation: UI state tests, release parsing/archive safety tests, Python web-app tests and Online protection policy checks. Actual portable self-update and runtime in-game behavior require the first public release and a portable Windows test.
+
 ## IL2CPP-safe online protection hook and install diagnosis 0.6.20 (2026-10-09)
 
 - Fresh game log showed BepInEx `6.0.0-be.788` initialized but rejected Toolkit 0.6.19 during `Plugin.Load`: the leaderboard Harmony target used original managed parameter types that IL2CPP interop transforms.
