@@ -5,7 +5,7 @@
 - Fresh game log showed BepInEx `6.0.0-be.788` initialized but rejected Toolkit 0.6.19 during `Plugin.Load`: the leaderboard Harmony target used original managed parameter types that IL2CPP interop transforms.
 - Replaced exact CLR parameter matching with a unique static `void` method/name/five-parameter shape check. Reflection against this installation's `Assembly-CSharp.dll` confirmed one target whose parameters include `Il2CppStructArray<float>`, `Il2CppSystem.Collections.Generic.List<CCheckpointTimes>` and `Il2CppSystem.Action`.
 - Setup readiness now requires the plugin's post-load marker and surfaces explicit plugin load failures; the chainloader's pre-load `Loading` message alone no longer counts as success.
-- Current plugin build succeeded against installed references with zero warnings/errors. The game was running during this fix, so the DLL was not replaced; live load and enforcement remain pending after close/restart.
+- Current plugin build succeeded against installed references with zero warnings/errors. After the game closed, 0.6.20 was installed with backup transaction `local/backups/1791576377687095000`; installed SHA matches artifact (`d619d1d46307a5e5fc79b170c095751d7fb83980e2019b5fb4add143e4fa8c7c`). A subsequent game start logged the post-load marker and confirmed one leaderboard plus ten Photon room-operation hooks. Policy behavior is covered by tests; actual blocked online requests were not exercised.
 - Mandatory online protection still blocks leaderboard and room operations when unapproved modules or plugins are active; only the explicitly reviewed HUD-only modules remain allowlisted.
 
 ## Mandatory online protection 0.6.19 (2026-10-09)

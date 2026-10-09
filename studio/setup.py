@@ -90,8 +90,11 @@ def readiness(game):
     version = match[1] if match else None
     # Chainloader's "Loading [...]" line is emitted before Plugin.Load runs;
     # require the plugin's own final startup marker and reject explicit load errors.
-    plugin_error = next((line for line in text.splitlines()
-                         if "[Error" in line and "Error loading [TK2 Mod Toolkit Pack" in line), None)
+    plugin_errors = [line for line in text.splitlines()
+                     if "[Error" in line and "Error loading [TK2 Mod Toolkit Pack" in line]
+    plugin_error = next((line for line in plugin_errors
+                         if not version or f"TK2 Mod Toolkit Pack {version}]" in line), None)
+    previous_plugin_errors = [line for line in plugin_errors if line != plugin_error]
     loaded = bool(version and f"TK2 Mod Toolkit {version}:" in text and plugin_error is None)
     warnings = [line for line in text.splitlines() if "[Warning" in line][-15:]
     errors = [line for line in text.splitlines() if any(word in line.lower() for word in ("[error", "exception", "error loading", "unavailable", "disabled after", "stopped:"))][-35:]
@@ -99,7 +102,9 @@ def readiness(game):
     if stage == "install-loader" and initialized and not loader_compatible:
         message = f"Unsupported or unverified BepInEx build ({loader_version or 'version unknown'}). Use {SUPPORTED_BEPINEX_VERSION} ({SUPPORTED_BEPINEX_COMMIT[:7]})."
     elif plugin_error:
-        message = "The Toolkit plugin failed during the last game start. Close the game, repair or update the plugin, then start the game and check again."
+        message = f"Toolkit {version} failed during the last game start. Close the game, repair the plugin, then start the game and check again."
+    elif not loaded:
+        message = f"Toolkit {version or 'plugin'} has not been confirmed in the game log yet. Start the game, reach the menu, close it, then check again."
     else:
         message = {"install-loader": "Install or repair BepInEx first.", "initialize-loader": "Start the game once, wait for its menu, close it, then check again.", "ready": f"BepInEx {SUPPORTED_BEPINEX_VERSION} is initialized. The mod pack can be installed."}[stage]
     return {"stage": stage, "ready": stage == "ready", "message": message, "loaderSource": str(source) if source else None,
@@ -108,7 +113,7 @@ def readiness(game):
                 {"name": "Game started with BepInEx", "ok": initialized}, {"name": "Current pack loaded successfully", "ok": loaded}],
             "loaderVersion": loader_version, "loaderCommit": loader_commit, "loaderCompatible": loader_compatible,
             "logPath": str(log) if log else None, "logModified": log.stat().st_mtime if log else None, "pluginLoadError": plugin_error,
-            "runtimeErrors": errors, "runtimeWarnings": warnings}
+            "previousPluginLoadErrors": previous_plugin_errors, "runtimeErrors": errors, "runtimeWarnings": warnings}
 
 
 def install_loader(game):

@@ -142,5 +142,23 @@ class SetupTests(unittest.TestCase):
         self.assertIn("MissingMethodException", result["pluginLoadError"])
         self.assertIn("failed", result["message"])
 
+    def test_old_plugin_failure_is_not_reported_as_current_after_repair_install(self):
+        for relative in setup.CRITICAL:
+            p = self.game / relative; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(b"fixture")
+        (self.game / "doorstop_config.ini").write_text('[General]\nenabled=true\ntarget_assembly=BepInEx\\core\\BepInEx.Unity.IL2CPP.dll\n')
+        interop = self.game / "BepInEx/interop/Assembly-CSharp.dll"; interop.parent.mkdir(parents=True); interop.write_bytes(b"fixture")
+        source = self.root / 'plugins/TK2.Customization/Plugin.cs'; source.parent.mkdir(parents=True)
+        source.write_text('[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.20")]')
+        log = self.game / "BepInEx/LogOutput.log"; log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_text(f"[Message: Preloader] BepInEx {setup.SUPPORTED_BEPINEX_VERSION}\n"
+                       f"[Message: Preloader] Built from commit {setup.SUPPORTED_BEPINEX_COMMIT}\n"
+                       "Chainloader initialized\n[Error: BepInEx] Error loading [TK2 Mod Toolkit Pack 0.6.19]: MissingMethodException\n")
+        with patch.object(core, "is_managed_dll", return_value=True): result = setup.readiness(self.game)
+        self.assertTrue(result["ready"])
+        self.assertFalse(result["checks"][-1]["ok"])
+        self.assertIsNone(result["pluginLoadError"])
+        self.assertEqual(len(result["previousPluginLoadErrors"]), 1)
+        self.assertIn("check again", result["message"])
+
 
 if __name__ == '__main__': unittest.main()

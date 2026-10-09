@@ -57,3 +57,5 @@ The default portable output is a slim compressed ZIP at `artifacts/portable/TK2-
 - [Readable source & limits](docs/READABLE-SOURCE.md) · [Validation](docs/VALIDATION.md)
 
 Gameplay modules start disabled and are intended for local/offline races. Mandatory Online protection permits only HUD size and transparency changes while unapproved mods are active; see [its policy](docs/ONLINE-PROTECTION.md). Native reconstruction is partial, not the original Unity source project. Compilation and simulated checks do not replace manual in-game testing.
+
+The code allowlist is maintained in `plugins/TK2.Customization/OnlineProtectionPolicy.cs`: only the `UI` and `HudOpacity` Toolkit modules are exempt. The Toolkit's own plugin GUID is trusted by the policy; no third-party plugin GUIDs are allowlisted. Policy regression checks are in `tests/OnlineProtection/Program.cs`.
