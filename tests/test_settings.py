@@ -125,6 +125,17 @@ class SettingsMergeTests(unittest.TestCase):
         self.assertEqual(set(pack.module_sources()["DisableVignette"]), {
             "plugins/TK2.Customization/PackModules.cs", "plugins/TK2.Customization/Plugin.cs"})
 
+    def test_online_protection_is_default_on_and_in_the_essentials_pack(self):
+        self.assertTrue(pack.defaults()["OnlineProtection/Enabled"])
+        self.assertTrue(pack.defaults()["OnlineProtection/BlockLeaderboardUploads"])
+        self.assertTrue(pack.defaults()["OnlineProtection/BlockOnlineLobbyJoins"])
+        garage = next(p for p in pack.catalog_packs() if p["id"] == "garage")
+        self.assertEqual(garage["features"][0], "OnlineProtection")
+        self.assertEqual(set(pack.module_sources()["OnlineProtection"]), {
+            "plugins/TK2.Customization/OnlineProtectionFeature.cs",
+            "plugins/TK2.Customization/OnlineProtectionPolicy.cs",
+            "plugins/TK2.Customization/Plugin.cs"})
+
     def test_performance_module_has_pack_membership_and_source_ownership(self):
         from unittest.mock import patch
         feature = next(f for f in pack.catalog_features() if f["id"] == "Performance")

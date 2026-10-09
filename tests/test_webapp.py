@@ -31,7 +31,8 @@ class GarageTests(unittest.TestCase):
     def test_pack_defaults_allow_requested_offline_test_toggles(self):
         self.assertGreaterEqual(len(pack.FEATURES), 25)
         values = pack.defaults()
-        self.assertTrue(all(not v for k, v in values.items() if k.endswith("/Enabled")))
+        self.assertTrue(values["OnlineProtection/Enabled"])
+        self.assertTrue(all(not v for k, v in values.items() if k.endswith("/Enabled") and k != "OnlineProtection/Enabled"))
         for feature in pack.FEATURES:
             if feature.get("gameplay"):
                 self.assertEqual(pack.validate({feature["id"] + "/Enabled": True})[(feature["id"],"Enabled")], "true")
@@ -109,7 +110,9 @@ class GarageTests(unittest.TestCase):
             result = self.app.action("build-install", {})
         build.assert_called_once(); deploy.assert_called_once()
         self.assertIn("One pack", result["message"])
-        self.assertTrue(all(not value for key, value in self.app.config_data()["settings"].items() if key.endswith("/Enabled")))
+        settings = self.app.config_data()["settings"]
+        self.assertTrue(settings["OnlineProtection/Enabled"])
+        self.assertTrue(all(not value for key, value in settings.items() if key.endswith("/Enabled") and key != "OnlineProtection/Enabled"))
 
     def test_only_one_garage_server_can_own_a_port(self):
         server = webapp.Server(self.app, 0)
@@ -134,7 +137,7 @@ class GarageTests(unittest.TestCase):
         self.assertEqual(request("GET", "/", {"Host": "example.com"})[0], 403)
         status, html = request("GET", "/")
         self.assertEqual(status, 200); self.assertIn(self.app.token.encode(), html); self.assertNotIn(b"__SESSION_TOKEN__", html)
-        self.assertIn(b"Toolkit 0.6.13", html); self.assertNotIn(b"__APP_VERSION__", html)
+        self.assertIn(b"Toolkit 0.6.14", html); self.assertNotIn(b"__APP_VERSION__", html)
         status, component_css = request("GET", "/components.css")
         self.assertEqual(status, 200); self.assertIn(b".module-expand", component_css)
         bad = json.dumps({"values": {"Audio/Enabled": True}, "hash": "stale"})

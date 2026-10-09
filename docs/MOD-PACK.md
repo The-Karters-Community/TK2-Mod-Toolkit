@@ -4,7 +4,7 @@ One physical plugin, TK2.Customization.dll, contains these logical packs. New mo
 
 | Pack | Modules |
 |---|---|
-| Toolkit Essentials | HUD size, HUD transparency, audio mixer, camera setup, graphics, race performance, performance diagnostics, track boundaries |
+| Toolkit Essentials | Online protection, HUD size, HUD transparency, audio mixer, camera setup, graphics, race performance, performance diagnostics, track boundaries |
 | Community Mods | Custom laps, driving challenge, automatic drift boost, basic kart tuning, fast respawn, boost trainer, alternate reserves, Dash and Stash, portal tricks, mirror, Bobby Gang, nearby voice lines, CNK-style boost meter, air brake, kart/boost parameters, practice save states, reverse race, Nightmare AI, fast fall/dodge, health/reserve/elimination chat commands |
 | Your recipes | FrameLimiter and author-created modules in the same DLL |
 
@@ -14,4 +14,4 @@ The full 57 legacy numeric tuning ideas have typed current-build bindings. They 
 
 Automatic boost includes the legacy early-press suppression and boost release on drift stop, with a configurable threshold. Driving challenge exposes separate jump/drift restrictions. Fast fall exposes press/hold, controller action, air time, acceleration, deadzone and optional dodge duration. Dodge uses an independent immunity flag, preserving native shield/respawn/death flags.
 
-Legacy ideas have a current code path or documented adaptation. This is not complete native/runtime parity: CNK bars replace the external arc overlay, reverse track checkpoint/respawn semantics remain experimental, snapshot route histories/other racers are not rewound, and old empirical reserve-speed percentages were replaced by explicit seconds. [Mirror race](MIRROR-RACE.md) mirrors the local race camera and steering without rewriting track assets. Framework SDK projects are absorbed into the single plugin; they are not separately toggled empty mods. Disable Leaderboards is deliberately excluded for this requested test build.
+Legacy ideas have a current code path or documented adaptation. This is not complete native/runtime parity: CNK bars replace the external arc overlay, reverse track checkpoint/respawn semantics remain experimental, snapshot route histories/other racers are not rewound, and old empirical reserve-speed percentages were replaced by explicit seconds. [Mirror race](MIRROR-RACE.md) mirrors the local race camera and steering without rewriting track assets. Framework SDK projects are absorbed into the single plugin; they are not separately toggled empty mods. [Online protection](ONLINE-PROTECTION.md) defaults on and only allowlists HUD size and HUD transparency.

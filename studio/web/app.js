@@ -80,7 +80,7 @@ function chevronIcon() {
   path.setAttribute('d', 'M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z'); icon.append(path);
   return icon;
 }
-function featureGroup(feature) {return feature.gameplay ? 'Gameplay' : feature.category === 'Audio' ? 'Audio' : 'Visual';}
+function featureGroup(feature) {return feature.category === 'Safety' || feature.gameplay ? 'Gameplay' : feature.category === 'Audio' ? 'Audio' : 'Visual';}
 function packsForState() {
   const packs = (state.packs || []).map(pack => ({...pack, features: (pack.features || []).map(id => typeof id === 'object' ? id : state.features.find(feature => feature.id === id)).filter(Boolean)}));
   const included = new Set(packs.flatMap(pack => pack.features.map(feature => feature.id)));

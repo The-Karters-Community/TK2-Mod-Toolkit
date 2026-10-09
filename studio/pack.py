@@ -8,6 +8,7 @@ ARTIFACT = core.ROOT / "artifacts/TK2.Customization"
 SOURCE_ROOT = PROJECT.parent
 
 FEATURES = [
+    {"id": "OnlineProtection", "name": "Online protection", "category": "Safety", "description": "Block leaderboard uploads and online-room actions while unapproved mods are active. Only HUD size and HUD transparency are allowlisted; other loaded plugins are treated as unapproved.", "origin": "New", "defaultEnabled": True, "settings": [("BlockLeaderboardUploads", "Block leaderboard uploads", "bool", True, None, None, "Stop record submissions while any non-allowlisted module or plugin is active."), ("BlockOnlineLobbyJoins", "Block online rooms", "bool", True, None, None, "Prevent joining or creating online rooms while any non-allowlisted module or plugin is active.")]},
     {"id": "UI", "name": "HUD scale", "category": "Interface", "description": "Make matching HUD canvases easier to read.", "origin": "New", "settings": [("HudScale", "Scale", "float", 1, .5, 2), ("CanvasNameFilter", "Canvas name contains", "text", "HUD", None, None)]},
     {"id": "HudOpacity", "name": "HUD opacity", "category": "Interface", "description": "Soften the HUD on matching canvases with an existing CanvasGroup. Uses the HUD name filter.", "origin": "New", "settings": [("Opacity", "Opacity", "float", 1, .1, 1)]},
     {"id": "DisableVignette", "name": "Disable vignette", "category": "Interface", "description": "Remove the game's edge-darkening vignette effect without changing its saved post-processing settings.", "origin": "New", "settings": []},
@@ -81,7 +82,7 @@ RETIRED_SETTINGS = frozenset()
 def schema(features=None):
     result = {}
     for feature in features if features is not None else catalog_features():
-        result[(feature["id"], "Enabled")] = ("bool", False, None, None)
+        result[(feature["id"], "Enabled")] = ("bool", bool(feature.get("defaultEnabled", False)), None, None)
         for setting in feature["settings"]:
             key, _, kind, default, low, high = setting[:6]
             result[(feature["id"], key)] = (kind, default, low, high)
@@ -123,7 +124,7 @@ def defaults():
 
 
 PACKS = [
-    {"id": "garage", "name": "Toolkit Essentials", "description": "Camera, interface, audio, graphics and race performance controls.", "features": ["UI", "HudOpacity", "DisableVignette", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
+    {"id": "garage", "name": "Toolkit Essentials", "description": "Online protection, camera, interface, audio, graphics and race performance controls.", "features": ["OnlineProtection", "UI", "HudOpacity", "DisableVignette", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
     {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
@@ -168,6 +169,7 @@ def module_sources():
     """Logical modules share one project; expose their real source ownership."""
     ownership = {
         "UI": ["StudioBehaviour.cs", "Plugin.cs"],
+        "OnlineProtection": ["OnlineProtectionFeature.cs", "OnlineProtectionPolicy.cs", "Plugin.cs"],
         "HudOpacity": ["StudioBehaviour.cs", "PackModules.cs"],
         "DisableVignette": ["PackModules.cs", "Plugin.cs"],
         "Rendering": ["StudioBehaviour.cs", "PackModules.cs"],

@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.17")]
+[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.18")]
 public sealed partial class Plugin : BasePlugin
 {
     internal static Plugin? Instance;
@@ -35,6 +35,8 @@ public sealed partial class Plugin : BasePlugin
         // Config.Reload must not save every setting back over a GUI edit.
         Config.SaveOnConfigSet = false;
         UiEnabled = Config.Bind("UI", "Enabled", false, "Scale matching root overlay HUD canvases.");
+        BindOnlineProtection();
+        InstallOnlineProtection();
         HudScale = Config.Bind("UI", "HudScale", 1f, new ConfigDescription("Multiplier of captured Canvas scale.", new AcceptableValueRange<float>(0.5f, 2f)));
         CanvasFilter = Config.Bind("UI", "CanvasNameFilter", "HUD", "Case-insensitive canvas name substring. Empty filters do not match.");
         AudioEnabled = Config.Bind("Audio", "Enabled", false, "Multiply the game's Wwise volume settings.");
@@ -64,7 +66,7 @@ public sealed partial class Plugin : BasePlugin
         _behaviour = AddComponent<StudioBehaviour>();
         Config.Save();
         LiveConfig.Initialize(this);
-        Log.LogInfo("TK2 Mod Toolkit 0.6.17: offline test features available; leaderboard uploads unchanged.");
+        Log.LogInfo("TK2 Mod Toolkit 0.6.18: offline test features available; online protection active when configured.");
     }
 
     private void TryFeature(string name, Action install)

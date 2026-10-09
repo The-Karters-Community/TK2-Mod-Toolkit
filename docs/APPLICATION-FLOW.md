@@ -11,7 +11,7 @@ Installation finds the Steam game folder and checks BepInEx files, generated int
 3. The already loaded plugin checks file content every 0.5 seconds on Unity's main thread and reloads its ConfigEntry values.
 4. Existing hooks and update loops read those values. No compiler, new DLL, reinstallation or restart is involved.
 
-External config editors use the same flow. Presentation overrides restore captured/native values when disabled. Some gameplay actions already performed, such as changing a lap outcome or killing a racer, cannot undo their past effects by switching a setting off. Online gameplay guards remain; this requested build has no leaderboard blocker.
+External config editors use the same flow. Presentation overrides restore captured/native values when disabled. Some gameplay actions already performed, such as changing a lap outcome or killing a racer, cannot undo their past effects by switching a setting off. The default-on Online protection module blocks leaderboard submissions and Photon room/lobby operations while non-allowlisted modules or external BepInEx plugins are active.
 
 ## Tune the camera in a race
 

@@ -30,3 +30,10 @@
 
 - Expanded accordion chevrons now use a bright amber in dark mode for stronger contrast.
 - Added Expand all and Collapse all controls for displayed module and recipe panels plus nested parameter sections. The state also stays consistent with individual accordion toggles.
+
+## Responsive module controls and online protection 0.6.18 (2026-10-09)
+
+- Reworked the module toolbar into a responsive filter/search grid and moved accordion actions onto their own labeled row so narrow windows no longer crowd or overlap controls.
+- Added default-on global Online protection with independent upload and online-room switches. The allowlist is limited to HUD size and HUD transparency. All other active Toolkit modules/recipes and non-Toolkit BepInEx plugins are treated as unapproved.
+- Read-only Ghidra evidence from the matching current `GameAssembly.dll` hash identifies leaderboard submission at `0x180529170` and Photon lobby/room API entrypoints at `0x182589580`, `0x18258d580`, `0x18258d660`, `0x18258d720`, `0x18258dc40`, `0x18258e180`, `0x18258e670`, `0x18258e6e0`, `0x18258e740`, and `0x182596180`. The plugin resolves and patches complete current interop `MethodInfo`s for the target method names and all overloads.
+- Runtime lobby and leaderboard behavior remains unverified; install/test manually after the plugin and Toolkit update. The user has explicitly superseded the prior test-build policy against upload blocking.
