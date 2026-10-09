@@ -27,6 +27,8 @@ assert "data-theme=dark" in css and "prefers-reduced-motion" in css
 components = (web / "components.css").read_text(encoding="utf-8")
 assert ".module-expand" in components and ".topbar-update" in components
 assert '/components.css' in (web / "index.html").read_text(encoding="utf-8")
+assert "max-width:1450px" not in css and "min-height:100vh" in css
+assert "__APP_VERSION__" in (web / "index.html").read_text(encoding="utf-8")
 assert all((core.ROOT / "assets" / name).exists() for name in ("Logo.png", "library_600x900_2x.jpg"))
 subprocess.run(["node", "--check", str(web / "app.js")], check=True, creationflags=core.CREATE_NO_WINDOW)
 result = {"uniqueControls": len(page.ids), "views": page.targets, "themeTokens": True, "assetsPresent": True,

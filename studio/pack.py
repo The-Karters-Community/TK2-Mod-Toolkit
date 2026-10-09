@@ -10,6 +10,7 @@ SOURCE_ROOT = PROJECT.parent
 FEATURES = [
     {"id": "UI", "name": "HUD scale", "category": "Interface", "description": "Make matching HUD canvases easier to read.", "origin": "New", "settings": [("HudScale", "Scale", "float", 1, .5, 2), ("CanvasNameFilter", "Canvas name contains", "text", "HUD", None, None)]},
     {"id": "HudOpacity", "name": "HUD opacity", "category": "Interface", "description": "Soften the HUD on matching canvases with an existing CanvasGroup. Uses the HUD name filter.", "origin": "New", "settings": [("Opacity", "Opacity", "float", 1, .1, 1)]},
+    {"id": "DisableVignette", "name": "Disable vignette", "category": "Interface", "description": "Remove the game's edge-darkening vignette effect without changing its saved post-processing settings.", "origin": "New", "settings": []},
     {"id": "Audio", "name": "Audio mixer", "category": "Audio", "description": "Multiply the game's Wwise volume settings, then restore them when disabled.", "origin": "New", "settings": [("MasterVolume", "Master volume", "float", 1, 0, 1), ("MusicVolume", "Music", "float", 1, 0, 1), ("SfxVolume", "Sound effects", "float", 1, 0, 1), ("VoiceVolume", "Voices", "float", 1, 0, 1), ("UiVolume", "Interface sounds", "float", 1, 0, 1)]},
     {"id": "Camera", "name": "Camera setup", "category": "Camera", "description": "Adjust the local racing camera while keeping your kart comfortably framed.", "origin": "New", "settings": [("FieldOfView", "Field of view", "float", 65, 35, 110), ("PreserveKartFraming", "Keep kart size", "bool", True, None, None), ("DistanceMultiplier", "Camera distance", "float", 1, .5, 2.5), ("HeightOffset", "Camera height", "float", 0, -2, 4)]},
     {"id": "Rendering", "name": "Shadow distance", "category": "Graphics", "description": "Set Unity's shadow draw distance. Rendering behavior depends on the game's pipeline.", "origin": "New", "settings": [("ShadowDistance", "Distance", "float", 100, 0, 500)]},
@@ -122,7 +123,7 @@ def defaults():
 
 
 PACKS = [
-    {"id": "garage", "name": "Toolkit Essentials", "description": "Camera, interface, audio, graphics and race performance controls.", "features": ["UI", "HudOpacity", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
+    {"id": "garage", "name": "Toolkit Essentials", "description": "Camera, interface, audio, graphics and race performance controls.", "features": ["UI", "HudOpacity", "DisableVignette", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
     {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
@@ -168,6 +169,7 @@ def module_sources():
     ownership = {
         "UI": ["StudioBehaviour.cs", "Plugin.cs"],
         "HudOpacity": ["StudioBehaviour.cs", "PackModules.cs"],
+        "DisableVignette": ["PackModules.cs", "Plugin.cs"],
         "Rendering": ["StudioBehaviour.cs", "PackModules.cs"],
         "Performance": ["PerformanceFeature.cs"],
         "PerformanceDiagnostics": ["PerformanceDiagnostics.cs", "PerformanceSamples.cs", "PerformanceEngineSamples.cs", "PerformanceFeature.cs"],

@@ -15,7 +15,7 @@ from urllib.parse import urlsplit, parse_qs
 from . import core, pack, settings, setup, symbols
 
 WEB = core.ROOT / "studio/web"
-APP_VERSION = "0.6.12"
+APP_VERSION = "0.6.13"
 
 
 class Application:
@@ -234,7 +234,7 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200, symbols.detail(parse_qs(parsed.query).get("id", [""])[0]))
                 return self.reply(404, {"error": "Unknown API"})
             if parsed.path == "/":
-                source = (WEB / "index.html").read_text(encoding="utf-8").replace("__SESSION_TOKEN__", self.server.app.token)
+                source = (WEB / "index.html").read_text(encoding="utf-8").replace("__SESSION_TOKEN__", self.server.app.token).replace("__APP_VERSION__", APP_VERSION)
                 return self.reply(200, source, "text/html")
             files = {"/app.js": WEB / "app.js", "/style.css": WEB / "style.css", "/components.css": WEB / "components.css",
                      "/assets/logo.png": core.ROOT / "assets/Logo.png",

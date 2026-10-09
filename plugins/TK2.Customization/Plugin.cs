@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.16")]
+[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.17")]
 public sealed partial class Plugin : BasePlugin
 {
     internal static Plugin? Instance;
@@ -20,6 +20,7 @@ public sealed partial class Plugin : BasePlugin
     internal ConfigEntry<float> HudScale = null!, Volume = null!, Fov = null!, FallAcceleration = null!, AirTime = null!;
     internal ConfigEntry<string> CanvasFilter = null!;
     internal ConfigEntry<bool> PreserveKartFraming = null!;
+    internal ConfigEntry<bool> VignetteDisabled = null!;
     internal ConfigEntry<float> CameraDistance = null!, CameraHeight = null!;
     internal ConfigEntry<float> MusicVolume = null!, SfxVolume = null!, VoiceVolume = null!, UiVolume = null!;
     internal bool GameplayReady, PhysicsFaulted, SessionModified;
@@ -63,7 +64,7 @@ public sealed partial class Plugin : BasePlugin
         _behaviour = AddComponent<StudioBehaviour>();
         Config.Save();
         LiveConfig.Initialize(this);
-        Log.LogInfo("TK2 Mod Toolkit 0.6.16: offline test features available; leaderboard uploads unchanged.");
+        Log.LogInfo("TK2 Mod Toolkit 0.6.17: offline test features available; leaderboard uploads unchanged.");
     }
 
     private void TryFeature(string name, Action install)

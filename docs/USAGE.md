@@ -21,6 +21,8 @@ Settings reload on the game's main thread within about half a second. Content fi
 
 Camera setup contains FOV, Keep kart size, distance, height, side offset, aim, target height, pitch/yaw/roll and smoothing. Press F8 during a local race to open the in-game editor; choose C or another hotkey in the panel settings. Sliders preview immediately and save changed camera keys after a 350 ms idle delay. +/- adjusts precisely; Shift reduces the step. Reset in the panel restores geometry defaults while keeping its current enable state and accessible hotkey. Toolkit module resets still switch the whole module off. Keep kart size compensates distance when FOV changes. Native camera intro/spectator behavior stays intact. A very narrow FOV can still reduce visibility around the kart; the geometry change needs manual feel/testing.
 
+Disable vignette is an optional visual module, off by default. Enable it to suppress the post-processing vignette while preserving the game's profile values; turning it off lets the game's current vignette settings apply again. The hook compiles against the installed game interop, but its live rendering behavior still needs an in-game check.
+
 ## Workshop
 
 Search the complete game-method declaration catalog by type, method or parameter. Select a result to see its C# signature and recovery status. Open reconstructed C# when available; declarations without recovered bodies remain labeled as declarations. No fabricated body is supplied.

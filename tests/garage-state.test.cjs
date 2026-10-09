@@ -33,7 +33,7 @@ function query(selector) {
   const names = selector.split(',').map(part => /^\[data-([^\]]+)\]$/.exec(part.trim())?.[1]?.replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase())).filter(Boolean);
   return Object.values(ids).flatMap(descendants).filter(node => names.some(name => node.dataset[name] !== undefined));
 }
-const document = {documentElement: new Node(), getElementById: id => ids[id], createElement: tag => new Node(tag), querySelector: selector => selector.startsWith('meta') ? meta : brand, querySelectorAll: query, addEventListener(){}};
+const document = {documentElement: new Node(), getElementById: id => ids[id], createElement: tag => new Node(tag), createElementNS: (_namespace, tag) => new Node(tag), querySelector: selector => selector.startsWith('meta') ? meta : brand, querySelectorAll: query, addEventListener(){}};
 const fixture = {installed: false, packCurrent: false, pluginCount: 0, game: 'test game', logs: [], backups: [],
   recipes: [{section: 'Recipe.FrameLimiter', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Limit FPS'}],
   extraSettings: [{section: 'MK.BoostTrainer', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Trainer'}],
@@ -96,6 +96,9 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   assert.equal(ids['plugin-update-top'].hidden, true, 'up-to-date plugins do not show an update action');
   const accordion = descendants(ids['feature-list']).find(node => node.classes.has('module-expand'));
   const panelId = accordion.getAttribute('aria-controls'), accordionPanel = descendants(ids['feature-list']).find(node => node.id === panelId);
+  const chevron = accordion.children.find(node => node.tagName === 'SVG');
+  assert.equal(chevron.getAttribute('viewBox'), '0 0 24 24');
+  assert.match(chevron.children[0].getAttribute('d'), /M16\.59 8\.59/);
   accordion.click(); assert.equal(accordion.getAttribute('aria-expanded'), 'true'); assert.equal(accordionPanel.hidden, false, 'module accordion opens and updates its accessible state');
   assert.equal(document.documentElement.dataset.theme, 'light'); ids.theme.click();
   assert.equal(document.documentElement.dataset.theme, 'dark'); assert.equal(context.localStorage.data['tk2-theme'], 'dark');

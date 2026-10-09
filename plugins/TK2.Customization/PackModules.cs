@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.Rendering.PostProcessing;
 using System.Reflection;
 
 namespace TK2.Customization;
@@ -33,6 +34,7 @@ public sealed partial class Plugin
         JumpMultiplier = Config.Bind("Tuning", "JumpMultiplier", 1f, new ConfigDescription("Jump strength multiplier.", new AcceptableValueRange<float>(0.25f, 3f)));
         HudOpacityEnabled = Config.Bind("HudOpacity", "Enabled", false, "Change opacity on matching HUD canvases that already have a CanvasGroup.");
         HudOpacity = Config.Bind("HudOpacity", "Opacity", 1f, new ConfigDescription("HUD alpha.", new AcceptableValueRange<float>(0.1f, 1f)));
+        VignetteDisabled = Config.Bind("DisableVignette", "Enabled", false, "Disable the vignette post-processing effect without changing its profile settings.");
         RenderEnabled = Config.Bind("Rendering", "Enabled", false, "Override Unity shadow distance.");
         ShadowDistance = Config.Bind("Rendering", "ShadowDistance", 100f, new ConfigDescription("Shadow draw distance.", new AcceptableValueRange<float>(0f, 500f)));
     }
@@ -50,12 +52,21 @@ public sealed partial class Plugin
             PatchExact(typeof(Ant_BoostManager), "BoostInput", new[] {typeof(bool)}, nameof(BoostInputPrefix), true);
         });
         TryFeature("kart tuning", () => PatchExact(typeof(PixelKartPhysics), "FixedUpdate", Type.EmptyTypes, nameof(TuningPostfix), false));
+        TryFeature("disable vignette", () => PatchExact(typeof(Vignette), "IsEnabledAndSupported",
+            new[] { typeof(PostProcessRenderContext) }, nameof(VignettePrefix), prefix: true));
         RecipeHost.Install(this);
         LegacyMK.BeforeAdvancedTuning = ReleaseSimpleTuning;
     }
 
     internal static bool OfflineLabAllowed => Instance != null && Instance.GameplayReady &&
         !Ant_CurrentGameConfiguration.IsOnlineGame_InRoom_WithInternet;
+
+    private static bool VignettePrefix(ref bool __result)
+    {
+        if (Instance?.VignetteDisabled.Value != true) return true;
+        __result = false;
+        return false;
+    }
 
     private static bool LocalPlayer(Ant_Player player) => player != null && player.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL;
 

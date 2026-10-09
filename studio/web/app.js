@@ -60,6 +60,14 @@ function bindAccordion(trigger, panel, key, expanded) {
     if (open) expandedModules.add(key); else expandedModules.delete(key);
   };
 }
+function chevronIcon() {
+  const namespace = 'http://www.w3.org/2000/svg';
+  const icon = document.createElementNS(namespace, 'svg'); icon.setAttribute('class', 'expand-arrow');
+  icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(namespace, 'path');
+  path.setAttribute('d', 'M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z'); icon.append(path);
+  return icon;
+}
 function featureGroup(feature) {return feature.gameplay ? 'Gameplay' : feature.category === 'Audio' ? 'Audio' : 'Visual';}
 function packsForState() {
   const packs = (state.packs || []).map(pack => ({...pack, features: (pack.features || []).map(id => typeof id === 'object' ? id : state.features.find(feature => feature.id === id)).filter(Boolean)}));
@@ -199,7 +207,7 @@ function renderFeatures() {
       if (feature.description) info.append(el('span', 'module-description', feature.description));
       const enabled = Boolean(state.settings[feature.id + '/Enabled']), status = el('span', 'module-state', enabled ? 'On' : 'Off'); status.dataset.moduleState = feature.id;
       const panel = el('div', 'module-body'); panel.id = 'module-' + feature.id; panel.hidden = !(expandedModules.has(feature.id) || Boolean(search));
-      expand.append(info, status, el('span', 'expand-arrow', '⌄'));
+      expand.append(info, status, chevronIcon());
       bindAccordion(expand, panel, feature.id, !panel.hidden);
       const toggle = switchControl('Enable ' + feature.name, enabled, unavailable || busy && actionInFlight !== 'settings', value => changeSetting(feature.id + '/Enabled', value));
       toggle.children[0].dataset.setting = feature.id + '/Enabled';
@@ -233,7 +241,7 @@ function appendEntryGroups(container, groups, extra = false) {
     const enabled = settings.find(entry => entry.key === 'Enabled' && entry.type === 'Boolean');
     if (enabled?.description) info.append(el('span', 'module-description', enabled.description));
     const panel = el('div', 'module-body'); panel.id = 'section-' + name.replace(/[^A-Za-z0-9_-]/g, '-'); panel.hidden = !(expandedModules.has(name) || Boolean($('mod-search').value));
-    expand.append(info, el('span', 'expand-arrow', '⌄'));
+    expand.append(info, chevronIcon());
     bindAccordion(expand, panel, name, !panel.hidden);
     heading.append(expand);
     if (enabled) {

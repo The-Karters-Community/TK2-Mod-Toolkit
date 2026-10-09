@@ -22,6 +22,9 @@
 .parameter-group summary{padding:2px 0 10px}
 .parameter-group[open] summary{color:var(--text)}
 .parameter-group .settings-grid{margin-top:0}
+.expand-arrow{display:block;flex:0 0 22px;width:22px;height:22px;fill:currentColor;transform:rotate(0);transform-origin:center;transition:transform .18s cubic-bezier(.2,.7,.2,1)}
+.module-expand[aria-expanded=true] .expand-arrow{transform:rotate(180deg)}
 @media(max-width:780px){.module-heading{padding:8px 10px}.module-body{margin-inline:8px;padding-inline:14px}}
+@media(min-width:1500px){.settings-grid{grid-template-columns:repeat(3,minmax(0,1fr));column-gap:24px}}
 @media(max-width:520px){.topbar-status{width:100%;justify-content:space-between}.module-heading{gap:6px}.module-expand{gap:7px;padding-inline:4px}.module-state{min-width:36px;padding-inline:6px}.module-body{margin-inline:6px;padding-inline:12px}.setting select{max-width:none}}
 @media(prefers-reduced-motion:reduce){.module{transition:none}}

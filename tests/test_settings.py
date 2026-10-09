@@ -118,6 +118,13 @@ class SettingsMergeTests(unittest.TestCase):
                 pack.validate({"TrackBoundaries/DrawDistance": value})
         with self.assertRaises(ValueError): pack.validate({"TrackBoundaries/ToggleKey": "Invalid"})
 
+    def test_vignette_module_is_default_off_and_tracks_its_patch_sources(self):
+        self.assertFalse(pack.defaults()["DisableVignette/Enabled"])
+        garage = next(p for p in pack.catalog_packs() if p["id"] == "garage")
+        self.assertEqual(garage["features"].count("DisableVignette"), 1)
+        self.assertEqual(set(pack.module_sources()["DisableVignette"]), {
+            "plugins/TK2.Customization/PackModules.cs", "plugins/TK2.Customization/Plugin.cs"})
+
     def test_performance_module_has_pack_membership_and_source_ownership(self):
         from unittest.mock import patch
         feature = next(f for f in pack.catalog_features() if f["id"] == "Performance")
