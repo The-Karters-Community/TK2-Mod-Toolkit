@@ -20,7 +20,7 @@ FEATURES = [
         ("AIPhysicsInterval", "AI physics interval", "int", 2, 1, 4, "Physics ticks between selected AI motor updates. 1 updates every tick; higher values lower accuracy.", None, "LowerAIPhysics"),
     ]},
     {"id": "PerformanceDiagnostics", "name": "Performance diagnostics", "category": "Graphics", "description": "Record game, engine, rendering and memory measurements during offline races. Available counters depend on the shipped player; capture stops automatically.", "origin": "New", "settings": [("CaptureSeconds", "Capture seconds", "int", 60, 10, 180, "Capture per race after a 5-second warmup; results are saved in BepInEx/diagnostics.")]},
-    {"id": "TrackBoundaries", "name": "Track boundaries", "category": "Graphics", "description": "Reveal the track's authored debug meshes: cyan invisible walls and orange respawn boundaries. Offline only; F10 toggles visibility. Turn off for performance measurements.", "origin": "New", "settings": [
+    {"id": "TrackBoundaries", "name": "Track boundaries", "category": "Graphics", "description": "Show the track's collider geometry: cyan invisible walls and orange respawn boundaries. Offline only; F10 toggles visibility. Turn off for performance measurements.", "origin": "New", "settings": [
         ("ShowWalls", "Invisible walls", "bool", True, None, None),
         ("ShowRespawn", "Respawn boundaries", "bool", True, None, None),
         ("DrawDistance", "View distance", "float", 200, 25, 1000, "Distance from a local kart in metres."),
@@ -167,7 +167,7 @@ def module_sources():
         "Rendering": ["StudioBehaviour.cs", "PackModules.cs"],
         "Performance": ["PerformanceFeature.cs"],
         "PerformanceDiagnostics": ["PerformanceDiagnostics.cs", "PerformanceSamples.cs", "PerformanceEngineSamples.cs", "PerformanceFeature.cs"],
-        "TrackBoundaries": ["TrackBoundaries.cs", "BoundarySelection.cs"],
+        "TrackBoundaries": ["TrackBoundaries.cs", "BoundarySelection.cs", "BoundaryGeometry.cs"],
         "Audio": ["AudioFeature.cs", "Plugin.cs"],
         "Camera": ["CameraFeature.cs", "CameraSettings.cs", "CameraPanel.cs"],
         "Physics": ["FastFallFeature.cs", "Plugin.cs"],

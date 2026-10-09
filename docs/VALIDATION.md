@@ -1,5 +1,15 @@
 # Validation
 
+## Boundary selection and Mirror Race menu correction (2026-10-09)
+
+Runtime 0.6.12 selects boundary colliders directly instead of requiring debug renderers. Read-only metadata from a sampled built-in track confirms 165 self-active/enabled wall/respawn colliders with only Transform + collider components. MeshCollider source meshes are shared; box/sphere/capsule visualizations use collider dimensions. Native hit masks remain the selection authority. The view does not modify native renderers, cameras, physics or scene transforms. [Evidence and limitations](TRACK-BOUNDARIES.md).
+
+Mirror Race now checks menu/map/offline/config context before scene searches and directly in callbacks. It removes injected render callbacks on exit and uses four discovery scans per second during setup/racing instead of twenty while waiting. Menu/loading/disabled/online paths perform zero scene scans. Countdown mirroring remains available. [Behavior and proof limits](MIRROR-RACE.md).
+
+Validation: 89 Python tests, 133 frontend assertions, 96-control static GUI smoke, 113 performance assertions, 73 production-linked boundary assertions and 49 production-linked mirror assertions pass. Compilation against installed references has zero warnings/errors. Stub tests do not establish live shader appearance, PhysX cooking, actual menu FPS or coverage of every track. The game was not launched automatically. Deployment and DLL/config integrity are recorded separately in ignored `local/boundary-regression/deployment.json` after the game closes; no portable executable or ZIP was built.
+
+Runtime 0.6.12 was deployed with the game stopped. Installed DLL SHA-256 matches the artifact: `495be88022ec43d965223dbc176a74fdbe2b403f3f7a65cf89d3756123fb4783`. Both existing config files remained byte-identical. DLL rollback transaction: `local/backups/1791541821381833900`. Live runtime verification remains pending.
+
 ## Engine capture and selective track boundaries (2026-10-09)
 
 Runtime 0.6.11 adds [engine/GPU capture](PERFORMANCE-ENGINE-CAPTURE.md) and a separate [track boundaries view](TRACK-BOUNDARIES.md). Six native UnityPlayer profiler bindings have current Ghidra/ABI evidence in an isolated scratch project and an exact binary hash guard. Three kart layer masks and the native mesh-hiding component establish selective boundary semantics. The view shares authored debug meshes on collider-free visual children; original rendering, camera masks and physics remain untouched.

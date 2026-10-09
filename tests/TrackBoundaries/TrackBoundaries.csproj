@@ -3,5 +3,6 @@
   <ItemGroup>
     <Compile Include="../../plugins/TK2.Customization/TrackBoundaries.cs" Link="TrackBoundaries.cs" />
     <Compile Include="../../plugins/TK2.Customization/BoundarySelection.cs" Link="BoundarySelection.cs" />
+    <Compile Include="../../plugins/TK2.Customization/BoundaryGeometry.cs" Link="BoundaryGeometry.cs" />
   </ItemGroup>
 </Project>
