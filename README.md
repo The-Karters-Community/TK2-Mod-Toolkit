@@ -11,8 +11,9 @@ The supported game build is **0.1.4.18 (Windows x64)**. The validated loader is 
 The screenshots below show the current Mod packs page and Workshop editor. The web UI adapts to the app window; controls and module catalog may change between toolkit builds.
 
 ![Mod packs overview](docs/images/mod-packs.png)
-
-![Workshop editor](docs/images/workshop.png)
+![Workshop 1](docs/images/workshop.png)
+![Workshop 3](docs/images/workshop3.png)
+![Tool Installation](docs/images/installation.png)
 
 ## Install and use the application
 
