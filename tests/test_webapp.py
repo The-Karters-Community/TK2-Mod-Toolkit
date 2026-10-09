@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
+from urllib.parse import quote
 from unittest.mock import patch
 from studio import core, pack, webapp
 
@@ -169,6 +170,18 @@ class GarageTests(unittest.TestCase):
         self.assertFalse(self.app.config_path.exists())
         self.assertEqual(request("GET", "/api/source?file=../../outside.cs", auth)[0], 400)
         self.assertEqual(request("GET", "/api/source?file=plugins/TK2.Customization/Example.cs", auth)[0], 200)
+        pseudo = self.root / "local/ghidra/test/pseudocode/180000001_Test__Tick.c"
+        pseudo.parent.mkdir(parents=True)
+        pseudo.write_text("/* Ghidra pseudocode, not original C#; Test$$Tick @ 180000001 */\nvelocity = 1;\n", encoding="utf-8")
+        status, body = request("GET", "/api/pseudocode?q=velocity", auth)
+        self.assertEqual(status, 200)
+        result = json.loads(body)
+        self.assertEqual(result["total"], 1)
+        identity = quote(result["results"][0]["id"], safe="")
+        status, body = request("GET", "/api/pseudocode?id=" + identity, auth)
+        self.assertEqual(status, 200)
+        self.assertIn("velocity", json.loads(body)["code"])
+        self.assertEqual(request("GET", "/api/pseudocode?id=../../outside.c", auth)[0], 400)
 
 
 if __name__ == "__main__": unittest.main()

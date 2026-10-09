@@ -125,11 +125,12 @@ The useful committed material is:
 - [`docs/READABLE-SOURCE.md`](docs/READABLE-SOURCE.md) lists currently reconstructed methods, evidence and limitations.
 - [`docs/RECONSTRUCTION.md`](docs/RECONSTRUCTION.md) explains the reconstruction workflow and incomplete areas.
 - [`docs/IL2CPP-EXPORTS.md`](docs/IL2CPP-EXPORTS.md) explains the declaration, native pseudocode and reviewed C# layers, with commands to regenerate local exports.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) separates runtime-code modding from the developer's Workshop content SDK and gives evidence, review and local setup expectations.
 - [`tools/il2cpp_source_map.py`](tools/il2cpp_source_map.py) builds an ignored local mapping from DummyDll type declarations to candidate Ghidra functions and native addresses.
 - [`tools/ghidra/targets.txt`](tools/ghidra/targets.txt) and [`tools/ghidra/migration-targets.txt`](tools/ghidra/migration-targets.txt) define reproducible function export targets; `tools/ghidra/ExportTk2.java` is the Ghidra exporter.
 - [`docs/REA-MIGRATION.md`](docs/REA-MIGRATION.md) summarizes recent REA findings and migration decisions.
 
-The Workshop **Game API reference** is a searchable method/signature catalog; a listed signature does not mean that its body has been recovered. The bulk Ghidra project, native pseudocode exports, generated interop, raw dumps and third-party managed decompilations live under ignored `local/` or `exports/` paths when present on the maintainer's machine. In this checkout, the native index and its provenance are `local/ghidra/functions.jsonl` and `local/ghidra/summary.json`; exported Ghidra C-like pseudocode is in `local/ghidra/pseudocode/`. These are not distributed in Git. The declaration export is for browsing and signature lookup, not game execution. Follow [the local export guide](docs/IL2CPP-EXPORTS.md) to generate matching evidence on your own installation; do not treat the function index as a full source release.
+The Workshop **Game API reference** is a searchable method/signature catalog; a listed signature does not mean that its body has been recovered. The browser can also full-text search local Ghidra pseudocode exports when present. The bulk Ghidra project, native pseudocode exports, generated interop, raw dumps and third-party managed decompilations live under ignored `local/` or `exports/` paths. In the maintainer's current checkout, the native index and provenance are `local/ghidra/functions.jsonl` and `local/ghidra/summary.json`; selected and broad Assembly-CSharp Ghidra C-like pseudocode is in `local/ghidra/**/pseudocode/`. These game-derived files are not distributed in Git. The declaration export is for browsing and signature lookup, not game execution. Follow [the local export guide](docs/IL2CPP-EXPORTS.md) to generate matching evidence on your own installation; do not treat the function index as a full source release.
 
 ## Guides and reference
 
@@ -139,6 +140,7 @@ The Workshop **Game API reference** is a searchable method/signature catalog; a 
 | Create a C# recipe | [First mod](docs/FIRST-MOD.md) |
 | Share/import modules | [Share modules](docs/SHARING-MODULES.md), [community packs](docs/MOD-PACK.md) |
 | Portable package and release process | [Portable packaging](docs/PORTABLE.md), [releases](docs/RELEASING.md) |
+| Community setup and modding routes | [Contributing](CONTRIBUTING.md) |
 | Reverse engineering and source status | [Readable source](docs/READABLE-SOURCE.md), [local IL2CPP exports](docs/IL2CPP-EXPORTS.md), [reconstruction notes](docs/RECONSTRUCTION.md), [REA migration](docs/REA-MIGRATION.md) |
 | Online safety | [Online protection policy](docs/ONLINE-PROTECTION.md) |
 | Track-boundary inspector | [Track boundaries](docs/TRACK-BOUNDARIES.md) |
@@ -152,7 +154,7 @@ Online protection stays on and cannot be disabled in the app. It blocks leaderbo
 
 When adding a module, keep user settings and implementation in the existing catalog-driven structure, provide defaults/ranges and reset behavior, add focused regression coverage, and review its online-safety classification. Keep generated game data, decompiled third-party sources, captures and machine-local paths out of commits. Record binary version, hashes, evidence sources and limitations when adding native reconstruction. `AGENTS.md` contains repository-specific implementation and validation rules.
 
-See [LICENSE](LICENSE) for the terms applying to this repository. Game files and any bundled third-party software keep their own licenses and are not relicensed by this project.
+See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change. See [LICENSE](LICENSE) for the terms applying to this repository. Game files and any bundled third-party software keep their own licenses and are not relicensed by this project.
 
 ## Credits and disclosure
 

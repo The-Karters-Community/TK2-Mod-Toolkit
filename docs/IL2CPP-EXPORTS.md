@@ -12,6 +12,8 @@ The practical modder workflow has three different evidence layers:
 
 Generated declarations and Ghidra exports are game-derived local analysis data. Keep them under ignored `local/` or `exports/`; do not commit or include them in toolkit releases. The scripts and documentation in this repository are the reproducible, shareable part.
 
+The `Launch Studio.cmd` web app separates the declaration browser from a **Search native pseudocode** panel. It searches exported function names and body text, then opens the selected `.c` file in a read-only viewer. Its first search builds an ignored SQLite full-text index under `local/ghidra/`; following searches update that index when export files change. No search corpus is bundled into Git or the portable release. Contributors can regenerate exports against their own exact game build, then use the same search UI.
+
 ## Regenerate the declaration layer
 
 Install an Il2CppDumper-compatible dumper and point it at the exact game `GameAssembly.dll` and `global-metadata.dat`. Keep the output outside Git. For the standard Il2CppDumper `DummyDll` output, dnSpy Console can turn those declaration assemblies into browseable C# files:

@@ -4,7 +4,7 @@ Generated DummyDll declarations and the local source-map/pseudocode workflow are
 
 ## What the first export establishes
 
-Ghidra reports 184,138 functions, of which 155,180 do not have default `FUN_` names. A name is not necessarily an original game-specific method: runtime/library symbols and imported/generated labels are included. There are 56 local pseudocode files after a broad camera sample and a targeted gameplay/audio export. All 26 functions selected in the targeted export completed without decompiler errors. We have not decompiled/reviewed the bodies of every function.
+Ghidra reports 184,138 functions, of which 155,180 do not have default `FUN_` names. A name is not necessarily an original game-specific method: runtime/library symbols and imported/generated labels are included. The maintainer's exact-build local export now contains 14,169 Assembly-CSharp-class-name pseudocode files plus one function timeout; the run used a broader, unanchored matcher, so some substring matches may be included. `local/ghidra/assembly-csharp-full/export-report.json` records the scope, limitation, and timeout. The complete function index is `local/ghidra/functions.jsonl`. The app's pseudocode search can inspect the local export; no game-derived files are committed or distributed. Exported pseudocode has not all been semantically reviewed.
 
 Metadata catalog: 23,785 types across game and dependency assemblies. Assembly-CSharp's image starts at type index 0; the next image starts at 4,753. Imported metadata also includes networking, Wwise, UI, Rewired, platform APIs and framework libraries. Treat the index as a browser, not a list of 23,785 gameplay classes.
 

@@ -13,7 +13,7 @@ import sys
 import threading
 import webbrowser
 from urllib.parse import urlsplit, parse_qs
-from . import core, pack, settings, setup, symbols, releases
+from . import core, pack, settings, setup, symbols, releases, pseudocode
 from .version import APP_VERSION
 
 WEB = core.ROOT / "studio/web"
@@ -254,6 +254,13 @@ class Handler(BaseHTTPRequestHandler):
                         query = parse_qs(parsed.query).get("q", [""])[0]
                         count, matches = core.search_native_functions(query)
                         return self.reply(200, {"count": count, "matches": matches})
+                    if parsed.path == "/api/pseudocode":
+                        query = parse_qs(parsed.query)
+                        identity = query.get("id", [""])[0]
+                        if identity:
+                            return self.reply(200, pseudocode.read(identity))
+                        return self.reply(200, pseudocode.search(
+                            query.get("q", [""])[0], int(query.get("offset", ["0"])[0])))
                     if parsed.path == "/api/functions":
                         query = parse_qs(parsed.query)
                         return self.reply(200, symbols.search(query.get("q", [""])[0], int(query.get("offset", ["0"])[0]), query.get("recovered", ["false"])[0] == "true", query.get("topic", ["all"])[0]))

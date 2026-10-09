@@ -68,6 +68,7 @@ const context = {document, console, location:{hash:'#mods'}, history:{replaceSta
       if (deferFunctions) data = await new Promise(resolve => {pendingFunctions = () => resolve(data);});
     }
     else if (url.startsWith('/api/function?')) data = {type:'PixelKartPhysics',name:'AddVelocity',label:'Add Velocity',access:'internal',status:'Editable reconstructed C# available',source:'src/Reconstructed/KartLogic.cs',declaration:'internal void AddVelocity(Vector3 velocity);'};
+    else if (url.startsWith('/api/pseudocode?')) data = url.includes('id=') ? {code:'velocity = groundFriction * deltaTime;',truncated:false} : {total:1,indexed:1,results:[{id:'local/ghidra/run/pseudocode/180000001_Kart__Update.c',name:'Kart$$Update',address:'180000001',snippet:'velocity = groundFriction'}],next:null,message:'Native C-like pseudocode.'};
     else if (url === '/api/save-source') {ok = !sourceConflict; data = sourceConflict ? {error:'Source changed outside the app'} : {hash:'saved-source-hash'};}
     else if (url === '/api/settings') {
       if (settingsFailure) {ok = false; data = settingsFailure;}
@@ -217,6 +218,11 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   functionFailure=false; await ids['function-search'].click(); assert.equal(ids['function-list'].children.length,1,'failed search can be retried');
   await ids['function-list'].children[0].click(); ids['open-function-source'].click(); await settle();
   assert.equal(run('source.file'),'src/Reconstructed/KartLogic.cs'); assert.equal(ids['panel-editor'].hidden,false);
+  ids['pseudocode-query'].value='groundFriction'; await ids['pseudocode-search'].click();
+  assert.equal(ids['pseudocode-list'].children.length,1,'native source search displays matching functions');
+  assert.equal(ids['pseudocode-list'].children[0].children[0].textContent,'Kart$$Update');
+  await ids['pseudocode-list'].children[0].click();
+  assert.match(ids['pseudocode-viewer'].textContent,/groundFriction/,'selected native pseudocode opens in the read-only viewer');
   ids['tab-tutorial'].click(); assert.equal(ids['panel-tutorial'].hidden,false); assert.equal(ids['panel-api'].hidden,true);
   assert.equal(ids['functions-more'],undefined,'infinite scrolling replaces the Load more button');
   assert.ok(html.includes('Your first mod: a kart hop') && html.includes('Recipes/MyKartHop.cs'));

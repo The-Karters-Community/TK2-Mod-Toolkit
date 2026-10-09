@@ -1,5 +1,6 @@
 'use strict';
 let nextFunctions = null, functionSequence = 0, functionLoading = false, detailSequence = 0, sourceSequence = 0;
+let nextPseudocode = null, pseudocodeSequence = 0, pseudocodeLoading = false, pseudocodeDetailSequence = 0;
 let workshopTab = 'editor', selectedModule = 'all', functionQueryTimer;
 const $ = id => document.getElementById(id);
 const token = document.querySelector('meta[name="tk2-session"]').content;
@@ -565,7 +566,9 @@ $('reload-source').onclick = () => {if (sourceDirty && !confirm('Discard unsaved
 $('code').onkeydown = event => {if (event.key === 'Tab') {event.preventDefault(); const node = event.target; node.setRangeText('    ', node.selectionStart, node.selectionEnd, 'end'); node.dispatchEvent(new Event('input'));}};
 document.addEventListener('keydown', event => {if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {event.preventDefault(); if (location.hash === '#workshop' && sourceDirty && !busy) $('save-source').click(); else if (settingsDirty && !busy) $('save-settings').click();}});
 window.addEventListener('beforeunload', event => {if (sourceDirty || settingsDirty || busy) {event.preventDefault(); event.returnValue = '';}});
-$('native-search').onclick = async () => {try {$('native-results').textContent = JSON.stringify(await api('native?q=' + encodeURIComponent($('native-query').value)), null, 2);} catch (error) {notice(error.message, true);}};
+$('pseudocode-search').onclick = () => searchPseudocode().catch(error => notice(error.message, true));
+$('pseudocode-query').onkeydown = event => {if (event.key === 'Enter') $('pseudocode-search').click();};
+$('pseudocode-more').onclick = () => searchPseudocode(true).catch(error => notice(error.message, true));
 showView(['mods', 'workshop', 'installation'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'mods');
 refresh().then(() => {if (!state.setup?.ready && !state.game) showView('installation');}).catch(error => {notice('Toolkit could not load: ' + error.message, true);});
 setInterval(() => {if (state && !busy && !document.hidden) refresh(true, true).catch(() => {});}, 5000);
@@ -617,6 +620,47 @@ async function selectFunction(method) {
     }[detail.type + '.' + detail.name];
     $('function-example').hidden = !usage; $('function-usage').textContent = usage || '';
   } catch (error) {if (sequence === detailSequence) {$('function-status').textContent = 'Reference unavailable. Select the function to retry.'; notice(error.message, true);}}
+}
+async function searchPseudocode(more = false) {
+  if (more && (pseudocodeLoading || nextPseudocode == null)) return;
+  const sequence = ++pseudocodeSequence, offset = more ? nextPseudocode : 0;
+  pseudocodeLoading = true; $('pseudocode-more').disabled = true;
+  if (!more) {
+    nextPseudocode = null; $('pseudocode-list').replaceChildren(); $('pseudocode-more').hidden = true;
+    $('pseudocode-count').textContent = 'Searching local Ghidra pseudocode…';
+    ++pseudocodeDetailSequence; $('pseudocode-name').textContent = 'Choose a result';
+    $('pseudocode-address').textContent = ''; $('pseudocode-viewer').textContent = 'Select a match to inspect its native pseudocode.';
+  }
+  try {
+    const result = await api('pseudocode?q=' + encodeURIComponent($('pseudocode-query').value) + '&offset=' + offset);
+    if (sequence !== pseudocodeSequence) return;
+    const status = result.message || 'Ghidra native pseudocode.';
+    $('pseudocode-count').textContent = `${result.total.toLocaleString()} matches across ${result.indexed.toLocaleString()} local exports. ${status}`;
+    (result.results || []).forEach(item => {
+      const button = el('button', 'pseudocode-row'); button.dataset.pseudocode = item.id;
+      button.append(el('strong', '', item.name), el('small', '', item.address));
+      button.append(el('span', 'pseudocode-snippet', item.snippet));
+      button.setAttribute('aria-pressed', 'false'); button.onclick = () => openPseudocode(item);
+      $('pseudocode-list').append(button);
+    });
+    nextPseudocode = result.next;
+    $('pseudocode-more').hidden = nextPseudocode == null;
+  } catch (error) {
+    if (sequence === pseudocodeSequence) {$('pseudocode-count').textContent = 'Could not search local pseudocode. Choose Search to retry.'; notice(error.message, true);}
+  } finally {
+    if (sequence === pseudocodeSequence) {pseudocodeLoading = false; $('pseudocode-more').disabled = false;}
+  }
+}
+async function openPseudocode(item) {
+  const sequence = ++pseudocodeDetailSequence;
+  document.querySelectorAll('[data-pseudocode]').forEach(button => {const active = button.dataset.pseudocode === item.id; button.classList.toggle('selected', active); button.setAttribute('aria-pressed', String(active));});
+  $('pseudocode-name').textContent = item.name; $('pseudocode-address').textContent = 'VA 0x' + item.address;
+  $('pseudocode-viewer').textContent = 'Loading native pseudocode…';
+  try {
+    const result = await api('pseudocode?id=' + encodeURIComponent(item.id));
+    if (sequence !== pseudocodeDetailSequence) return;
+    $('pseudocode-viewer').textContent = result.code + (result.truncated ? '\n\n' + result.message : '');
+  } catch (error) {if (sequence === pseudocodeDetailSequence) {$('pseudocode-viewer').textContent = 'Could not open this pseudocode file.'; notice(error.message, true);}}
 }
 $('function-topic').value = 'important';
 $('function-search').onclick = () => searchFunctions().catch(error => notice(error.message, true));
