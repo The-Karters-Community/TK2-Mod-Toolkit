@@ -72,7 +72,7 @@ internal static class LiveConfig
                 Pending.Clear();
                 p.Config.Reload();
                 _hash = Hash(after);
-                Status = "Camera saved to config · applied live.";
+                Status = "Toolkit settings saved to config · applied live.";
                 return true;
             }
             throw new IOException("Config changed during saving; finish editing in one window first.");

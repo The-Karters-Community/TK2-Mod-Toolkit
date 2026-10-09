@@ -146,3 +146,15 @@ Current native evidence: `Ant_MapData.InitMapDataFrom_ModTrack` copies the debug
 Mirror Race now suppresses the native local-camera steering/drift orbit only during its mirrored framing call, then restores the original flag. This targets the camera branch visible in current Ghidra pseudocode and avoids changing normal camera behavior when the recipe is off.
 
 Validation: plugin **0.6.3** compiles with **0 warnings and 0 errors**; **83 Python tests**, **133 frontend assertions**, and the **96-control static UI smoke check** pass. The new DLL is installed with rollback backup at `local/backups/1791503556440265400`; artifact and installed SHA-256 match (`435df8bd99ba16a4d2ef559d6478eef7ffe3d99e9eee790a130e92a4c5979e82`). The game was not launched automatically, so the final visual effect still needs manual offline verification. No portable executable or distribution ZIP was built.
+
+## Track inspector refinement 0.6.14 (2026-10-09)
+
+The collider view now supports F9 X-ray, F8 pin details, nearest-first capped rendering and screen-space bounds culling. Toolkit settings expose the cap and hotkeys. The pin consumes a slot within the draw cap and is highlighted separately. This is a diagnostic overlay improvement, not a claimed fix for the game's CPU or memory use.
+
+Validation: `python -m studio.cli build` completed against current installed references with **0 warnings and 0 errors**; `git diff --check` passed. Automated tests and GUI smoke were not run. The game process remains active, so the built artifact has not been installed and live appearance, pin targeting, X-ray, rendering cost and cleanup remain unverified.
+
+## Track inspector surfaces and in-game controls 0.6.15 (2026-10-09)
+
+Optional collider fills are now a separate translucent pass with back-face culling, no depth writes and the existing scene-depth/X-ray mode. The F7 controls window previews category, fill, opacity, range, cap and X-ray changes live; edits flow through `LiveConfig`, which saves automatically and on explicit Save. Opening controls unlocks the cursor and closing with F7, Escape or the window button restores its previous state.
+
+The plugin compiled against current installed references with **0 warnings and 0 errors**; `git diff --check` passed. Automated tests and GUI smoke were not run. The game process remains active, so this DLL has not been installed; live fill appearance, in-game interaction, cursor restoration, rendering cost and cleanup remain unverified.

@@ -212,7 +212,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.authorized(): return self.reply(403, {"error": "Invalid session"})
                 app = self.server.app
                 with app.lock:
-                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Toolkit", "version": "0.6.8", "pid": os.getpid(), "game": str(app.game)})
+                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Toolkit", "version": "0.6.10", "pid": os.getpid(), "game": str(app.game)})
                     if parsed.path == "/api/state": return self.reply(200, app.state())
                     if parsed.path == '/api/download':
                         from . import module_packages
@@ -300,7 +300,7 @@ def main():
             if health.get("app") in ("TK2 Mod Toolkit", "TK2 Mod Garage"):
                 if args.game is not None and health.get("game") != str(core.validate_game(args.game)):
                     raise RuntimeError("Close the existing Toolkit before switching game installations")
-                if health.get("version") == "0.6.8":
+                if health.get("version") == "0.6.10":
                     if not args.no_browser: open_window(saved["origin"])
                     return
                 request = urllib.request.Request(saved["origin"] + "/api/shutdown", data=b"{}", headers={"X-TK2-Token": saved["token"], "Content-Type": "application/json"})
@@ -324,7 +324,7 @@ def main():
             if health.get("app") not in ("TK2 Mod Toolkit", "TK2 Mod Garage"): raise RuntimeError("Unexpected service on Toolkit port")
             if args.game is not None and health.get("game") != str(core.validate_game(args.game)):
                 raise RuntimeError("Close the existing Toolkit before switching game installations")
-        if health.get("version") == "0.6.8":
+        if health.get("version") == "0.6.10":
             if not args.no_browser: open_window(expected)
             return
         # Upgrade our old authenticated service so launching the new app cannot

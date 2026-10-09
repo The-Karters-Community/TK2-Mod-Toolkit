@@ -155,7 +155,7 @@ internal static class PerformanceDiagnostics
                 inclusiveMs = Samples.Ticks[i] * 1000d / Stopwatch.Frequency,
                 maxCallMs = Samples.MaxTicks[i] * 1000d / Stopwatch.Frequency };
         using var process = Process.GetCurrentProcess(); process.Refresh();
-        var record = new { schema = 2, utc = DateTime.UtcNow, runtime = "0.6.13", elapsedSeconds = elapsed, context = _context,
+        var record = new { schema = 2, utc = DateTime.UtcNow, runtime = "0.6.15", elapsedSeconds = elapsed, context = _context,
             frames = Samples.Frames, averageFps = Samples.Frames / Samples.FrameSeconds,
             averageFrameMs = Samples.FrameSeconds * 1000 / Samples.Frames, p95FrameMsUpperBound = Samples.FrameP95Ms(),
             p95OverflowAt200Ms = Samples.FrameP95Ms() == null, maxFrameMs = Samples.MaxFrameMs,

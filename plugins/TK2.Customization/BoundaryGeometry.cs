@@ -14,6 +14,7 @@ internal sealed class BoundaryGeometry : IDisposable
     private float _radius, _height, _capsuleRatio = -1;
     private int _shape, _direction;
     private BoundaryGeometry(Collider source) => Source = source;
+    internal string ShapeName => _shape switch { 0 => "mesh", 1 => "box", 2 => "sphere", 3 => "capsule", _ => "unknown" };
     internal static BoundaryGeometry? Create(Collider source)
     {
         var result = new BoundaryGeometry(source);
