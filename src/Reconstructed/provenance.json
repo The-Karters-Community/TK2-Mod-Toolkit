@@ -177,6 +177,38 @@
       "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180668290_Ant_BoostManager__KartIsBreakingOnGround.c",
       "evidenceSha256": "50d2711ae2ec5fa66e0e36f9f0f9d69e0079fa5eae9d401b611ebc8954338f1e",
       "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "Ant_BoostManager.ForceReservesMinVal",
+      "address": "180667900",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180667900_Ant_BoostManager__ForceReservesMinVal.c",
+      "evidenceSha256": "18853672aea9f4261a0a09a21311dd87039a97a8f08fd426f9bdf98cf598f600",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "Ant_BoostManager.WillWallCollisionReduceReserves",
+      "address": "180669a30",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180669a30_Ant_BoostManager__WillWallCollisionReduceReserves.c",
+      "evidenceSha256": "894947deb739cdc17d641724dbd3a612064139c1259b492a554830017ba62c82",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "Ant_BoostManager.GetTriggeredBoostClickedOnBoostingRangeStrengthNormalized",
+      "address": "180667dc0",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180667dc0_Ant_BoostManager__GetTriggeredBoostClickedOnBoostingRangeStrengthNormalized.c",
+      "evidenceSha256": "c541efadbff5a9352f8b48ec827d35723ccd3e5749130b51e8ae33fc7d22ef90",
+      "confidence": "reviewed normal-state semantics; clamp constant independently read from matching GameAssembly.dll"
+    },
+    {
+      "method": "Ant_BoostManager.WallCollisionOccuredInTimeFromLastOne",
+      "address": "180669640",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180669640_Ant_BoostManager__WallCollisionOccuredInTimeFromLastOne.c",
+      "evidenceSha256": "22dd67205f998fcde3655a40618a840e4be4f48fb33e9f4779067040a9132ae3",
+      "confidence": "reviewed normal-state semantics; multiplier independently read from matching GameAssembly.dll"
     }
   ],
   "constant": {
@@ -184,5 +216,21 @@
     "fileOffset": "3706634",
     "bytes": "3333733f",
     "value": 0.95
-  }
+  },
+  "constants": [
+    {
+      "address": "1837079b4",
+      "fileOffset": "37061b4",
+      "bytes": "0000803f",
+      "value": 1.0,
+      "usedBy": "Ant_BoostManager.GetTriggeredBoostClickedOnBoostingRangeStrengthNormalized"
+    },
+    {
+      "address": "183707ed4",
+      "fileOffset": "37066d4",
+      "bytes": "3333333f",
+      "value": 0.7,
+      "usedBy": "Ant_BoostManager.WallCollisionOccuredInTimeFromLastOne"
+    }
+  ]
 }

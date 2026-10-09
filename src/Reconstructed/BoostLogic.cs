@@ -1,3 +1,5 @@
+using System;
+
 namespace TK2.Reconstructed;
 
 // Values observed in Ant_BoostManager.EBoostType metadata for game build 0.1.4.18.
@@ -48,8 +50,44 @@ public static class BoostLogic
         return fillTime <= maximumTime;
     }
 
+    // GetTriggeredBoostClickedOnBoostingRangeStrengthNormalized.
+    // The upper clamp is a native float global measured as 1.0f in the matching binary.
+    public static float GetTriggeredBoostStrengthNormalized(float[] fillTimes, int boostIndex,
+        float minimumTime, float maximumBestBoostTime)
+    {
+        float normalized = (fillTimes[boostIndex] - minimumTime) / (maximumBestBoostTime - minimumTime);
+        if (normalized < 0f) return 0f;
+        if (1f < normalized) return 1f;
+        return normalized;
+    }
+
     // IsPlayerAchivedMaximumBoostLevel uses equality, not a greater-than-or-equal check.
     public static bool HasMaximumManualBoostLevel(int boosterCount) => boosterCount == 3;
+
+    // ForceReservesMinVal raises the reserve only when it is below the supplied floor.
+    // currentReserves is a decoded ObscuredFloat value; callers own the native encoding.
+    public static float ForceReservesMinimum(float currentReserves, float minimum)
+    {
+        if (currentReserves < minimum) currentReserves = minimum;
+        return currentReserves;
+    }
+
+    // WillWallCollisionReduceReserves first requires positive reserves, then suppresses
+    // the loss while the player's tank weapon is triggered or running.
+    public static bool WillWallCollisionReduceReserves(float reserveTime, bool tankWeaponTriggeredOrRunning) =>
+        reserveTime > 0f && !tankWeaponTriggeredOrRunning;
+
+    // WallCollisionOccuredInTimeFromLastOne resets lateral velocity, applies the native
+    // reserve multiplier unless the tank weapon is active, then invokes its event if present.
+    public const float WallCollisionReserveMultiplier = 0.7f;
+    public static void OnWallCollision(ref float loadedLateralVelocity, ref float reserveTime,
+        bool tankWeaponTriggeredOrRunning, Action? onWallCollision)
+    {
+        loadedLateralVelocity = 0f;
+        if (WillWallCollisionReduceReserves(reserveTime, tankWeaponTriggeredOrRunning))
+            reserveTime *= WallCollisionReserveMultiplier;
+        onWallCollision?.Invoke();
+    }
 
     // IsPhysicalManualBoostEnabled_OnlyAICanDisable, for valid game boost enum values.
     // Native player type value 2 and the debug-forced-human flag enter the AI restriction branch.

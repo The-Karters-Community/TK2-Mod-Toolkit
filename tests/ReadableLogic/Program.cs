@@ -80,7 +80,23 @@ float[] boostFills = { .35f, .8f, 1.2f };
 Check(BoostLogic.GetManualBoostFillNormalized(boostFills, 1) == .8f, "manual boost getter returns the selected fill slot");
 foreach (var item in new[] { (.2f, true), (.5f, true), (.5001f, false), (.1999f, false), (float.NaN, false) })
     Check(BoostLogic.IsManualBoostWithinFireRange(new[] { item.Item1 }, .2f, .5f) == item.Item2, "manual boost fire range uses inclusive bounds and rejects NaN");
+foreach (var item in new[] { (.2f, 0f), (.5f, .5f), (.8f, 1f), (1.1f, 1f), (.1f, 0f) })
+    Check(BoostLogic.GetTriggeredBoostStrengthNormalized(new[] { item.Item1 }, 0, .2f, .8f) == item.Item2, "triggered boost strength normalizes and clamps to zero through one");
 Check(BoostLogic.HasMaximumManualBoostLevel(3) && !BoostLogic.HasMaximumManualBoostLevel(4), "maximum boost level is exactly three");
+Check(BoostLogic.ForceReservesMinimum(.2f, .5f) == .5f && BoostLogic.ForceReservesMinimum(.8f, .5f) == .8f, "reserve floor raises only values below the target");
+Check(float.IsNaN(BoostLogic.ForceReservesMinimum(float.NaN, .5f)), "reserve floor preserves a NaN current value like the native comparison");
+foreach (var item in new[] { (0f, false, false), (0f, true, false), (.1f, false, true), (.1f, true, false) })
+    Check(BoostLogic.WillWallCollisionReduceReserves(item.Item1, item.Item2) == item.Item3, "wall collision loses reserves only when reserves are positive and tank weapon is idle");
+int wallEvents = 0;
+float lateralVelocity = 8f, collisionReserves = 10f;
+BoostLogic.OnWallCollision(ref lateralVelocity, ref collisionReserves, false, () => wallEvents++);
+Check(lateralVelocity == 0f && Math.Abs(collisionReserves - 7f) < .00001f && wallEvents == 1, "wall collision resets lateral velocity, reduces reserves by native 0.7 and invokes event");
+lateralVelocity = 3f; collisionReserves = 10f;
+BoostLogic.OnWallCollision(ref lateralVelocity, ref collisionReserves, true, () => wallEvents++);
+Check(lateralVelocity == 0f && collisionReserves == 10f && wallEvents == 2, "active tank weapon suppresses reserve loss but not the event");
+lateralVelocity = 3f; collisionReserves = 0f;
+BoostLogic.OnWallCollision(ref lateralVelocity, ref collisionReserves, false, null);
+Check(lateralVelocity == 0f && collisionReserves == 0f && wallEvents == 2, "zero reserves still reset lateral velocity; absent event is skipped");
 foreach (BoostKind kind in Enum.GetValues<BoostKind>())
 {
     bool expectedForAi = kind is BoostKind.BoostPad or BoostKind.JumpLanding or BoostKind.BoosterPowerUp or BoostKind.StarAura;
