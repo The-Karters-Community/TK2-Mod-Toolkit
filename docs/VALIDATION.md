@@ -158,3 +158,7 @@ Validation: `python -m studio.cli build` completed against current installed ref
 Optional collider fills are now a separate translucent pass with back-face culling, no depth writes and the existing scene-depth/X-ray mode. The F7 controls window previews category, fill, opacity, range, cap and X-ray changes live; edits flow through `LiveConfig`, which saves automatically and on explicit Save. Opening controls unlocks the cursor and closing with F7, Escape or the window button restores its previous state.
 
 The plugin compiled against current installed references with **0 warnings and 0 errors**; `git diff --check` passed. Automated tests and GUI smoke were not run. The game process remains active, so this DLL has not been installed; live fill appearance, in-game interaction, cursor restoration, rendering cost and cleanup remain unverified.
+
+## Track inspector UX simplification 0.6.16 (2026-10-09)
+
+Build verification and UI scope update: F10 is the single inspector open/close key; the settings panel is part of the inspector, and X-ray/F7 options have been removed. F8 selects an already displayed collider for details and does not alter physics. Checked states and panel backgrounds are custom-drawn for higher contrast in both Track Inspector and Camera panels. Unmarked respawn-trigger coverage remains unknown: current native evidence confirms kart collision masks and a generic physics-trigger system, but does not tie the generic trigger types to respawning. The inspector therefore labels only mask-matched respawn colliders.

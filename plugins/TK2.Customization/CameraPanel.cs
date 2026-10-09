@@ -76,7 +76,7 @@ internal static class CameraPanel
             GUI.backgroundColor = new Color(.17f, .21f, .28f, 1);
             GUI.contentColor = new Color(.94f, .96f, .99f, 1);
             float x = Screen.width / scale - Width - 20, y = 20;
-            GUI.Box(new Rect(x, y, Width, height), "");
+            StudioBehaviour.DrawSolidPanel(new Rect(x, y, Width, height));
             GUI.Label(new Rect(x + 18, y + 12, 330, 26), "TK2 Mod Toolkit · Camera", _title);
             if (GUI.Button(new Rect(x + Width - 48, y + 12, 30, 25), "×")) { Close(p); return; }
             y += 47;
@@ -111,8 +111,9 @@ internal static class CameraPanel
 
     private static void Toggle(Plugin p, ConfigEntry<bool> entry, string text, float x, ref float y)
     {
-        bool value = GUI.Toggle(new Rect(x + 18, y, Width - 36, 24), entry.Value, text);
-        LiveConfig.Change(p, entry, value, Time.unscaledTime); y += 26;
+        bool value = StudioBehaviour.DrawCheckBox(new Rect(x + 18, y, Width - 36, 24), entry.Value, text);
+        if (value != entry.Value) LiveConfig.Change(p, entry, value, Time.unscaledTime);
+        y += 26;
     }
 
     private static void Slider(Plugin p, ConfigEntry<float> entry, string text, float low, float high, float step, float x, ref float y)

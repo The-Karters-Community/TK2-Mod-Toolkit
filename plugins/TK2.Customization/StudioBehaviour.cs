@@ -17,6 +17,46 @@ public sealed class StudioBehaviour : MonoBehaviour
     private bool _uiFaulted, _audioFaulted;
     private bool _mkFaulted, _communityFaulted, _nightmareFaulted;
 
+    [HideFromIl2Cpp]
+    internal static void DrawSolidPanel(Rect rect)
+    {
+        var old = GUI.color;
+        GUI.color = new Color(.035f, .045f, .065f, .98f);
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = new Color(.33f, .43f, .58f, 1f);
+        GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 2), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.x, rect.yMax - 2, rect.width, 2), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.x, rect.y, 2, rect.height), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.xMax - 2, rect.y, 2, rect.height), Texture2D.whiteTexture);
+        GUI.color = old;
+    }
+
+    [HideFromIl2Cpp]
+    internal static bool DrawCheckBox(Rect rect, bool value, string label)
+    {
+        bool clicked = GUI.Button(rect, GUIContent.none, GUIStyle.none);
+        var old = GUI.color;
+        var box = new Rect(rect.x + 2, rect.y + 3, 17, 17);
+        GUI.color = new Color(.025f, .035f, .05f, 1f);
+        GUI.DrawTexture(box, Texture2D.whiteTexture);
+        GUI.color = new Color(.65f, .72f, .82f, 1f);
+        GUI.DrawTexture(new Rect(box.x, box.y, box.width, 1), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(box.x, box.yMax - 1, box.width, 1), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(box.x, box.y, 1, box.height), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(box.xMax - 1, box.y, 1, box.height), Texture2D.whiteTexture);
+        if (value)
+        {
+            GUI.color = new Color(.08f, .72f, .32f, 1f);
+            GUI.DrawTexture(new Rect(box.x + 2, box.y + 2, box.width - 4, box.height - 4), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(box.x + 1, box.y - 2, box.width + 2, box.height + 2), "✓");
+        }
+        GUI.color = Color.white;
+        GUI.Label(new Rect(rect.x + 27, rect.y, rect.width - 29, rect.height), label);
+        GUI.color = old;
+        return clicked ? !value : value;
+    }
+
     public void Update()
     {
         var p = Plugin.Instance;

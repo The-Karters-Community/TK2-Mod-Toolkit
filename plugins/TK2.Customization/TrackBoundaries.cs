@@ -9,20 +9,19 @@ namespace TK2.Customization;
 // Native hit masks select the collider; visualization never changes physics.
 internal static class TrackBoundaries
 {
-    private static ConfigEntry<bool> _enabled = null!, _walls = null!, _respawn = null!, _xray = null!, _fills = null!;
+    private static ConfigEntry<bool> _enabled = null!, _walls = null!, _respawn = null!, _fills = null!;
     private static ConfigEntry<float> _distance = null!;
     private static ConfigEntry<float> _fillOpacity = null!;
     private static ConfigEntry<int> _maxVisible = null!;
-    private static ConfigEntry<string> _key = null!, _xrayKey = null!, _inspectKey = null!, _optionsKey = null!;
-    private static bool _wasEnabled, _visible, _faulted, _optionsOpen, _cursorOwned;
+    private static ConfigEntry<string> _key = null!, _inspectKey = null!;
+    private static bool _wasEnabled, _visible, _faulted, _cursorOwned;
     private static bool _previousCursorVisible;
     private static CursorLockMode _previousCursorLock;
     private static float _nextScan, _nextInventory;
     private static int _mapId;
     private static string _status = "Waiting for track";
-    private static bool _lastXray;
     private static float _lastFillOpacity = -1f;
-    private static Rect _optionsRect = new(0, 40, 440, 365);
+    private static Rect _optionsRect = new(0, 40, 440, 400);
     private static int _pinnedId = -1, _candidateCount, _renderedThisFrame;
     private static Camera? _focusCamera;
     private static Collider[] _inventory = Array.Empty<Collider>();
@@ -66,10 +65,7 @@ internal static class TrackBoundaries
         _maxVisible = p.Config.Bind("TrackBoundaries", "MaxVisibleColliders", 64,
             new ConfigDescription("Maximum number of nearest boundaries to outline per track.", new AcceptableValueRange<int>(16, 192)));
         _key = p.Config.Bind("TrackBoundaries", "ToggleKey", "F10", "Toggle visibility during an offline race while this module is enabled.");
-        _xray = p.Config.Bind("TrackBoundaries", "XRay", false, "Draw outlines through scenery. F9 toggles this during a race.");
-        _xrayKey = p.Config.Bind("TrackBoundaries", "XRayKey", "F9", "Toggle outlines through scenery while the inspector is visible.");
-        _inspectKey = p.Config.Bind("TrackBoundaries", "InspectKey", "F8", "Pin the boundary under the screen center and show its details; press again to clear.");
-        _optionsKey = p.Config.Bind("TrackBoundaries", "OptionsKey", "F7", "Open the in-game track inspector controls.");
+        _inspectKey = p.Config.Bind("TrackBoundaries", "InspectKey", "F8", "Pin one displayed collider under the screen center for inspection; press again to clear.");
     }
     private static bool Allowed => Plugin.Instance?.GameplayReady == true && Plugin.OfflineLabAllowed && MenuManager.Instance == null &&
         Ant_CurrentGameConfiguration.eCurrentRaceState == Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING;
@@ -77,29 +73,27 @@ internal static class TrackBoundaries
     {
         if (_enabled == null) return;
         if (!_enabled.Value) { Restore(); _wasEnabled = _faulted = false; return; }
-        if (_faulted) { CloseOptions(Plugin.Instance); return; }
+        if (_faulted) { CloseInspector(Plugin.Instance); return; }
         try
         {
-            if (!_wasEnabled) { _visible = true; _wasEnabled = true; _nextScan = 0; }
-            if (!Allowed) { CloseOptions(Plugin.Instance); ClearTrack(); return; }
+            if (!_wasEnabled) { _visible = false; _wasEnabled = true; _nextScan = 0; }
+            if (!Allowed) { CloseInspector(Plugin.Instance); ClearTrack(); return; }
             if (Application.isFocused)
             {
-                if (Pressed(_optionsKey.Value)) ToggleOptions(Plugin.Instance);
-                if (_optionsOpen && Pressed("Escape")) CloseOptions(Plugin.Instance);
-                if (_optionsOpen)
+                if (Pressed(_key.Value))
+                {
+                    if (_visible) CloseInspector(Plugin.Instance);
+                    else OpenInspector(Plugin.Instance);
+                }
+                if (_visible && Pressed("Escape")) CloseInspector(Plugin.Instance);
+                if (_visible)
                 {
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
-                }
-                else
-                {
-                    if (Pressed(_key.Value)) { _visible = !_visible; _nextScan = 0; }
-                    if (_visible && Pressed(_xrayKey.Value)) Set(Plugin.Instance, _xray, !_xray.Value);
-                    if (_visible && Pressed(_inspectKey.Value)) TogglePinnedBoundary();
+                    if (Pressed(_inspectKey.Value)) TogglePinnedBoundary();
                 }
             }
             if (!_visible) { ClearTrack(); return; }
-            if (_lastXray != _xray.Value) { ApplyDepthMode(); _lastXray = _xray.Value; }
             if (Math.Abs(_lastFillOpacity - _fillOpacity.Value) > .0001f) ApplyFillOpacity();
             if (Time.unscaledTime >= _nextScan)
             {
@@ -118,7 +112,7 @@ internal static class TrackBoundaries
         }
         catch (Exception ex)
         {
-            _faulted = true; CloseOptions(Plugin.Instance); ClearTrack();
+            _faulted = true; CloseInspector(Plugin.Instance); ClearTrack();
             Plugin.Instance?.Log.LogWarning("Track boundaries unavailable: " + ex.Message);
         }
     }
@@ -131,11 +125,11 @@ internal static class TrackBoundaries
         else LiveConfig.Change(plugin, entry, value, Time.unscaledTime);
     }
 
-    private static void ToggleOptions(Plugin? plugin)
+    private static void OpenInspector(Plugin? plugin)
     {
-        if (_optionsOpen) { CloseOptions(plugin); return; }
         if (plugin == null) return;
-        _optionsOpen = true;
+        _visible = true;
+        _nextScan = 0;
         _previousCursorVisible = Cursor.visible;
         _previousCursorLock = Cursor.lockState;
         _cursorOwned = true;
@@ -143,16 +137,18 @@ internal static class TrackBoundaries
         Cursor.visible = true;
     }
 
-    private static void CloseOptions(Plugin? plugin)
+    private static void CloseInspector(Plugin? plugin)
     {
-        _optionsOpen = false;
+        bool wasOpen = _visible || _cursorOwned;
+        _visible = false;
+        ClearTrack();
         if (_cursorOwned)
         {
             if (Cursor.lockState == CursorLockMode.None)
             { Cursor.lockState = _previousCursorLock; Cursor.visible = _previousCursorVisible; }
             _cursorOwned = false;
         }
-        if (plugin == null) return;
+        if (!wasOpen || plugin == null) return;
         try { LiveConfig.Flush(plugin); }
         catch (Exception ex) { plugin.Log.LogWarning($"Track inspector settings save will retry: {ex.Message}"); }
     }
@@ -307,15 +303,6 @@ internal static class TrackBoundaries
         _pinnedId = selected;
     }
 
-    private static void ApplyDepthMode()
-    {
-        int test = (int)(_xray.Value ? CompareFunction.Always : CompareFunction.LessEqual);
-        foreach (var material in Palette.Values)
-            if (material != null && material.HasProperty("_ZTest")) material.SetInt("_ZTest", test);
-        foreach (var material in FillPalette.Values)
-            if (material != null && material.HasProperty("_ZTest")) material.SetInt("_ZTest", test);
-        if (_pinnedMaterial != null && _pinnedMaterial.HasProperty("_ZTest")) _pinnedMaterial.SetInt("_ZTest", test);
-    }
     private static void ApplyFillOpacity()
     {
         _lastFillOpacity = _fillOpacity.Value;
@@ -371,7 +358,7 @@ internal static class TrackBoundaries
         if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
         if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
         if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
-        if (material.HasProperty("_ZTest")) material.SetInt("_ZTest", (int)(_xray.Value ? CompareFunction.Always : CompareFunction.LessEqual));
+        if (material.HasProperty("_ZTest")) material.SetInt("_ZTest", (int)CompareFunction.LessEqual);
         if (material.HasProperty("_Cull")) material.SetInt("_Cull", (int)(fill ? CullMode.Back : CullMode.Off));
         material.renderQueue = fill ? 3000 : 3100;
         palette[kind] = material;
@@ -470,7 +457,7 @@ internal static class TrackBoundaries
         if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
         if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
         if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
-        if (material.HasProperty("_ZTest")) material.SetInt("_ZTest", (int)(_xray.Value ? CompareFunction.Always : CompareFunction.LessEqual));
+        if (material.HasProperty("_ZTest")) material.SetInt("_ZTest", (int)CompareFunction.LessEqual);
         if (material.HasProperty("_Cull")) material.SetInt("_Cull", (int)CullMode.Off);
         material.renderQueue = 3100;
         return material;
@@ -486,17 +473,15 @@ internal static class TrackBoundaries
         bool enabled = GUI.enabled;
         try
         {
+            if (!_visible) return;
             float height = _pinnedId >= 0 && Saved.TryGetValue(_pinnedId, out _) ? 126f : 94f;
             float top = Screen.height - height - 16f;
-            GUI.Box(new Rect(16, top, 640, height), "");
+            StudioBehaviour.DrawSolidPanel(new Rect(16, top, 640, height));
             GUI.color = Color.white;
-            GUI.Label(new Rect(28, top + 7, 470, 20), $"TRACK INSPECTOR  ·  {_key.Value} view  ·  {_xrayKey.Value} X-ray  ·  {_inspectKey.Value} pin  ·  {(_visible ? "ON" : "OFF")}");
-            if (GUI.Button(new Rect(516, top + 5, 126, 24), _optionsOpen ? "Close options" : $"{_optionsKey.Value} Options"))
-            {
-                if (_optionsOpen) CloseOptions(Plugin.Instance); else ToggleOptions(Plugin.Instance);
-            }
+            GUI.Label(new Rect(28, top + 7, 470, 20), $"TRACK INSPECTOR  ·  {_key.Value} close  ·  {_inspectKey.Value} pin/clear selection");
+            if (GUI.Button(new Rect(516, top + 5, 108, 24), $"Close · {_key.Value}")) { CloseInspector(Plugin.Instance); return; }
             GUI.color = new Color(.08f, .82f, 1f, 1); GUI.Label(new Rect(28, top + 29, 190, 20), "●  Invisible walls");
-            GUI.color = new Color(1f, .45f, .15f, 1); GUI.Label(new Rect(218, top + 29, 220, 20), "●  Respawn boundaries");
+            GUI.color = new Color(1f, .45f, .15f, 1); GUI.Label(new Rect(218, top + 29, 360, 20), "●  Respawn colliders (kart masks)");
             GUI.color = Color.white; GUI.Label(new Rect(28, top + 51, 616, 20), _faulted ? "Unavailable; see BepInEx log" : _status + $" · drawing {_renderedThisFrame}");
             if (_pinnedId >= 0 && Saved.TryGetValue(_pinnedId, out var saved) && saved.Collider != null)
             {
@@ -504,18 +489,15 @@ internal static class TrackBoundaries
                 string layer = LayerMask.LayerToName(collider.gameObject.layer);
                 var size = collider.bounds.size;
                 GUI.color = new Color(1f, 1f, .35f, 1f);
-                GUI.Label(new Rect(28, top + 73, 616, 20), $"PINNED  {saved.Kind} {saved.Geometry.ShapeName}  ·  {collider.gameObject.name}");
+                GUI.Label(new Rect(28, top + 73, 616, 20), $"INSPECTING ONLY  ·  {saved.Kind} {saved.Geometry.ShapeName}  ·  {collider.gameObject.name}");
                 GUI.color = Color.white;
                 GUI.Label(new Rect(28, top + 95, 616, 20), $"Layer {collider.gameObject.layer}{(string.IsNullOrEmpty(layer) ? "" : " / " + layer)}  ·  {saved.KartDistance:0.0} m  ·  bounds {size.x:0.0} × {size.y:0.0} × {size.z:0.0} m");
             }
-            if (_optionsOpen)
-            {
-                _optionsRect.width = Math.Min(460f, Screen.width - 32f);
-                _optionsRect.height = 365f;
-                _optionsRect.x = Math.Max(16f, Screen.width - _optionsRect.width - 24f);
-                _optionsRect.y = Math.Max(16f, Math.Min(60f, Screen.height - _optionsRect.height - 16f));
-                DrawOptionsPanel(_optionsRect.x, _optionsRect.y, _optionsRect.width);
-            }
+            _optionsRect.width = Math.Min(460f, Screen.width - 32f);
+            _optionsRect.height = 400f;
+            _optionsRect.x = Math.Max(16f, Screen.width - _optionsRect.width - 24f);
+            _optionsRect.y = Math.Max(16f, Math.Min(60f, Screen.height - _optionsRect.height - 16f));
+            DrawOptionsPanel(_optionsRect.x, _optionsRect.y, _optionsRect.width);
         }
         finally
         { GUI.matrix = matrix; GUI.color = color; GUI.backgroundColor = background; GUI.contentColor = content; GUI.depth = depth; GUI.enabled = enabled; }
@@ -533,30 +515,30 @@ internal static class TrackBoundaries
             GUI.color = new Color(.94f, .97f, 1f, 1f);
             GUI.backgroundColor = new Color(.16f, .20f, .27f, .97f);
             GUI.contentColor = new Color(.94f, .97f, 1f, 1f);
-            GUI.Box(new Rect(x, y, width, 365), "");
+            StudioBehaviour.DrawSolidPanel(new Rect(x, y, width, 400));
             GUI.Label(new Rect(x + 16, y + 5, width - 66, 24), "TRACK INSPECTOR OPTIONS");
-            if (GUI.Button(new Rect(x + width - 43, y + 3, 30, 24), "×")) { CloseOptions(plugin); return; }
-            ToggleControl(plugin, _walls, "Invisible walls", x + 16, y + 34, width * .5f - 20);
-            ToggleControl(plugin, _respawn, "Respawn boundaries", x + width * .5f, y + 34, width * .5f - 14);
-            ToggleControl(plugin, _fills, "Translucent surfaces", x + 16, y + 61, width * .5f - 20);
-            ToggleControl(plugin, _xray, "X-ray through scenery", x + width * .5f, y + 61, width * .5f - 14);
-            SliderControl(plugin, _fillOpacity, "Surface opacity", .03f, .35f, 2, 0, y + 96, width, x);
-            SliderControl(plugin, _distance, "View distance", 25, 1000, 0, 1, y + 148, width, x);
+            if (GUI.Button(new Rect(x + width - 43, y + 3, 30, 24), "×")) { CloseInspector(plugin); return; }
+            ToggleControl(plugin, _walls, "Invisible walls", x + 16, y + 35, width * .5f - 20);
+            ToggleControl(plugin, _respawn, "Respawn colliders", x + width * .5f, y + 35, width * .5f - 14);
+            ToggleControl(plugin, _fills, "Translucent surfaces", x + 16, y + 64, width * .5f - 20);
+            SliderControl(plugin, _fillOpacity, "Surface opacity", .03f, .35f, 2, 0, y + 98, width, x);
+            SliderControl(plugin, _distance, "View distance", 25, 1000, 0, 1, y + 150, width, x);
             int maxVisible = _maxVisible.Value;
-            GUI.Label(new Rect(x + 16, y + 200, width - 32, 20), $"Maximum outlines: {maxVisible}");
-            float maxSlider = GUI.HorizontalSlider(new Rect(x + 16, y + 222, width - 32, 18), maxVisible, 16, 192);
+            GUI.Label(new Rect(x + 16, y + 202, width - 32, 20), $"Maximum outlines: {maxVisible}");
+            float maxSlider = GUI.HorizontalSlider(new Rect(x + 16, y + 224, width - 32, 18), maxVisible, 16, 192);
             int nextMax = Math.Clamp((int)Math.Round(maxSlider), 16, 192);
             if (nextMax != maxVisible) Set(plugin, _maxVisible, nextMax);
-            if (GUI.Button(new Rect(x + 16, y + 250, 110, 27), "Reset defaults")) ResetOptions(plugin);
-            if (GUI.Button(new Rect(x + width - 142, y + 250, 126, 27), "Save now")) LiveConfig.Flush(plugin);
-            GUI.Label(new Rect(x + 16, y + 283, width - 32, 28), LiveConfig.Status);
-            GUI.Label(new Rect(x + 16, y + 314, width - 32, 30), $"F10 show · F9 X-ray · F8 pin · {_optionsKey.Value} options · Esc closes · settings apply live");
+            GUI.Label(new Rect(x + 16, y + 244, width - 32, 46), "Respawn = colliders in the kart's native respawn masks.\nF8 selects a shown collider for details only; it does not affect physics.\nSeparate track triggers may not be included.");
+            if (GUI.Button(new Rect(x + 16, y + 292, 110, 27), "Reset defaults")) ResetOptions(plugin);
+            if (GUI.Button(new Rect(x + width - 142, y + 292, 126, 27), "Save now")) LiveConfig.Flush(plugin);
+            GUI.Label(new Rect(x + 16, y + 324, width - 32, 26), LiveConfig.Status);
+            GUI.Label(new Rect(x + 16, y + 354, width - 32, 36), $"{_key.Value} close · F8 pin/clear · Esc close · settings apply live");
         }
         finally { GUI.color = color; GUI.backgroundColor = background; GUI.contentColor = content; GUI.enabled = enabled; }
     }
     private static void ToggleControl(Plugin plugin, ConfigEntry<bool> entry, string label, float x, float y, float width)
     {
-        bool next = GUI.Toggle(new Rect(x, y, width, 23), entry.Value, label);
+        bool next = StudioBehaviour.DrawCheckBox(new Rect(x, y, width, 24), entry.Value, label);
         if (next != entry.Value) Set(plugin, entry, next);
     }
     private static void SliderControl(Plugin plugin, ConfigEntry<float> entry, string label, float low, float high, int decimals, int sliderId, float y, float width, float x)
@@ -573,7 +555,7 @@ internal static class TrackBoundaries
     }
     private static void ResetOptions(Plugin plugin)
     {
-        Set(plugin, _walls, true); Set(plugin, _respawn, true); Set(plugin, _fills, false); Set(plugin, _xray, false);
+        Set(plugin, _walls, true); Set(plugin, _respawn, true); Set(plugin, _fills, false);
         Set(plugin, _fillOpacity, .12f); Set(plugin, _distance, 200f); Set(plugin, _maxVisible, 64);
     }
     private static void Remove(int id)
@@ -597,5 +579,5 @@ internal static class TrackBoundaries
         DrawOrder.Clear(); Candidates.Clear(); Selected.Clear(); Palette.Clear(); FillPalette.Clear(); _inventory = Array.Empty<Collider>();
         _focusCamera = null; _mapId = 0; _nextInventory = _nextScan = 0;
     }
-    internal static void Restore() { CloseOptions(Plugin.Instance); ClearTrack(); _visible = false; }
+    internal static void Restore() { CloseInspector(Plugin.Instance); ClearTrack(); _visible = false; }
 }
