@@ -27,9 +27,11 @@ internal void AddVelocity(Vector3 velocity)
 }
 ```
 
-This initial example has now become actual compiled, editable code in `src/Reconstructed/KartLogic.cs` and `plugins/TK2.Customization/ReadableGame.cs`. The pack's fast-fall path calls that reconstructed accumulator when gameplay validation is eventually opened. Seven native methods now have semantic C# implementations; see [readable source](READABLE-SOURCE.md) for provenance, executable tests and limits. The game's physics implementation as a whole is not replaced.
+This initial example has now become actual compiled, editable code in `src/Reconstructed/KartLogic.cs` and `plugins/TK2.Customization/ReadableGame.cs`. The pack's fast-fall path calls that reconstructed accumulator when gameplay validation is eventually opened. The repository now has 22 reviewed normal-state semantic translations; see [readable source](READABLE-SOURCE.md) for the method list, per-method evidence hashes, executable tests and limits. The game's physics implementation as a whole is not replaced.
 
 The current `JumpInput(bool)` at `0x1805e0270` is more involved: it ignores false input, handles extra jump effects, resets the pre-ground input history, considers replay grounding state, buffers airborne clicks, and supports a grace interval after leaving ground. This evidence makes a direct rename of the old jump hook unsafe without testing its event timing.
+
+The first `Ant_BoostManager` slice adds ten small C# translations for boost-source predicates, manual boost timing, the AI-only physical-boost gate and braking state. Source values and addresses are recorded in `provenance.json`. `IsBoosting` checks reserves, the just-triggered flag, boost-pad time and Booster time, while the Star timer has a separate predicate but is not included in that aggregate method. The pure tests cover threshold and inclusive-window behavior plus every valid `EBoostType` under the AI gate. Larger timer/update, boost firing, reserve accumulation and collision paths still need focused reconstruction and call-site review.
 
 ## Why the C-like export needs review
 

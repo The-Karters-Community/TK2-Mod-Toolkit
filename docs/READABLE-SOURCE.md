@@ -1,6 +1,6 @@
 # Editable reconstruction, version 0.1.4.18
 
-The workshop now opens **C# with executable method bodies**, not dump declarations. `src/Reconstructed/KartLogic.cs` and `CameraLogic.cs` are compiled into the same pack DLL. `ReadableGame.cs` adapts the reconstructed logic to current game interop objects. Changing these files, then pressing Build & install, changes the pack behavior. It does not rewrite GameAssembly or automatically replace every original method.
+The workshop now opens **C# with executable method bodies**, not dump declarations. `src/Reconstructed/` contains semantic translations and pure logic models compiled into the same pack DLL; `ReadableGame.cs` adapts selected behavior to current game interop objects. Changing an adapter used by a recipe or module changes pack behavior. These files do not rewrite GameAssembly or automatically replace every original method.
 
 | Native method | Virtual address | Readable implementation | Evidence / assumptions |
 |---|---|---|---|
@@ -11,8 +11,23 @@ The workshop now opens **C# with executable method bodies**, not dump declaratio
 | PixelGameKartCamera.IsIntroCameraActiveAndRunning | 0x1804f05b0 | CameraLogic.IsIntroActive | Strict comparison against 0.95f; constant bytes `33 33 73 3f` at VA 0x183707e34 / file offset 0x3706634 |
 | PixelGameKartCamera.EnableTribuneCamera | 0x1804ed620 | CameraLogic.EnableTribune | Boolean assignment |
 | PixelGameKartCamera.ForceInstantTeleport | 0x1804ed730 | CameraLogic.ForceInstantTeleport | Set forced teleport, clear tribune camera |
+| Ant_BoostManager.IsBoostingConstFromBoostpad | 0x180668080 | BoostLogic.IsBoostingFromBoostPad | Boost-pad timer is strictly greater than zero |
+| Ant_BoostManager.IsBoostingConstFromReserves | 0x1806680a0 | BoostLogic.IsBoostingFromReserves | Decoded reserve timer is strictly greater than zero |
+| Ant_BoostManager.IsBoostingFromPowerUp_Booster | 0x180668130 | BoostLogic.IsBoostingFromBooster | Booster timer is strictly greater than zero |
+| Ant_BoostManager.IsBoostingFromPowerUp_Star | 0x180668150 | BoostLogic.IsBoostingFromStar | Star timer is strictly greater than zero |
+| Ant_BoostManager.IsBoosting | 0x180668170 | BoostLogic.IsBoosting | Native aggregate checks reserves, just-triggered, boost-pad and Booster; it does not query the Star timer |
+| Ant_BoostManager.GetManualBoostFillNormalized | 0x180667d70 | BoostLogic.GetManualBoostFillNormalized | Returns the indexed fill-time array value |
+| Ant_BoostManager.IsManualBoostWithingFireRange | 0x1806681c0 | BoostLogic.IsManualBoostWithinFireRange | Slot zero; minimum and maximum are inclusive |
+| Ant_BoostManager.IsPlayerAchivedMaximumBoostLevel | 0x180668280 | BoostLogic.HasMaximumManualBoostLevel | Booster count equals exactly three |
+| Ant_BoostManager.IsPhysicalManualBoostEnabled_OnlyAICanDisable | 0x180668210 | BoostLogic.IsPhysicalManualBoostEnabled | AI restriction covers manual boost kinds 0–2 and leaves boost pad, jump-landed, Booster and Star kinds enabled |
+| Ant_BoostManager.KartIsBreakingOnGround | 0x180668290 | BoostLogic.SetBreakingOnGround | Direct state assignment |
+| PixelGameKartCamera.InitOriginalProperties | 0x1804eff80 | ReadableGame.InitOriginalProperties | Captures original camera parameters; initialized nested objects assumed |
+| Ant_BoostManager.GetCurrentBoostReservesTime | 0x180667ce0 | ReadableGame.GetCurrentBoostReservesTime | Reads the ObscuredFloat reserve value through its interop conversion |
+| HpBarController.GetCurrentHP | 0x18056d2b0 | ReadableGame.GetCurrentHP | Shared native body with PlayerGlobalStats; reads synchronized visible HP |
+| HpBarController.ActivateImmunityNow | 0x18056c150 | ReadableGame.ActivateImmunityNow | Updates one source flag and refreshes derived state |
+| HpBarController.RefreshImmunityState | 0x18056ee90 | ReadableGame.RefreshImmunityState | Rebuilds immunity, death-immunity, collider, HP and VFX state from source flags |
 
-`src/Reconstructed/provenance.json` records input hashes, addresses, source files, and the local native evidence. The C# console tests check branch combinations, boundary cases, state preservation, slot selection, NaN and velocity accumulation. These are semantic tests, not native runtime equivalence proof.
+`src/Reconstructed/provenance.json` records the game build hash, addresses, source files, and hashes of the local native evidence used for each translation. The C# console tests check branch combinations, boundary cases, state preservation, slot selection, NaN, boost timing, AI boost gates and velocity accumulation. These are semantic tests, not native runtime equivalence proof.
 
 Native IL2CPP metadata initialization and error-helper assembly are omitted from the pure models. Null/error behavior is not fully reconstructed. The jump adapter snapshots grounding once; the native method queries it twice. A side effect between those native queries would require a more exact adapter. The adapter is opt-in and does not patch JumpInput automatically.
 
@@ -26,9 +41,11 @@ Native IL2CPP metadata initialization and error-helper assembly are omitted from
 
 Recipes implement `IModRecipe`: Configure, Tick, Restore, and a gameplay declaration. The starter recipe demonstrates a configurable kart-hop shortcut using reconstructed velocity accumulation. Source edits have local backups and reject an external edit conflict. This interface is intentionally a small C# editor; it does not yet provide IntelliSense or a debugger.
 
+The boost work is intentionally a first slice through `Ant_BoostManager`, not a translation of its large update/state-machine methods. It also preserves a surprising native distinction: the Star timer has its own active predicate but is absent from `IsBoosting`'s aggregate conditions. `BoostLogic` accepts decoded values and normal valid enum inputs; IL2CPP's ObscuredFloat runtime plumbing, null/lifecycle failures and game-side effects are outside these pure methods.
+
 ## What remains to reconstruct
 
-Twelve native methods have reviewed normal-state translations. The function browser indexes 32,350 Assembly-CSharp method declarations; selected native bodies are exported separately. There are 184,138 native function entries in the local index, including engine and library code. Fully recovering the original C# source, comments, variable names, stripped code, and original Unity editor project from optimized IL2CPP binaries is not achievable by simply translating all Ghidra listings.
+Twenty-two native methods have reviewed normal-state semantic translations. The function browser indexes 32,350 Assembly-CSharp method declarations; selected native bodies are exported separately. There are 184,138 native function entries in the local index, including engine and library code. Fully recovering the original C# source, comments, variable names, stripped code, and original Unity editor project from optimized IL2CPP binaries is not achievable by simply translating all Ghidra listings.
 
 Continue subsystem by subsystem: boost state machine, complete jump motion, input dispatch, damage overloads, race rules, replay/save states, UI controller lifecycle, and native mod-content formats. For each method, record exact signature and aliases, resolve constants/call targets, reconstruct state transitions, test pure behavior, then compare against runtime observations. Do not substitute generated wrappers or fabricated stubs for a completed reconstruction.
 

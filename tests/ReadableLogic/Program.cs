@@ -66,4 +66,30 @@ foreach (uint mask in new uint[]{0,1,2,4,8,16,32,1|16}) {
     Check(HealthLogic.CollidersActive(mask) == (mask == 0 || (mask & 16) != 0), "native collider flag truth table");
 }
 Check(HealthLogic.IsImmune(0,true) && !HealthLogic.IsImmune(0,false), "ghost transformation grants immunity independently");
+Check(BoostLogic.IsBoostingFromBoostPad(.001f) && !BoostLogic.IsBoostingFromBoostPad(0f), "boost-pad timer uses a strict positive threshold");
+Check(BoostLogic.IsBoostingFromReserves(.001f) && !BoostLogic.IsBoostingFromReserves(0f), "reserve boost uses a strict positive threshold");
+Check(BoostLogic.IsBoostingFromBooster(.001f) && !BoostLogic.IsBoostingFromBooster(0f), "booster power-up uses a strict positive threshold");
+Check(BoostLogic.IsBoostingFromStar(.001f) && !BoostLogic.IsBoostingFromStar(0f), "star power-up has its own strict positive predicate");
+Check(BoostLogic.IsBoosting(.1f, false, 0f, 0f), "reserve boost contributes to aggregate state");
+Check(BoostLogic.IsBoosting(0f, true, 0f, 0f), "just-triggered flag contributes to aggregate state");
+Check(BoostLogic.IsBoosting(0f, false, .1f, 0f), "boost-pad time contributes to aggregate state");
+Check(BoostLogic.IsBoosting(0f, false, 0f, .1f), "booster power-up time contributes to aggregate state");
+Check(!BoostLogic.IsBoosting(0f, false, 0f, 0f), "aggregate state is false without its four native conditions");
+Check(BoostLogic.IsBoostingFromStar(.1f) && !BoostLogic.IsBoosting(0f, false, 0f, 0f), "star timer is omitted from the native aggregate predicate");
+float[] boostFills = { .35f, .8f, 1.2f };
+Check(BoostLogic.GetManualBoostFillNormalized(boostFills, 1) == .8f, "manual boost getter returns the selected fill slot");
+foreach (var item in new[] { (.2f, true), (.5f, true), (.5001f, false), (.1999f, false), (float.NaN, false) })
+    Check(BoostLogic.IsManualBoostWithinFireRange(new[] { item.Item1 }, .2f, .5f) == item.Item2, "manual boost fire range uses inclusive bounds and rejects NaN");
+Check(BoostLogic.HasMaximumManualBoostLevel(3) && !BoostLogic.HasMaximumManualBoostLevel(4), "maximum boost level is exactly three");
+foreach (BoostKind kind in Enum.GetValues<BoostKind>())
+{
+    bool expectedForAi = kind is BoostKind.BoostPad or BoostKind.JumpLanding or BoostKind.BoosterPowerUp or BoostKind.StarAura;
+    Check(BoostLogic.IsPhysicalManualBoostEnabled(2, false, true, kind) == expectedForAi, "AI physical-boost restriction follows native enum branches");
+    Check(BoostLogic.IsPhysicalManualBoostEnabled(0, false, true, kind), "AI-only restriction leaves ordinary human boost enabled");
+}
+Check(!BoostLogic.IsPhysicalManualBoostEnabled(0, true, true, BoostKind.ManualOne), "debug-forced human enters AI restriction branch");
+Check(BoostLogic.IsPhysicalManualBoostEnabled(0, false, false, BoostKind.ManualOne), "AI flag alone does not disable physical boost");
+bool breaking = false;
+BoostLogic.SetBreakingOnGround(ref breaking, true);
+Check(breaking, "braking setter writes current state");
 Console.WriteLine($"Readable behavior and camera geometry: {assertions} assertions passed.");

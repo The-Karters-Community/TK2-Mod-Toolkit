@@ -97,6 +97,86 @@
       "evidence": "local/ghidra/pseudocode/18056ee90_HpBarController__RefreshImmunityState.c",
       "evidenceSha256": "6fb1c0a39e4a6386f5d6a8a6d9b52508fba488f71ea717de7db6c683274fcdf3",
       "confidence": "reviewed normal-object-state native translation; runtime equivalence not yet tested"
+    },
+    {
+      "method": "Ant_BoostManager.IsBoostingConstFromBoostpad",
+      "address": "180668080",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180668080_Ant_BoostManager__IsBoostingConstFromBoostpad.c",
+      "evidenceSha256": "006868ebfa38c271085ea8f1f4de8c250dd37ad512ba99125959c8e77455971c",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "Ant_BoostManager.IsBoostingConstFromReserves",
+      "address": "1806680a0",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/1806680a0_Ant_BoostManager__IsBoostingConstFromReserves.c",
+      "evidenceSha256": "462706eb6ad54e29c7d1ecfa187c6b90bad966457f005b27dff51c7f11e6a511",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "Ant_BoostManager.IsBoostingFromPowerUp_Booster",
+      "address": "180668130",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180668130_Ant_BoostManager__IsBoostingFromPowerUp_Booster.c",
+      "evidenceSha256": "35466af5dcf7f7446e7a1ae6d096e483ad8471f32ac5c9c34cf3fac8ccea0189",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "Ant_BoostManager.IsBoostingFromPowerUp_Star",
+      "address": "180668150",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180668150_Ant_BoostManager__IsBoostingFromPowerUp_Star.c",
+      "evidenceSha256": "09257532cb15e4ae88f67db3f0f370900c212949f5906cd921c1308f7312e39d",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "Ant_BoostManager.IsBoosting",
+      "address": "180668170",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180668170_Ant_BoostManager__IsBoosting.c",
+      "evidenceSha256": "22e8eed664beeaffe98b2e59c04cfbe06422e7ed75403fb33e7beea4ddee4510",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "Ant_BoostManager.IsManualBoostWithingFireRange",
+      "address": "1806681c0",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/1806681c0_Ant_BoostManager__IsManualBoostWithingFireRange.c",
+      "evidenceSha256": "201c77714a5c7136528cb5371d4521d5ef43cedc91979dd514defb1c7e271126",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "Ant_BoostManager.GetManualBoostFillNormalized",
+      "address": "180667d70",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180667d70_Ant_BoostManager__GetManualBoostFillNormalized.c",
+      "evidenceSha256": "edf0170bcda5c8ee7b521783bd0f40d9246df22e98b670e278ab409e9159795f",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "Ant_BoostManager.IsPlayerAchivedMaximumBoostLevel",
+      "address": "180668280",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180668280_Ant_BoostManager__IsPlayerAchivedMaximumBoostLevel.c",
+      "evidenceSha256": "7e8912056366001198fb3554ad6980f7dbc998a47e32cbac909569fc8a6ca608",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "Ant_BoostManager.IsPhysicalManualBoostEnabled_OnlyAICanDisable",
+      "address": "180668210",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180668210_Ant_BoostManager__IsPhysicalManualBoostEnabled_OnlyAICanDisable.c",
+      "evidenceSha256": "0918ccabe7f3e109856cbeba56ea97932272b1451b52c374627da7eb9114b3b6",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
+    },
+    {
+      "method": "Ant_BoostManager.KartIsBreakingOnGround",
+      "address": "180668290",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180668290_Ant_BoostManager__KartIsBreakingOnGround.c",
+      "evidenceSha256": "50d2711ae2ec5fa66e0e36f9f0f9d69e0079fa5eae9d401b611ebc8954338f1e",
+      "confidence": "reviewed normal-state semantics; no runtime equivalence proof"
     }
   ],
   "constant": {
