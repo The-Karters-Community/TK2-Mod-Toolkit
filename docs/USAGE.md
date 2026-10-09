@@ -23,7 +23,7 @@ Camera setup contains FOV, Keep kart size, distance, height, side offset, aim, t
 
 Disable vignette is an optional visual module, off by default. Enable it to suppress the post-processing vignette while preserving the game's profile values; turning it off lets the game's current vignette settings apply again. The hook compiles against the installed game interop, but its live rendering behavior still needs an in-game check.
 
-Online protection is enabled by default. It permits leaderboard submissions and online rooms when only the built-in allowlisted modules are active: HUD size and HUD transparency. Other enabled Toolkit modules, enabled recipes, and any other loaded BepInEx plugin block the selected actions. Turn the master switch or either action switch off only if you intend to use that feature with unapproved modifications. See [Online protection](ONLINE-PROTECTION.md) for the module-by-module review and hook coverage.
+Online protection is mandatory and locked on. It permits leaderboard submissions and online rooms when only the built-in allowlisted modules are active: HUD size and HUD transparency. Other enabled Toolkit modules, enabled recipes, and any other loaded BepInEx plugin block those actions. See [Online protection](ONLINE-PROTECTION.md) for the module-by-module review and hook coverage.
 
 ## Workshop
 

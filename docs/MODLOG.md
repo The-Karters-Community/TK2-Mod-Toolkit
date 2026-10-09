@@ -1,5 +1,11 @@
 # Mod log
 
+## Mandatory online protection 0.6.19 (2026-10-09)
+
+- Locked the Online protection module and both of its actions in the app UI; reset controls cannot turn it off.
+- The game plugin always evaluates the unapproved-mod policy and ignores attempts to disable protection in config. Settings reads, config seeding and saves enforce true values; explicit disable requests are rejected.
+- Only HUD size and HUD transparency remain allowlisted. Plugin build and policy checks pass; live online interception remains unverified in-game.
+
 ## 2026-10-09 — Track inspector 0.6.15
 
 - Kept the existing offline-only native-mask collider discovery, nearest-first cap, camera culling, X-ray and pinned-object readout.

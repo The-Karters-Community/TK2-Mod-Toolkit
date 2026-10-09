@@ -15,7 +15,7 @@ from urllib.parse import urlsplit, parse_qs
 from . import core, pack, settings, setup, symbols
 
 WEB = core.ROOT / "studio/web"
-APP_VERSION = "0.6.14"
+APP_VERSION = "0.6.15"
 
 
 class Application:

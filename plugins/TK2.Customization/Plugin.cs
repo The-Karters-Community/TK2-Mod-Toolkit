@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.18")]
+[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.19")]
 public sealed partial class Plugin : BasePlugin
 {
     internal static Plugin? Instance;
@@ -66,7 +66,7 @@ public sealed partial class Plugin : BasePlugin
         _behaviour = AddComponent<StudioBehaviour>();
         Config.Save();
         LiveConfig.Initialize(this);
-        Log.LogInfo("TK2 Mod Toolkit 0.6.18: offline test features available; online protection active when configured.");
+        Log.LogInfo("TK2 Mod Toolkit 0.6.19: offline test features available; mandatory online protection active.");
     }
 
     private void TryFeature(string name, Action install)

@@ -1,6 +1,6 @@
 # Online protection
 
-The global **Online protection** module defaults on. It has independent switches for leaderboard uploads and online-room operations; both default on. An action is blocked only while an unapproved Toolkit module, enabled recipe, or non-Toolkit BepInEx plugin is loaded. With no unapproved code active, normal leaderboard and online-room behavior continues.
+The global **Online protection** module is mandatory and locked on. Users cannot disable the module or either protection rule in the toolkit. The plugin enforces both rules regardless of config-file values, and the toolkit repairs attempts to turn them off. An action is blocked while an unapproved Toolkit module, enabled recipe, or non-Toolkit BepInEx plugin is loaded. With no unapproved code active, normal leaderboard and online-room behavior continues.
 
 The fixed built-in allowlist is deliberately small:
 

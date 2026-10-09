@@ -8,7 +8,7 @@ ARTIFACT = core.ROOT / "artifacts/TK2.Customization"
 SOURCE_ROOT = PROJECT.parent
 
 FEATURES = [
-    {"id": "OnlineProtection", "name": "Online protection", "category": "Safety", "description": "Block leaderboard uploads and online-room actions while unapproved mods are active. Only HUD size and HUD transparency are allowlisted; other loaded plugins are treated as unapproved.", "origin": "New", "defaultEnabled": True, "settings": [("BlockLeaderboardUploads", "Block leaderboard uploads", "bool", True, None, None, "Stop record submissions while any non-allowlisted module or plugin is active."), ("BlockOnlineLobbyJoins", "Block online rooms", "bool", True, None, None, "Prevent joining or creating online rooms while any non-allowlisted module or plugin is active.")]},
+    {"id": "OnlineProtection", "name": "Online protection", "category": "Safety", "description": "Mandatory protection. Blocks leaderboard uploads and online-room actions while unapproved mods are active. Only HUD size and HUD transparency are allowlisted.", "origin": "New", "defaultEnabled": True, "locked": True, "settings": [("BlockLeaderboardUploads", "Block leaderboard uploads", "bool", True, None, None, "Mandatory. Record uploads are blocked while any non-allowlisted module or plugin is active."), ("BlockOnlineLobbyJoins", "Block online rooms", "bool", True, None, None, "Mandatory. Online rooms are blocked while any non-allowlisted module or plugin is active.")]},
     {"id": "UI", "name": "HUD scale", "category": "Interface", "description": "Make matching HUD canvases easier to read.", "origin": "New", "settings": [("HudScale", "Scale", "float", 1, .5, 2), ("CanvasNameFilter", "Canvas name contains", "text", "HUD", None, None)]},
     {"id": "HudOpacity", "name": "HUD opacity", "category": "Interface", "description": "Soften the HUD on matching canvases with an existing CanvasGroup. Uses the HUD name filter.", "origin": "New", "settings": [("Opacity", "Opacity", "float", 1, .1, 1)]},
     {"id": "DisableVignette", "name": "Disable vignette", "category": "Interface", "description": "Remove the game's edge-darkening vignette effect without changing its saved post-processing settings.", "origin": "New", "settings": []},
@@ -77,6 +77,11 @@ RETIRED_MODULES = frozenset({'MirrorMode'} | {'Recipe.' + name for name in (
     'AirGlider','DriftCapacitor','EchoRewind','GravitySurf','LandingCombo',
     'RepulsorPulse','SlipstreamSling','CosmeticModel','TrackInspector')})
 RETIRED_SETTINGS = frozenset()
+FORCED_TRUE_SETTINGS = frozenset({
+    ("OnlineProtection", "Enabled"),
+    ("OnlineProtection", "BlockLeaderboardUploads"),
+    ("OnlineProtection", "BlockOnlineLobbyJoins"),
+})
 
 
 def schema(features=None):
@@ -148,9 +153,10 @@ def initial_config():
 
 
 def seed_config(text):
-    """Add missing definitions without changing any existing player settings."""
+    """Add missing definitions and enforce the mandatory online-safety settings."""
     present = {(e["section"], e["key"]) for e in core.parse_cfg_settings(text)}
     missing = {pair: value for pair, value in validate(defaults()).items() if pair not in present}
+    missing.update({pair: "true" for pair in FORCED_TRUE_SETTINGS})
     return core.update_cfg(text or "# TK2 Mod Toolkit Pack\n", missing) if missing else text
 
 

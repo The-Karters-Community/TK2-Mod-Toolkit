@@ -46,9 +46,6 @@ public sealed partial class Plugin
 
     private bool ShouldBlockOnlineAction(bool leaderboardUpload)
     {
-        if (!OnlineProtectionEnabled.Value) return false;
-        if (leaderboardUpload ? !BlockLeaderboardUploads.Value : !BlockOnlineLobbyJoins.Value) return false;
-
         try
         {
             var activeSettings = Config.Keys.Select(definition =>

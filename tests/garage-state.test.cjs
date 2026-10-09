@@ -9,6 +9,7 @@ class Node {
   set textContent(value) {this.text = value; this.children = [];}
   get textContent() {return this.text;}
   append(...nodes) {this.children.push(...nodes);}
+  querySelectorAll(selector) {const tags = selector.split(',').map(value => value.trim().toUpperCase()); return descendants(this).filter(node => tags.includes(node.tagName));}
   replaceChildren(...nodes) {this.children = nodes;}
   setAttribute(name, value) {this.attrs[name] = value;}
   getAttribute(name) {return this.attrs[name];}
@@ -38,10 +39,11 @@ const fixture = {installed: false, packCurrent: false, pluginCount: 0, game: 'te
   recipes: [{section: 'Recipe.FrameLimiter', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Limit FPS'}],
   extraSettings: [{section: 'MK.BoostTrainer', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Trainer'}],
   extraPacks: {'MK.BoostTrainer': 'mks'},
-  settings: {'Audio/Enabled': false, 'Audio/MasterVolume': 1, 'Physics/Enabled': false, 'Camera/Enabled': false, 'Camera/FieldOfView': 65, 'Camera/AimAtKart':true, 'Camera/PanelHotkey':'F8', 'Audio/LargeCount':120, 'BobbyGang/OriginalName':'Legacy Racer', 'BobbyGang/ReplacementName':'Bobby'}, configHash: 'first-hash',
-  packs: [{id:'garage', name:'Toolkit Essentials', features:['Audio','Camera']}, {id:'mks', name:"Community Mods", features:['Physics','BobbyGang']}, {id:'community', name:'Community Pack', features:[]}],
+  settings: {'OnlineProtection/Enabled': true, 'OnlineProtection/BlockLeaderboardUploads': true, 'OnlineProtection/BlockOnlineLobbyJoins': true, 'Audio/Enabled': false, 'Audio/MasterVolume': 1, 'Physics/Enabled': false, 'Camera/Enabled': false, 'Camera/FieldOfView': 65, 'Camera/AimAtKart':true, 'Camera/PanelHotkey':'F8', 'Audio/LargeCount':120, 'BobbyGang/OriginalName':'Legacy Racer', 'BobbyGang/ReplacementName':'Bobby'}, configHash: 'first-hash',
+  packs: [{id:'garage', name:'Toolkit Essentials', features:['OnlineProtection','Audio','Camera']}, {id:'mks', name:"Community Mods", features:['Physics','BobbyGang']}, {id:'community', name:'Community Pack', features:[]}],
   moduleSources: {Camera:['plugins/TK2.Customization/CameraFeature.cs','plugins/TK2.Customization/CameraSettings.cs'], Audio:['plugins/TK2.Customization/AudioFeature.cs'], BobbyGang:['plugins/TK2.Customization/LegacyMK.cs'], 'Recipe.FrameLimiter':['plugins/TK2.Customization/Recipes/FrameLimiter.cs']},
   files: ['src/Reconstructed/KartLogic.cs','plugins/TK2.Customization/CameraFeature.cs','plugins/TK2.Customization/CameraSettings.cs','plugins/TK2.Customization/AudioFeature.cs','plugins/TK2.Customization/Recipes/FrameLimiter.cs'], features: [
+    {id:'OnlineProtection', name:'Online protection', category:'Safety', description:'Mandatory protection', origin:'New', locked:true, settings:[['BlockLeaderboardUploads','Block leaderboard uploads','bool',true],['BlockOnlineLobbyJoins','Block online rooms','bool',true]]},
     {id:'Audio', name:'Audio mixer', category:'Audio', description:'Volume adjustment', origin:'New', settings:[['MasterVolume','Volume','float',1,0,1],['LargeCount','Large count','int',120,0,20000]]},
     {id:'Physics', name:'Fast fall', category:'Driving', description:'Physics description', origin:'Adapted', gameplay:true, settings:[]},
     {id:'Camera', name:'Camera', category:'Camera', description:'Keep your kart in view', origin:'New', settings:[['FieldOfView','Field of view','float',65,35,110],['AimAtKart','Aim at kart','bool',true,null,null],['PanelHotkey','Panel hotkey','text','F8',null,null,'Camera key',['F8','C','F6']]]}
@@ -84,6 +86,12 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   await settle();
   assert.equal(ids['feature-list'].children.length, 2, 'modules must be grouped into packs');
   assert.equal(ids['feature-list'].children[0].dataset.pack, 'garage');
+  assert.equal(control('OnlineProtection/Enabled'), undefined, 'mandatory protection has no enable toggle');
+  assert.equal(control('OnlineProtection/BlockLeaderboardUploads').disabled, true, 'leaderboard protection cannot be edited');
+  assert.equal(control('OnlineProtection/BlockOnlineLobbyJoins').disabled, true, 'lobby protection cannot be edited');
+  run(`resetFeatures(state.features.filter(feature => feature.id === 'OnlineProtection')); syncDependencies()`);
+  assert.equal(run('settingEdits.has("OnlineProtection/Enabled")'), false, 'reset cannot turn off mandatory protection');
+  assert.equal(control('OnlineProtection/BlockLeaderboardUploads').disabled, true, 'dependency refresh preserves the lock');
   const characterName = run(`settingsControl('BobbyGang/OriginalName','Original name','text','Saved custom racer',null,null,'Choose a built-in or saved custom name.',['Mia','Bobby','Bubble'],()=>{},'setting','Bubble')`);
   assert.equal(characterName.field.tagName, 'SELECT', 'original character name is selected from a menu');
   assert.ok(characterName.field.children.some(option => option.value === 'Saved custom racer' && /Saved custom/.test(option.text)), 'legacy custom names remain selectable');
@@ -100,7 +108,7 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   assert.equal(chevron.getAttribute('viewBox'), '0 0 24 24');
   assert.match(chevron.children[0].getAttribute('d'), /M16\.59 8\.59/);
   accordion.click(); assert.equal(accordion.getAttribute('aria-expanded'), 'true'); assert.equal(accordionPanel.hidden, false, 'module accordion opens and updates its accessible state');
-  assert.equal(run("document.querySelectorAll('[data-accordion-key]').length"), 5, 'all current accordion controls can be selected');
+  assert.equal(run("document.querySelectorAll('[data-accordion-key]').length"), 6, 'all current accordion controls can be selected');
   ids['expand-all-accordions'].click();
   const accordions = [...descendants(ids['feature-list']), ...descendants(ids['recipe-controls'])].filter(node => node.dataset.accordionKey);
   assert.ok(accordions.length > 2, 'all module and recipe accordions are included');

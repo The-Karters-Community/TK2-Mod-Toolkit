@@ -129,11 +129,11 @@ function settingsControl(key, label, kind, value, low, high, description, choice
   } else control.append(tools);
   input.defaultAvailable = defaultValue !== undefined; return control;
 }
-function syncModuleState(id) {document.querySelectorAll('[data-module-state]').forEach(node => {if (node.dataset.moduleState === id) node.textContent = state.settings[id + '/Enabled'] ? 'On' : 'Off';});}
+function syncModuleState(id) {const feature = state.features.find(item => item.id === id); document.querySelectorAll('[data-module-state]').forEach(node => {if (node.dataset.moduleState === id) node.textContent = feature?.locked ? 'Always on' : state.settings[id + '/Enabled'] ? 'On' : 'Off';});}
 function syncDependencies() {
   document.querySelectorAll('[data-setting]').forEach(input => {
     const feature = state.features.find(item => item.id === input.dataset.setting.split('/')[0]);
-    input.disabled = !state.game || busy && actionInFlight !== 'settings' || feature?.available === false || Boolean(input.dataset.requires && !state.settings[input.dataset.requires]);
+    input.disabled = !state.game || busy && actionInFlight !== 'settings' || feature?.available === false || feature?.locked === true || Boolean(input.dataset.requires && !state.settings[input.dataset.requires]);
     if (input.dataset.requires) input.setAttribute('aria-description', input.disabled ? 'Turn on this parameter’s override switch to edit its custom value.' : 'Custom override value.');
   });
   document.querySelectorAll('[data-setting], [data-recipe], [data-extra]').forEach(input => {
@@ -169,6 +169,7 @@ function featureSettings(feature, search) {
     settings.forEach(([key, label, kind, fallback, low, high, description, choices, requires]) => {
       const fullKey = feature.id + '/' + key;
       const control = settingsControl(fullKey, label, kind, state.settings[fullKey] ?? fallback, low, high, description, choices, value => changeSetting(fullKey, value), 'setting', fallback);
+      if (feature.locked) control.querySelectorAll('input,select,button').forEach(input => {input.disabled = true;});
       if (requires) {
         const requireKey = requires.includes('/') ? requires : feature.id + '/' + requires;
         const input = control.field; input.dataset.requires = requireKey; input.disabled = busy && actionInFlight !== 'settings' || !state.settings[requireKey];
@@ -218,17 +219,17 @@ function renderFeatures() {
       const heading = el('div', 'module-heading'), expand = el('button', 'module-expand'), info = el('span', 'module-info');
       info.append(el('span', 'module-name', feature.name));
       if (feature.description) info.append(el('span', 'module-description', feature.description));
-      const enabled = Boolean(state.settings[feature.id + '/Enabled']), status = el('span', 'module-state', enabled ? 'On' : 'Off'); status.dataset.moduleState = feature.id;
+      const enabled = feature.locked || Boolean(state.settings[feature.id + '/Enabled']), status = el('span', 'module-state', feature.locked ? 'Always on' : enabled ? 'On' : 'Off'); status.dataset.moduleState = feature.id;
       const panel = el('div', 'module-body'); panel.id = 'module-' + feature.id; panel.hidden = !(expandedModules.has(feature.id) || Boolean(search));
       expand.append(info, status, chevronIcon());
       bindAccordion(expand, panel, feature.id, !panel.hidden);
-      const toggle = switchControl('Enable ' + feature.name, enabled, unavailable || busy && actionInFlight !== 'settings', value => changeSetting(feature.id + '/Enabled', value));
-      toggle.children[0].dataset.setting = feature.id + '/Enabled';
-      const headerReset = el('button', 'quiet module-reset', 'Reset'); headerReset.setAttribute('aria-label', 'Reset ' + feature.name + ' to defaults'); headerReset.onclick = () => resetFeatures([feature]);
+      const toggle = feature.locked ? el('span', 'module-lock-badge', 'Locked') : switchControl('Enable ' + feature.name, enabled, unavailable || busy && actionInFlight !== 'settings', value => changeSetting(feature.id + '/Enabled', value));
+      if (!feature.locked) toggle.children[0].dataset.setting = feature.id + '/Enabled';
+      const headerReset = el('button', 'quiet module-reset', 'Reset'); headerReset.setAttribute('aria-label', 'Reset ' + feature.name + ' to defaults'); headerReset.hidden = Boolean(feature.locked); headerReset.onclick = () => resetFeatures([feature]);
       heading.append(expand, headerReset, toggle); row.append(heading);
       if (unavailable) panel.append(el('p', 'module-note', feature.reason || 'This module needs a compatibility update before it can be enabled.'));
       if (feature.status && feature.status !== 'verified') panel.append(el('p', 'module-note', feature.status));
-      const moduleTools = el('div', 'module-tools'); moduleTools.append(el('small', '', 'Reset restores all defaults and switches this module off.')); panel.append(moduleTools);
+      const moduleTools = el('div', 'module-tools'); moduleTools.append(el('small', '', feature.locked ? 'Mandatory protection stays on. Online actions are blocked while unapproved modules or plugins are active.' : 'Reset restores all defaults and switches this module off.')); panel.append(moduleTools);
       const edit = el('button', 'secondary', 'Edit code'); edit.dataset.editModule = feature.id; edit.disabled = busy || !state.moduleSources?.[feature.id]?.length;
       edit.onclick = () => editModule(feature.id); moduleTools.append(edit);
       panel.append(featureSettings(feature, search)); row.append(panel); section.append(row);
@@ -329,7 +330,7 @@ function renderInstallation() {
   $('workshop-build-log').textContent = state.buildLog || 'No compiler run yet. Build pack validates your C#; Build & install also replaces the plugin with the game closed.';
 }
 function resetFeatures(features) {
-  features.forEach(feature => {changeSetting(feature.id + '/Enabled', false); feature.settings.forEach(setting => changeSetting(feature.id + '/' + setting[0], setting[3]));});
+  features.filter(feature => !feature.locked).forEach(feature => {changeSetting(feature.id + '/Enabled', false); feature.settings.forEach(setting => changeSetting(feature.id + '/' + setting[0], setting[3]));});
   syncControls(); notice('Defaults restored. Save changes to apply.');
 }
 function render() {renderFeatures(); renderRecipes(); renderFiles(); renderInstallation(); renderSharing(); syncDependencies(); updateSaveState();}

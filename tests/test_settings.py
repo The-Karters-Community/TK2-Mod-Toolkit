@@ -29,7 +29,11 @@ class SettingsMergeTests(unittest.TestCase):
 
     def test_game_already_has_requested_value_is_idempotent(self):
         data = b"[Camera]\nFieldOfView = 75\n"
-        self.assertEqual(self.save(data, {"Camera/FieldOfView": 75}, {"Camera/FieldOfView": 65}), data)
+        changed = self.save(data, {"Camera/FieldOfView": 75}, {"Camera/FieldOfView": 65})
+        self.assertEqual(settings.read(changed)["settings"]["Camera/FieldOfView"], 75)
+        self.assertTrue(all(settings.read(changed)["settings"][key] for key in (
+            "OnlineProtection/Enabled", "OnlineProtection/BlockLeaderboardUploads", "OnlineProtection/BlockOnlineLobbyJoins")))
+        self.assertEqual(self.save(changed, {"Camera/FieldOfView": 75}, {"Camera/FieldOfView": 65}), changed)
 
     def test_dirty_only_validation_allows_untouched_bad_values(self):
         data = b"[Camera]\nFieldOfView = 20\n[Audio]\nEnabled = false\n"
@@ -135,6 +139,23 @@ class SettingsMergeTests(unittest.TestCase):
             "plugins/TK2.Customization/OnlineProtectionFeature.cs",
             "plugins/TK2.Customization/OnlineProtectionPolicy.cs",
             "plugins/TK2.Customization/Plugin.cs"})
+
+    def test_online_protection_cannot_be_disabled_and_repairs_existing_config(self):
+        disabled = "[OnlineProtection]\nEnabled = false\nBlockLeaderboardUploads = false\nBlockOnlineLobbyJoins = false\n"
+        seeded = pack.seed_config(disabled)
+        self.assertIn("Enabled = true", seeded)
+        self.assertIn("BlockLeaderboardUploads = true", seeded)
+        self.assertIn("BlockOnlineLobbyJoins = true", seeded)
+        self.assertTrue(all(settings.read(seeded.encode())["settings"][key] for key in (
+            "OnlineProtection/Enabled", "OnlineProtection/BlockLeaderboardUploads", "OnlineProtection/BlockOnlineLobbyJoins")))
+        with self.assertRaisesRegex(ValueError, "mandatory"):
+            settings.merge(seeded.encode(), {"hash": hashlib.sha256(seeded.encode()).hexdigest(),
+                "values": {"OnlineProtection/Enabled": False}, "baseValues": {"OnlineProtection/Enabled": True}})
+        repaired = settings.merge(disabled.encode(), {"hash": hashlib.sha256(disabled.encode()).hexdigest(),
+            "values": {"Camera/FieldOfView": 75}, "baseValues": {"Camera/FieldOfView": 65}})
+        self.assertIn(b"Enabled = true", repaired)
+        self.assertIn(b"BlockLeaderboardUploads = true", repaired)
+        self.assertIn(b"BlockOnlineLobbyJoins = true", repaired)
 
     def test_performance_module_has_pack_membership_and_source_ownership(self):
         from unittest.mock import patch

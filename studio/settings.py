@@ -32,6 +32,8 @@ def read(data):
         schema = known.get((entry["section"], entry["key"]))
         if schema:
             values[compound] = normalized(entry["value"], schema[0])
+    for section, key in pack.FORCED_TRUE_SETTINGS:
+        values[f"{section}/{key}"] = True
     return {"settings": values, "configHash": hashlib.sha256(data).hexdigest(),
             "recipes": [e for e in entries if e["section"].startswith("Recipe.") and e["section"] not in pack.RETIRED_MODULES and (e["section"], e["key"]) not in known and (e["section"], e["key"]) not in pack.RETIRED_SETTINGS],
             "extraSettings": [e for e in entries if (e["section"], e["key"]) not in known and not e["section"].startswith("Recipe.") and e["section"] not in pack.RETIRED_MODULES],
@@ -49,6 +51,9 @@ def merge(data, body):
     if body.get("hash") != current["configHash"] and not any(k in body for k in ("baseValues", "baseRecipes", "baseExtraSettings")):
         raise SettingsConflict(list(dirty) + list(recipe_dirty) + list(extra_dirty))
     updates = pack.validate(dirty)
+    for (section, key), value in updates.items():
+        if (section, key) in pack.FORCED_TRUE_SETTINGS and normalized(value, "bool") is not True:
+            raise ValueError(f"{section}/{key} is mandatory and cannot be disabled")
     definitions = {e["section"] + "/" + e["key"]: e for e in current["entries"]
                    if (e["section"], e["key"]) not in pack.RETIRED_SETTINGS}
     kinds = {s + "/" + k: definition[0] for (s, k), definition in pack.schema().items()}
@@ -76,6 +81,9 @@ def merge(data, body):
         elif body.get("hash") != current["configHash"]:
             conflicts.append(compound)
     if conflicts: raise SettingsConflict(conflicts)
+    # The toolkit always restores these settings even if a config file was edited
+    # outside the app while it was open.
+    updates.update({pair: "true" for pair in pack.FORCED_TRUE_SETTINGS})
     updated = core.update_cfg(data.decode("utf-8-sig") or "# TK2 Mod Toolkit Pack\n", updates)
     # Old module sections must not reappear in the game's config after a save.
     output, section = [], ""
