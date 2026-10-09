@@ -10,6 +10,7 @@ A Windows mod manager and C# workshop for **The Karters 2 Turbo Charged 0.1.4.18
 - Per-value, module and pack resets; visible defaults, allowed ranges and interactive sliders.
 - Live camera tuning with **F8**, plus interface, audio, graphics and driving controls.
 - Camera-mirror racing for local offline races and time trials.
+- Race performance: cached draw-distance arrays, optional race GC and native AI physics cadence for offline testing.
 - C# editor, first-mod tutorial, game API browser and selective **.tk2mod** export/import.
 
 ## Get started
@@ -39,6 +40,7 @@ Only build a portable distribution when needed. Output: `artifacts/portable/TK2 
 - [First mod](docs/FIRST-MOD.md) · [Application flow](docs/APPLICATION-FLOW.md)
 - [Share modules](docs/SHARING-MODULES.md) · [Community ports](docs/MOD-PACK.md)
 - [Mirror race](docs/MIRROR-RACE.md)
+- [Race performance & developer handoff](docs/PERFORMANCE-MOD.md) · [Performance investigation](docs/PERFORMANCE-INVESTIGATION-2026-10-09.md)
 - [Readable source & limits](docs/READABLE-SOURCE.md) · [Validation](docs/VALIDATION.md)
 
 Modules start disabled. Gameplay changes run in local/offline races. This test build does not require Disable Leaderboards or block uploads. Native reconstruction is partial, not the original Unity source project. Compilation and simulated checks pass; handling and visuals still need manual in-game testing.

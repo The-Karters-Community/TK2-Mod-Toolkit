@@ -10,6 +10,8 @@ Open **Workshop → Share modules**, name the package, tick the modules you want
 
 Save unsaved C# before exporting. The package is for another **TK2 Mod Toolkit 0.6.3+**, using the same supported game build. It is not a standalone DLL; the recipient's Toolkit supplies BepInEx, runtime host and compilation.
 
+Packages containing **Race performance** require runtime **0.6.9+** and a Studio catalog that includes Performance (source-app 0.6.4+). The exported helper relies on the recipient's Plugin and StudioBehaviour integration; older installations cannot import this new built-in module.
+
 Built-in modules share implementation files. Their package may contain code for other built-in modules, but only selected config sections are exported. Game binaries, interop DLLs, the loader and unrelated custom recipes are excluded.
 
 ## Import

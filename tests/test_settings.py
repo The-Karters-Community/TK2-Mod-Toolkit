@@ -66,5 +66,34 @@ class SettingsMergeTests(unittest.TestCase):
         self.assertEqual(pack.validate({"CommunityCommands/Channel": ""}), {("CommunityCommands", "Channel"): ""})
         with self.assertRaises(ValueError): pack.validate({"Camera/PreserveKartFraming": "true"})
 
+    def test_performance_controls_seed_disabled_and_validate_ai_interval(self):
+        original = "[Performance]\nEnabled = true\nAIPhysicsInterval = 3\n"
+        seeded = pack.seed_config(original)
+        values = settings.read(seeded.encode())["settings"]
+        self.assertTrue(values["Performance/Enabled"])
+        self.assertEqual(values["Performance/AIPhysicsInterval"], 3)
+        self.assertTrue(values["Performance/CacheDrawDistance"])
+        self.assertTrue(values["Performance/RaceGarbageCollection"])
+        self.assertFalse(values["Performance/LowerAIPhysics"])
+        self.assertFalse(pack.defaults()["Performance/Enabled"])
+        self.assertEqual(pack.seed_config(seeded), seeded)
+        for invalid in (0, 5, 1.5, True):
+            with self.subTest(interval=invalid), self.assertRaises(ValueError):
+                pack.validate({"Performance/AIPhysicsInterval": invalid})
+        for interval in (1, 4):
+            self.assertEqual(pack.validate({"Performance/AIPhysicsInterval": interval}),
+                             {("Performance", "AIPhysicsInterval"): str(interval)})
+
+    def test_performance_module_has_pack_membership_and_source_ownership(self):
+        from unittest.mock import patch
+        feature = next(f for f in pack.catalog_features() if f["id"] == "Performance")
+        self.assertEqual(feature["name"], "Race performance")
+        self.assertTrue(feature["gameplay"])
+        essentials = next(p for p in pack.catalog_packs() if p["id"] == "garage")
+        self.assertIn("Performance", essentials["features"])
+        source = "plugins/TK2.Customization/PerformanceFeature.cs"
+        with patch.object(pack, "source_files", return_value=[source]):
+            self.assertEqual(pack.module_sources()["Performance"], [source])
+
 
 if __name__ == "__main__": unittest.main()

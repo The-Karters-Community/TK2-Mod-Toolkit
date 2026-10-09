@@ -1,5 +1,11 @@
 # Validation
 
+## Race performance module (2026-10-09)
+
+Runtime 0.6.9 builds with zero warnings/errors against current installed interop. All 86 Python tests, 133 frontend assertions, 96-control static UI smoke and 79 production performance-feature assertions pass. The latter use stub engine APIs and cover graphics buffer reuse, AI/offline guards, policy restoration and cleanup failures; they are not in-game verification. All four hook targets were checked as unique exact parameterless void signatures in current Assembly-CSharp.dll.
+
+Installed 0.6.9 DLL SHA-256 matches the build artifact (`e48e1628cd0586822b5d5daee125bb83e80d0b15ae75eeae2b31d82f2aae54b4`). SDK rollback backups preserve DLL and config. Performance is enabled locally with caching and race GC on; optional lower AI physics stays off. Unrelated config values were verified preserved. The game was not launched automatically and gains/real-engine behavior remain unmeasured. [Controls, developer changes and rollback](PERFORMANCE-MOD.md).
+
 ## Automated evidence
 
 The plugin compiles against this installation's current .NET 6, BepInEx and IL2CPP interop assemblies. Every build/deployment is fingerprinted. Python tests cover config merge conflicts, comments/unknown keys, recipe/source backups, deployment/rollback, Steam secondary library discovery, loader readiness and portable prebuilt installation into another path. JavaScript tests cover dirty-only saves, concurrent edits, focused inputs, module/pack grouping, advanced dependencies and default reset. Native pure logic tests cover jump branching, camera selection, FOV framing and immunity flags; community parser tests cover all six command families and permissions.

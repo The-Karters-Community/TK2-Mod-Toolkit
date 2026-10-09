@@ -13,6 +13,12 @@ FEATURES = [
     {"id": "Audio", "name": "Audio mixer", "category": "Audio", "description": "Multiply the game's Wwise volume settings, then restore them when disabled.", "origin": "New", "settings": [("MasterVolume", "Master volume", "float", 1, 0, 1), ("MusicVolume", "Music", "float", 1, 0, 1), ("SfxVolume", "Sound effects", "float", 1, 0, 1), ("VoiceVolume", "Voices", "float", 1, 0, 1), ("UiVolume", "Interface sounds", "float", 1, 0, 1)]},
     {"id": "Camera", "name": "Camera setup", "category": "Camera", "description": "Adjust the local racing camera while keeping your kart comfortably framed.", "origin": "New", "settings": [("FieldOfView", "Field of view", "float", 65, 35, 110), ("PreserveKartFraming", "Keep kart size", "bool", True, None, None), ("DistanceMultiplier", "Camera distance", "float", 1, .5, 2.5), ("HeightOffset", "Camera height", "float", 0, -2, 4)]},
     {"id": "Rendering", "name": "Shadow distance", "category": "Graphics", "description": "Set Unity's shadow draw distance. Rendering behavior depends on the game's pipeline.", "origin": "New", "settings": [("ShadowDistance", "Distance", "float", 100, 0, 500)]},
+    {"id": "Performance", "name": "Race performance", "category": "Graphics", "description": "Cache draw-distance settings and allow garbage collection during offline races. Optional lower AI physics changes movement accuracy.", "origin": "New", "gameplay": True, "settings": [
+        ("CacheDrawDistance", "Cache draw distance", "bool", True, None, None, "Reuse camera distance settings to reduce repeated array allocations."),
+        ("RaceGarbageCollection", "Allow race garbage collection", "bool", True, None, None, "Keep managed collection enabled during offline races; collections can cause brief pauses."),
+        ("LowerAIPhysics", "Lower AI physics", "bool", False, None, None, "Use the game's existing lower-accuracy AI physics path. May affect movement and collisions; offline only."),
+        ("AIPhysicsInterval", "AI physics interval", "int", 2, 1, 4, "Physics ticks between selected AI motor updates. 1 updates every tick; higher values lower accuracy.", None, "LowerAIPhysics"),
+    ]},
     {"id": "Physics", "name": "Fast fall", "category": "Driving", "description": "Press Down Arrow or the mapped controller button after the minimum air time. Includes the legacy press, directional input and optional dodge modes.", "origin": "Community legacy port", "gameplay": True, "settings": [("FastFallAcceleration", "Downward acceleration", "float", 100, 0, 500), ("MinimumAirTime", "Air time before activation", "float", .4, 0, 3), ("UseSinglePressInput", "Press once per jump", "bool", True, None, None), ("ControllerAction", "Controller action", "text", "MenuTriangle", None, None), ("ShouldDodgeOnPress", "Dodge on fast fall", "bool", False, None, None), ("DodgeDurationAfterPress", "Dodge duration", "float", .5, .1, 1), ("MinimumJoystickInputBeforeFastFall", "Directional deadzone", "float", .1, 0, 1)]},
     {"id": "Laps", "name": "Custom lap count", "category": "Race rules", "description": "Choose how many laps an offline race requires. Port of the legacy custom-laps idea.", "origin": "Legacy port", "gameplay": True, "settings": [("Count", "Laps", "int", 3, 1, 99)]},
     {"id": "SimpleDriving", "name": "Driving challenge", "category": "Driving", "description": "Disable local jump and drift inputs. Fresh port of the legacy BoringMode idea.", "origin": "Legacy port", "gameplay": True, "settings": [("DisableJump", "Disable jumping", "bool", True, None, None), ("DisableDrift", "Disable drifting", "bool", True, None, None)]},
@@ -105,7 +111,7 @@ def defaults():
 
 
 PACKS = [
-    {"id": "garage", "name": "Toolkit Essentials", "description": "Camera, interface, audio and graphics controls.", "features": ["UI", "HudOpacity", "Audio", "Camera", "Rendering"]},
+    {"id": "garage", "name": "Toolkit Essentials", "description": "Camera, interface, audio, graphics and race performance controls.", "features": ["UI", "HudOpacity", "Audio", "Camera", "Rendering", "Performance"]},
     {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
@@ -152,6 +158,7 @@ def module_sources():
         "UI": ["StudioBehaviour.cs", "Plugin.cs"],
         "HudOpacity": ["StudioBehaviour.cs", "PackModules.cs"],
         "Rendering": ["StudioBehaviour.cs", "PackModules.cs"],
+        "Performance": ["PerformanceFeature.cs"],
         "Audio": ["AudioFeature.cs", "Plugin.cs"],
         "Camera": ["CameraFeature.cs", "CameraSettings.cs", "CameraPanel.cs"],
         "Physics": ["FastFallFeature.cs", "Plugin.cs"],

@@ -148,6 +148,7 @@ internal static partial class LegacyMK
     private static readonly Dictionary<int, (Ant_BoostManager Target, float One, float Two, float Three)> ReserveOriginals = new();
     private static void ControllerPrefix(PixelEasyCharMoveKartController __instance)
     {
+        if (!Reserves.Value && ReserveOriginals.Count == 0 && !AirBrake.Value) return;
         try
         {
             var boost = __instance.kartPhysics.boostManager;

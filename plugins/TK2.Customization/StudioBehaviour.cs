@@ -41,6 +41,7 @@ public sealed class StudioBehaviour : MonoBehaviour
         CameraPanel.Tick(p);
         RunFeature(ref _audioFaulted, "audio", () => AudioFeature.Tick(p));
         RecipeHost.Tick();
+        PerformanceFeature.Tick();
         RunFeature(ref _mkFaulted, "MK modules", LegacyMK.Tick);
         RunFeature(ref _communityFaulted, "community commands", CommunityMods.Tick);
         RunFeature(ref _nightmareFaulted, "Nightmare AI", NightmareAI.Tick);
