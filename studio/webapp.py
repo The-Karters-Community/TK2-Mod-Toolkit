@@ -15,6 +15,7 @@ from urllib.parse import urlsplit, parse_qs
 from . import core, pack, settings, setup, symbols
 
 WEB = core.ROOT / "studio/web"
+APP_VERSION = "0.6.12"
 
 
 class Application:
@@ -212,7 +213,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.authorized(): return self.reply(403, {"error": "Invalid session"})
                 app = self.server.app
                 with app.lock:
-                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Toolkit", "version": "0.6.11", "pid": os.getpid(), "game": str(app.game)})
+                    if parsed.path == "/api/health": return self.reply(200, {"app": "TK2 Mod Toolkit", "version": APP_VERSION, "pid": os.getpid(), "game": str(app.game)})
                     if parsed.path == "/api/state": return self.reply(200, app.state())
                     if parsed.path == '/api/download':
                         from . import module_packages
@@ -235,7 +236,7 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/":
                 source = (WEB / "index.html").read_text(encoding="utf-8").replace("__SESSION_TOKEN__", self.server.app.token)
                 return self.reply(200, source, "text/html")
-            files = {"/app.js": WEB / "app.js", "/style.css": WEB / "style.css",
+            files = {"/app.js": WEB / "app.js", "/style.css": WEB / "style.css", "/components.css": WEB / "components.css",
                      "/assets/logo.png": core.ROOT / "assets/Logo.png",
                      "/assets/art.jpg": core.ROOT / "assets/library_600x900_2x.jpg",
                      "/assets/app.ico": core.ROOT / "assets/TheKartersLogoModified.ico"}
@@ -300,7 +301,7 @@ def main():
             if health.get("app") in ("TK2 Mod Toolkit", "TK2 Mod Garage"):
                 if args.game is not None and health.get("game") != str(core.validate_game(args.game)):
                     raise RuntimeError("Close the existing Toolkit before switching game installations")
-                if health.get("version") == "0.6.11":
+                if health.get("version") == APP_VERSION:
                     if not args.no_browser: open_window(saved["origin"])
                     return
                 request = urllib.request.Request(saved["origin"] + "/api/shutdown", data=b"{}", headers={"X-TK2-Token": saved["token"], "Content-Type": "application/json"})
@@ -324,7 +325,7 @@ def main():
             if health.get("app") not in ("TK2 Mod Toolkit", "TK2 Mod Garage"): raise RuntimeError("Unexpected service on Toolkit port")
             if args.game is not None and health.get("game") != str(core.validate_game(args.game)):
                 raise RuntimeError("Close the existing Toolkit before switching game installations")
-        if health.get("version") == "0.6.11":
+        if health.get("version") == APP_VERSION:
             if not args.no_browser: open_window(expected)
             return
         # Upgrade our old authenticated service so launching the new app cannot

@@ -49,6 +49,17 @@ function switchControl(label, value, disabled, change) {
   const wrapper = el('label', 'switch'); const input = el('input'); input.type = 'checkbox'; input.checked = value; input.disabled = disabled; input.setAttribute('aria-label', label);
   input.onchange = () => change(input.checked); wrapper.append(input, el('span')); return wrapper;
 }
+function bindAccordion(trigger, panel, key, expanded) {
+  panel.hidden = !expanded;
+  trigger.setAttribute('aria-expanded', String(expanded));
+  trigger.setAttribute('aria-controls', panel.id);
+  trigger.onclick = () => {
+    const open = panel.hidden;
+    panel.hidden = !open;
+    trigger.setAttribute('aria-expanded', String(open));
+    if (open) expandedModules.add(key); else expandedModules.delete(key);
+  };
+}
 function featureGroup(feature) {return feature.gameplay ? 'Gameplay' : feature.category === 'Audio' ? 'Audio' : 'Visual';}
 function packsForState() {
   const packs = (state.packs || []).map(pack => ({...pack, features: (pack.features || []).map(id => typeof id === 'object' ? id : state.features.find(feature => feature.id === id)).filter(Boolean)}));
@@ -69,7 +80,12 @@ function settingsControl(key, label, kind, value, low, high, description, choice
   copy.append(el('small', 'setting-hint', `Default: ${defaultText} · Allowed: ${allowed}`));
   control.append(copy);
   const input = el(choices?.length ? 'select' : 'input');
-  if (choices?.length) choices.forEach(choice => {const option = el('option', '', String(choice)); option.value = choice; input.append(option);});
+  if (choices?.length) {
+    choices.forEach(choice => {const option = el('option', '', String(choice)); option.value = choice; input.append(option);});
+    if (kind === 'text' && value !== undefined && value !== null && !choices.some(choice => String(choice) === String(value))) {
+      const legacy = el('option', '', `Saved custom: ${value}`); legacy.value = value; input.append(legacy);
+    }
+  }
   else {
     input.type = kind === 'text' ? 'text' : kind === 'bool' ? 'checkbox' : 'number';
     if (!['text', 'bool'].includes(kind)) {if (low !== null && low !== undefined) input.min = low; if (high !== null && high !== undefined) input.max = high; input.step = kind === 'int' ? '1' : 'any';}
@@ -183,9 +199,8 @@ function renderFeatures() {
       if (feature.description) info.append(el('span', 'module-description', feature.description));
       const enabled = Boolean(state.settings[feature.id + '/Enabled']), status = el('span', 'module-state', enabled ? 'On' : 'Off'); status.dataset.moduleState = feature.id;
       const panel = el('div', 'module-body'); panel.id = 'module-' + feature.id; panel.hidden = !(expandedModules.has(feature.id) || Boolean(search));
-      expand.setAttribute('aria-expanded', String(!panel.hidden)); expand.setAttribute('aria-controls', panel.id);
       expand.append(info, status, el('span', 'expand-arrow', '⌄'));
-      expand.onclick = () => {panel.hidden = !panel.hidden; expand.setAttribute('aria-expanded', String(!panel.hidden)); if (panel.hidden) expandedModules.delete(feature.id); else expandedModules.add(feature.id);};
+      bindAccordion(expand, panel, feature.id, !panel.hidden);
       const toggle = switchControl('Enable ' + feature.name, enabled, unavailable || busy && actionInFlight !== 'settings', value => changeSetting(feature.id + '/Enabled', value));
       toggle.children[0].dataset.setting = feature.id + '/Enabled';
       const headerReset = el('button', 'quiet module-reset', 'Reset'); headerReset.setAttribute('aria-label', 'Reset ' + feature.name + ' to defaults'); headerReset.onclick = () => resetFeatures([feature]);
@@ -218,8 +233,8 @@ function appendEntryGroups(container, groups, extra = false) {
     const enabled = settings.find(entry => entry.key === 'Enabled' && entry.type === 'Boolean');
     if (enabled?.description) info.append(el('span', 'module-description', enabled.description));
     const panel = el('div', 'module-body'); panel.id = 'section-' + name.replace(/[^A-Za-z0-9_-]/g, '-'); panel.hidden = !(expandedModules.has(name) || Boolean($('mod-search').value));
-    expand.setAttribute('aria-expanded', String(!panel.hidden)); expand.setAttribute('aria-controls', panel.id);
-    expand.append(info, el('span', 'expand-arrow', '⌄')); expand.onclick = () => {panel.hidden = !panel.hidden; expand.setAttribute('aria-expanded', String(!panel.hidden)); if (panel.hidden) expandedModules.delete(name); else expandedModules.add(name);};
+    expand.append(info, el('span', 'expand-arrow', '⌄'));
+    bindAccordion(expand, panel, name, !panel.hidden);
     heading.append(expand);
     if (enabled) {
       const toggle = switchControl('Enable ' + title, enabled.value.toLowerCase() === 'true', busy && actionInFlight !== 'settings', value => changeEntry(enabled, String(value), extra));
@@ -277,9 +292,12 @@ function renderInstallation() {
   $('loader-help').textContent = ready.loaderSource ? 'Loader distribution included. Existing mods and settings are preserved.' : 'Loader bundle not available. Add the Unity IL2CPP x64 distribution to vendor/BepInEx.';
   $('installation-install').disabled = busy || !ready.ready || state.packCurrent;
   $('installation-install').textContent = state.packCurrent ? 'Plugin up to date' : state.installed ? 'Update plugin (restart required)' : 'Install plugin';
+  const updateAvailable = Boolean(ready.ready && state.installed && !state.packCurrent);
+  $('plugin-update-top').hidden = !updateAvailable;
+  $('plugin-update-top').disabled = busy || !ready.ready;
   $('open-game-folder').disabled = busy || !state.game;
   $('runtime-errors').textContent = [...(ready.runtimeErrors || []), ...(ready.runtimeWarnings || [])].join('\n') || 'No errors or warnings found in the available BepInEx log.';
-  $('install-state').textContent = !ready.ready ? 'Setup needed' : state.installed ? (state.packCurrent ? 'Plugin installed' : 'Plugin update available') : 'Ready to install';
+  $('install-state').textContent = !ready.ready ? 'Setup needed' : state.installed ? (state.packCurrent ? 'Plugin up to date' : 'Plugin update available') : 'Ready to install';
   const list = $('backups'); list.replaceChildren();
   state.backups.forEach(backup => {
     const row = el('div', 'backup-row'), info = el('div'); info.append(el('p', '', backup.file), el('small', '', `${backup.id} · ${backup.existed ? 'restore previous contents' : 'remove newly installed file'}`));
@@ -359,7 +377,7 @@ function showWorkshopTab(name) {
   if (name === 'api' && functionSequence === 0) searchFunctions().catch(error => notice(error.message, true));
 }
 function setBusy(value) {
-  busy = value; ['workshop-install', 'build', 'create-recipe', 'diagnose', 'prepare-loader', 'installation-install', 'scan-games', 'select-game', 'browse-game', 'browse-package', 'preview-package'].forEach(id => {$(id).disabled = value;});
+  busy = value; ['workshop-install', 'build', 'create-recipe', 'diagnose', 'prepare-loader', 'installation-install', 'plugin-update-top', 'scan-games', 'select-game', 'browse-game', 'browse-package', 'preview-package'].forEach(id => {$(id).disabled = value;});
   $('save-source').disabled = value || !sourceDirty; $('code').readOnly = value || !source; $('reload-source').disabled = value || !source; $('open-source-folder').disabled = value || !source; updateSaveState();
   document.querySelectorAll('[data-edit-module]').forEach(button => {button.disabled = value || !state?.moduleSources?.[button.dataset.editModule]?.length;});
   // Keep controls mounted and editable during a settings save.
@@ -402,6 +420,7 @@ document.querySelectorAll('[data-category]').forEach(button => button.onclick = 
 $('mod-search').oninput = () => {renderFeatures(); renderRecipes();};
 $('workshop-install').onclick = () => runAction('build-install');
 $('installation-install').onclick = () => runAction('install'); $('build').onclick = () => runAction('build');
+$('plugin-update-top').onclick = () => runAction('install');
 $('create-recipe').onclick = () => {if (sourceDirty) {notice('Save the current C# before creating another recipe.', true); return;} runAction('create-recipe', {name: $('recipe-name').value.trim()});};
 $('diagnose').onclick = () => runAction('diagnose');
 $('prepare-loader').onclick = () => runAction('install-loader');

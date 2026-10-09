@@ -216,7 +216,9 @@
           "default": "Bubble",
           "low": null,
           "high": null,
-          "description": "Case-sensitive text to replace; blank does nothing."
+          "description": "Choose a built-in character name or keep a saved custom name. Matching is case-sensitive; blank does nothing.",
+          "choices": ["Mia", "Bobby", "Bubble", "Sir Ronald", "Pablo", "Zig", "Zag", "Zoom", "Otto"],
+          "allowCustom": true
         },
         {
           "key": "ReplacementName",

@@ -42,7 +42,7 @@ FEATURES = [
 _CATALOG_ROOT = Path(__file__).resolve().parent
 _MK = json.loads((_CATALOG_ROOT / "mk_catalog.json").read_text(encoding="utf-8"))["features"]
 for feature in _MK:
-    feature["settings"] = [tuple(s.get(k) for k in ("key", "label", "kind", "default", "low", "high", "description", "choices", "requires")) for s in feature["settings"]]
+    feature["settings"] = [tuple(s.get(k) for k in ("key", "label", "kind", "default", "low", "high", "description", "choices", "requires", "allowCustom")) for s in feature["settings"]]
 _COMMUNITY = json.loads((_CATALOG_ROOT / "community_catalog.json").read_text(encoding="utf-8"))
 FEATURES.extend(_MK + _COMMUNITY)
 for feature in FEATURES:

@@ -38,9 +38,9 @@ const fixture = {installed: false, packCurrent: false, pluginCount: 0, game: 'te
   recipes: [{section: 'Recipe.FrameLimiter', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Limit FPS'}],
   extraSettings: [{section: 'MK.BoostTrainer', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Trainer'}],
   extraPacks: {'MK.BoostTrainer': 'mks'},
-  settings: {'Audio/Enabled': false, 'Audio/MasterVolume': 1, 'Physics/Enabled': false, 'Camera/Enabled': false, 'Camera/FieldOfView': 65, 'Camera/AimAtKart':true, 'Camera/PanelHotkey':'F8', 'Audio/LargeCount':120}, configHash: 'first-hash',
-  packs: [{id:'garage', name:'Toolkit Essentials', features:['Audio','Camera']}, {id:'mks', name:"Community Mods", features:['Physics']}, {id:'community', name:'Community Pack', features:[]}],
-  moduleSources: {Camera:['plugins/TK2.Customization/CameraFeature.cs','plugins/TK2.Customization/CameraSettings.cs'], Audio:['plugins/TK2.Customization/AudioFeature.cs'], 'Recipe.FrameLimiter':['plugins/TK2.Customization/Recipes/FrameLimiter.cs']},
+  settings: {'Audio/Enabled': false, 'Audio/MasterVolume': 1, 'Physics/Enabled': false, 'Camera/Enabled': false, 'Camera/FieldOfView': 65, 'Camera/AimAtKart':true, 'Camera/PanelHotkey':'F8', 'Audio/LargeCount':120, 'BobbyGang/OriginalName':'Legacy Racer', 'BobbyGang/ReplacementName':'Bobby'}, configHash: 'first-hash',
+  packs: [{id:'garage', name:'Toolkit Essentials', features:['Audio','Camera']}, {id:'mks', name:"Community Mods", features:['Physics','BobbyGang']}, {id:'community', name:'Community Pack', features:[]}],
+  moduleSources: {Camera:['plugins/TK2.Customization/CameraFeature.cs','plugins/TK2.Customization/CameraSettings.cs'], Audio:['plugins/TK2.Customization/AudioFeature.cs'], BobbyGang:['plugins/TK2.Customization/LegacyMK.cs'], 'Recipe.FrameLimiter':['plugins/TK2.Customization/Recipes/FrameLimiter.cs']},
   files: ['src/Reconstructed/KartLogic.cs','plugins/TK2.Customization/CameraFeature.cs','plugins/TK2.Customization/CameraSettings.cs','plugins/TK2.Customization/AudioFeature.cs','plugins/TK2.Customization/Recipes/FrameLimiter.cs'], features: [
     {id:'Audio', name:'Audio mixer', category:'Audio', description:'Volume adjustment', origin:'New', settings:[['MasterVolume','Volume','float',1,0,1],['LargeCount','Large count','int',120,0,20000]]},
     {id:'Physics', name:'Fast fall', category:'Driving', description:'Physics description', origin:'Adapted', gameplay:true, settings:[]},
@@ -84,6 +84,19 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   await settle();
   assert.equal(ids['feature-list'].children.length, 2, 'modules must be grouped into packs');
   assert.equal(ids['feature-list'].children[0].dataset.pack, 'garage');
+  const characterName = run(`settingsControl('BobbyGang/OriginalName','Original name','text','Saved custom racer',null,null,'Choose a built-in or saved custom name.',['Mia','Bobby','Bubble'],()=>{},'setting','Bubble')`);
+  assert.equal(characterName.field.tagName, 'SELECT', 'original character name is selected from a menu');
+  assert.ok(characterName.field.children.some(option => option.value === 'Saved custom racer' && /Saved custom/.test(option.text)), 'legacy custom names remain selectable');
+  const replacementName = run(`settingsControl('BobbyGang/ReplacementName','Replacement name','text','My racer',null,null,'Replacement text.',null,()=>{},'setting','Bobby')`);
+  assert.equal(replacementName.field.tagName, 'INPUT'); assert.equal(replacementName.field.type, 'text', 'replacement character name remains editable');
+  run(`state.setup={ready:true};state.installed=true;state.packCurrent=false;renderInstallation()`);
+  assert.equal(ids['plugin-update-top'].hidden, false, 'available plugin updates are shown in the top bar');
+  assert.equal(ids['install-state'].textContent, 'Plugin update available');
+  run(`state.packCurrent=true;renderInstallation()`);
+  assert.equal(ids['plugin-update-top'].hidden, true, 'up-to-date plugins do not show an update action');
+  const accordion = descendants(ids['feature-list']).find(node => node.classes.has('module-expand'));
+  const panelId = accordion.getAttribute('aria-controls'), accordionPanel = descendants(ids['feature-list']).find(node => node.id === panelId);
+  accordion.click(); assert.equal(accordion.getAttribute('aria-expanded'), 'true'); assert.equal(accordionPanel.hidden, false, 'module accordion opens and updates its accessible state');
   assert.equal(document.documentElement.dataset.theme, 'light'); ids.theme.click();
   assert.equal(document.documentElement.dataset.theme, 'dark'); assert.equal(context.localStorage.data['tk2-theme'], 'dark');
   assert.equal(control('Physics/Enabled').disabled, false, 'requested gameplay testing must not be blanket locked');

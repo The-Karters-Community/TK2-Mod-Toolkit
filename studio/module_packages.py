@@ -87,7 +87,8 @@ def _schema(feature):
     for setting in feature.get("settings", []):
         key, _, kind, default, low, high = setting[:6]
         result[key] = {"kind": kind, "default": default, "low": low, "high": high,
-                       "choices": setting[7] if len(setting) > 7 else None}
+                       "choices": setting[7] if len(setting) > 7 else None,
+                       "allowCustom": setting[9] if len(setting) > 9 else False}
     return result
 
 
@@ -106,7 +107,8 @@ def _setting(value, definition):
         if not isinstance(value, str) or len(value) > 4096 or any(c in value for c in "\r\n\x00"):
             raise ValueError("Expected a single-line package setting")
         choices = definition.get("choices")
-        if choices and value not in choices: raise ValueError("Package setting is not an allowed choice")
+        if choices and not definition.get("allowCustom") and value not in choices:
+            raise ValueError("Package setting is not an allowed choice")
     else: raise ValueError("Unsupported package setting type")
     return value
 

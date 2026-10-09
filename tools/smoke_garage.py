@@ -24,9 +24,13 @@ script = (web / "app.js").read_text(encoding="utf-8")
 assert all(name in page.ids for name in re.findall(r"\$\('([^']+)'\)", script)), "Unknown control id"
 css = (web / "style.css").read_text(encoding="utf-8")
 assert "data-theme=dark" in css and "prefers-reduced-motion" in css
+components = (web / "components.css").read_text(encoding="utf-8")
+assert ".module-expand" in components and ".topbar-update" in components
+assert '/components.css' in (web / "index.html").read_text(encoding="utf-8")
 assert all((core.ROOT / "assets" / name).exists() for name in ("Logo.png", "library_600x900_2x.jpg"))
 subprocess.run(["node", "--check", str(web / "app.js")], check=True, creationflags=core.CREATE_NO_WINDOW)
 result = {"uniqueControls": len(page.ids), "views": page.targets, "themeTokens": True, "assetsPresent": True,
+          "componentStyles": "passed",
           "javascriptSyntax": "passed", "visualBrowserCheck": "blocked by declined browser permission; pending",
           "gameRuntimeTest": "not run"}
 core.write_json(core.ROOT / "local/garage-smoke.json", result)

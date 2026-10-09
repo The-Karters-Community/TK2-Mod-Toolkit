@@ -41,6 +41,13 @@ class ModulePackagesTests(unittest.TestCase):
         result = packages.export_package(["Recipe.TestHop"], "My hop", values or {})
         return packages.download_path(result["id"])
 
+    def test_character_name_selector_accepts_builtins_and_preserves_legacy_custom_names(self):
+        feature = next(item for item in pack.catalog_features() if item["id"] == "BobbyGang")
+        schema = packages._schema(feature)["OriginalName"]
+        self.assertIn("Bubble", schema["choices"])
+        self.assertEqual(packages._setting("Bubble", schema), "Bubble")
+        self.assertEqual(packages._setting("Player's custom racer", schema), "Player's custom racer")
+
     def rewrite(self, path, mutate=None, extra=None):
         with zipfile.ZipFile(path) as archive: data = {entry.filename: archive.read(entry) for entry in archive.infolist()}
         manifest = json.loads(data["manifest.json"])

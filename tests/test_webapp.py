@@ -134,6 +134,8 @@ class GarageTests(unittest.TestCase):
         self.assertEqual(request("GET", "/", {"Host": "example.com"})[0], 403)
         status, html = request("GET", "/")
         self.assertEqual(status, 200); self.assertIn(self.app.token.encode(), html); self.assertNotIn(b"__SESSION_TOKEN__", html)
+        status, component_css = request("GET", "/components.css")
+        self.assertEqual(status, 200); self.assertIn(b".module-expand", component_css)
         bad = json.dumps({"values": {"Audio/Enabled": True}, "hash": "stale"})
         self.assertEqual(request("POST", "/api/settings", {**auth, "Content-Type": "application/json"}, bad)[0], 409)
         self.assertFalse(self.app.config_path.exists())
