@@ -1,5 +1,7 @@
 # From native logic to readable C#
 
+Generated DummyDll declarations and the local source-map/pseudocode workflow are documented in [IL2CPP exports](IL2CPP-EXPORTS.md). Those artifacts make more of the game inspectable, but they remain distinct from the selected, evidence-reviewed C# translations maintained by this repository.
+
 ## What the first export establishes
 
 Ghidra reports 184,138 functions, of which 155,180 do not have default `FUN_` names. A name is not necessarily an original game-specific method: runtime/library symbols and imported/generated labels are included. There are 56 local pseudocode files after a broad camera sample and a targeted gameplay/audio export. All 26 functions selected in the targeted export completed without decompiler errors. We have not decompiled/reviewed the bodies of every function.

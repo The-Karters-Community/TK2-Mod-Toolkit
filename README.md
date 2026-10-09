@@ -117,17 +117,19 @@ The repository has **no published GitHub releases as of October 10, 2026**, so t
 
 ## Decompiled code and reverse-engineering evidence
 
-There is **no complete, fully decompiled C# source tree** in this repository. The original game is a Unity IL2CPP build: Ghidra analyzes native `GameAssembly.dll` code, while generated interop assemblies mostly provide managed declarations and wrappers. Native pseudocode is not the original Unity project or original C# source.
+There is **no complete, fully decompiled C# source tree** in this repository. The original game is a Unity IL2CPP build: generated DummyDlls provide browseable declarations with placeholder method bodies, while Ghidra analyzes native `GameAssembly.dll` code. Native pseudocode is not original C# or the original Unity project. The local workflow joins declarations, Ghidra function names/addresses and pseudocode so modders can investigate implementations and contribute reviewed C# reconstructions subsystem by subsystem.
 
 The useful committed material is:
 
 - [`src/Reconstructed/`](src/Reconstructed/) contains the selected readable C# behavior models, plugin-facing adapters and `provenance.json` linking work to binary hashes and addresses.
 - [`docs/READABLE-SOURCE.md`](docs/READABLE-SOURCE.md) lists currently reconstructed methods, evidence and limitations.
 - [`docs/RECONSTRUCTION.md`](docs/RECONSTRUCTION.md) explains the reconstruction workflow and incomplete areas.
+- [`docs/IL2CPP-EXPORTS.md`](docs/IL2CPP-EXPORTS.md) explains the declaration, native pseudocode and reviewed C# layers, with commands to regenerate local exports.
+- [`tools/il2cpp_source_map.py`](tools/il2cpp_source_map.py) builds an ignored local mapping from DummyDll type declarations to candidate Ghidra functions and native addresses.
 - [`tools/ghidra/targets.txt`](tools/ghidra/targets.txt) and [`tools/ghidra/migration-targets.txt`](tools/ghidra/migration-targets.txt) define reproducible function export targets; `tools/ghidra/ExportTk2.java` is the Ghidra exporter.
 - [`docs/REA-MIGRATION.md`](docs/REA-MIGRATION.md) summarizes recent REA findings and migration decisions.
 
-The Workshop **Game API reference** is a searchable method/signature catalog; a listed signature does not mean that its body has been recovered. The bulk Ghidra project, native pseudocode exports, generated interop, raw dumps and third-party managed decompilations live under ignored `local/` or `exports/` paths when present on the maintainer's machine. In this checkout, the native index and its provenance are `local/ghidra/functions.jsonl` and `local/ghidra/summary.json`; exported Ghidra C-like pseudocode is in `local/ghidra/pseudocode/`. These are not distributed in Git. Ask the maintainer for the corresponding local evidence bundle if you need a specific function; do not treat the function index as a full source release.
+The Workshop **Game API reference** is a searchable method/signature catalog; a listed signature does not mean that its body has been recovered. The bulk Ghidra project, native pseudocode exports, generated interop, raw dumps and third-party managed decompilations live under ignored `local/` or `exports/` paths when present on the maintainer's machine. In this checkout, the native index and its provenance are `local/ghidra/functions.jsonl` and `local/ghidra/summary.json`; exported Ghidra C-like pseudocode is in `local/ghidra/pseudocode/`. These are not distributed in Git. The declaration export is for browsing and signature lookup, not game execution. Follow [the local export guide](docs/IL2CPP-EXPORTS.md) to generate matching evidence on your own installation; do not treat the function index as a full source release.
 
 ## Guides and reference
 
@@ -137,7 +139,7 @@ The Workshop **Game API reference** is a searchable method/signature catalog; a 
 | Create a C# recipe | [First mod](docs/FIRST-MOD.md) |
 | Share/import modules | [Share modules](docs/SHARING-MODULES.md), [community packs](docs/MOD-PACK.md) |
 | Portable package and release process | [Portable packaging](docs/PORTABLE.md), [releases](docs/RELEASING.md) |
-| Reverse engineering and source status | [Readable source](docs/READABLE-SOURCE.md), [reconstruction notes](docs/RECONSTRUCTION.md), [REA migration](docs/REA-MIGRATION.md) |
+| Reverse engineering and source status | [Readable source](docs/READABLE-SOURCE.md), [local IL2CPP exports](docs/IL2CPP-EXPORTS.md), [reconstruction notes](docs/RECONSTRUCTION.md), [REA migration](docs/REA-MIGRATION.md) |
 | Online safety | [Online protection policy](docs/ONLINE-PROTECTION.md) |
 | Track-boundary inspector | [Track boundaries](docs/TRACK-BOUNDARIES.md) |
 | Mirror camera | [Mirror race](docs/MIRROR-RACE.md) |
