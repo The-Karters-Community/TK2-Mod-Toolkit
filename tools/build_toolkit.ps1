@@ -1,4 +1,4 @@
-param([string]$GamePath, [string]$LoaderPath, [switch]$RebuildPlugin)
+param([string]$GamePath, [string]$LoaderPath, [switch]$RebuildPlugin, [switch]$IncludeLoader)
 $ErrorActionPreference = 'Stop'
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Push-Location $repoRoot
@@ -17,6 +17,7 @@ try {
     $buildArguments = @((Join-Path $PSScriptRoot 'build_portable.py'), '--python', $buildPython)
     if ($GamePath) { $buildArguments += @('--game', $GamePath) }
     if ($LoaderPath) { $buildArguments += @('--loader', $LoaderPath) }
+    if ($IncludeLoader) { $buildArguments += '--include-loader' }
     if ($RebuildPlugin) { $buildArguments += '--rebuild-plugin' }
     & $buildPython @buildArguments
     if ($LASTEXITCODE -ne 0) { throw 'Toolkit build failed. Existing portable output is preserved.' }

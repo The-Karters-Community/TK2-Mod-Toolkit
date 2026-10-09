@@ -15,7 +15,7 @@ from urllib.parse import urlsplit, parse_qs
 from . import core, pack, settings, setup, symbols
 
 WEB = core.ROOT / "studio/web"
-APP_VERSION = "0.6.15"
+APP_VERSION = "0.6.17"
 
 
 class Application:
@@ -56,6 +56,9 @@ class Application:
         current = installed.is_file() and artifact.is_file() and core.sha256(installed) == core.sha256(artifact)
         return {"game": str(self.game) if self.game else "", "installed": installed.is_file(), "packCurrent": current, "features": pack.catalog_features(),
                 "plugin": "TK2.Customization.dll", "pluginCount": len([p for p in core.plugins(self.game) if p["enabled"]]) if self.game else 0,
+                "plugins": [{**item, "toolkit": item["relative"].replace("\\", "/").casefold() in ("tk2-mod-studio/tk2.customization.dll", "tk2-mod-studio/tk2.customization.dll.disabled")} for item in core.plugins(self.game)] if self.game else [],
+                "configs": [item for item in core.config_files(self.game) if not item["protected"]] if self.game else [],
+                "prebuiltCompatibility": setup.prebuilt_compatibility(self.game) if self.game else {"compatible": False, "reason": "Choose a game installation first.", "mismatches": []},
                 "setup": setup.readiness(self.game),
                 "runtimeValidated": False, "packs": pack.catalog_packs(), "files": pack.source_files(), "moduleSources": pack.module_sources(), "sourceRoot": str(core.ROOT), "logs": self.logs,
                 "backups": backups[:30], "buildLog": self.latest_build(), **self.config_data()}
@@ -117,6 +120,24 @@ class Application:
                 os.startfile(self.game)
                 return {"message": "Game folder opened. Start the game yourself."}
             if action == "settings": return self.save_settings(body)
+            if action == "toggle-plugin":
+                if self.game is None: raise ValueError("Choose a game first.")
+                relative = body.get("path")
+                if not isinstance(relative, str): raise ValueError("Choose a plugin from the detected list.")
+                base = self.game / "BepInEx/plugins"
+                path = core.contained(base, base / relative)
+                if path.relative_to(base).as_posix().casefold() in ("tk2-mod-studio/tk2.customization.dll", "tk2-mod-studio/tk2.customization.dll.disabled"):
+                    raise ValueError("The toolkit plugin cannot be disabled here.")
+                changed = core.toggle_plugin(self.game, path)
+                return {"message": ("Disabled " if changed.name.lower().endswith(".dll.disabled") else "Enabled ") + relative}
+            if action == "toggle-config":
+                if self.game is None: raise ValueError("Choose a game first.")
+                relative = body.get("path")
+                if not isinstance(relative, str): raise ValueError("Choose a config from the detected list.")
+                base = self.game / "BepInEx/config"
+                path = core.contained(base, base / relative)
+                changed = core.toggle_config(self.game, path)
+                return {"message": ("Disabled " if changed.name.lower().endswith(".cfg.disabled") else "Enabled ") + relative + ". The plugin may recreate its config at launch."}
             if action == "open-source-folder":
                 path = pack.source_path(body["file"])
                 os.startfile(path.parent)

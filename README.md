@@ -17,13 +17,22 @@ A Windows mod manager and C# workshop for **The Karters 2 Turbo Charged 0.1.4.18
 
 ## Get started
 
-1. From this checkout, open **Launch Studio.cmd** (Python 3.10+, 64-bit). A shared distribution runs through **TK2 Mod Toolkit.exe**; keep its files together.
-2. In **Installation**, select the game folder and prepare BepInEx if needed. Start the game yourself once, close it, then install/update the plugin.
+1. From this checkout, open **Launch Studio.cmd** (Python 3.10+, 64-bit). A portable distribution runs through **TK2 Mod Toolkit.exe**; keep its extracted files together.
+2. Install the supported BepInEx build below, select the game folder in **Installation**, start the game once, wait for the menu, close it, then install/update the plugin.
 3. In **Mod packs**, enable a module, adjust its settings and choose **Save changes**.
 
 Settings reload live through `BepInEx/config/local.tk2.customization.cfg`. Changing C# requires **Build & install** with the game closed, followed by a game restart. Ordinary settings do not rebuild the plugin.
 
 The source checkout runs with `Launch Studio.cmd` or `python launch.py` (Python 3.10+, 64-bit). Player installation from a portable package needs neither Python nor a .NET SDK; compiling custom C# needs a .NET SDK and initialized game interop.
+
+## Prerequisites and compatibility
+
+- **Game:** The Karters 2 Turbo Charged **0.1.4.18**, Windows x64.
+- **Loader:** **BepInEx Unity IL2CPP x64 `6.0.0-be.788`**, built from commit `5b766a3b7f6c164d4798924a93f3acf4db769d06` (short SHA `5b766a3`). This is the verified loader build, including for installations that still use this older release. The Installation screen checks the BepInEx startup log and plugin build fingerprints before allowing installation; other loader builds must be rebuilt and validated against that installation.
+- **Runtime validation:** Start the game once after installing BepInEx so it generates IL2CPP interop and a loader log. Then close it before installing or disabling plugin files. The Toolkit does not launch the game automatically.
+- **Authoring:** A .NET SDK is needed to compile custom plugin code. A normal player install uses the prebuilt plugin and does not need the SDK.
+
+The Installation screen lists plugin DLLs and other plugin configs. Other enabled plugins are marked as *possible* conflicts; a filename alone cannot prove they conflict. **Disable** renames a DLL to `.dll.disabled`, and **Disable config** renames a config to `.cfg.disabled`; neither deletes the file. These controls require the game to be closed. Disable one suspected plugin at a time, then re-test. Config files do not load code by themselves, and their plugin may regenerate a default config on launch. The Toolkit and BepInEx core configs are protected. Loader preparation preserves existing plugins and configs.
 
 ## Build the Windows app
 
@@ -35,7 +44,7 @@ Double-click **Build Toolkit.cmd**, or run:
 
 Requires Python 3.10+ (64-bit), a .NET SDK and the initialized game. Steam discovery supplies the game path; optional `-GamePath` and `-LoaderPath` arguments support other installations. Omit `-RebuildPlugin` to reuse the existing compiled plugin.
 
-Only build a portable distribution when needed. Output: `artifacts/portable/TK2 Mod Toolkit 0.6.3/` and its ZIP. Distribute the entire folder or ZIP. The build script never installs into the game.
+The default portable output is a slim compressed ZIP at `artifacts/portable/TK2-Mod-Toolkit-0.6.5-win-x64.zip`; it bundles the app runtime, not the 70+ MB BepInEx distribution. The recipient installs the loader prerequisite above separately. To make a larger self-contained package that can also prepare BepInEx, run `tools/build_toolkit.ps1 -IncludeLoader` (or add `--include-loader` to `tools/build_portable.py`). Both variants include the Python runtime, so players need no Python installation. The build script never installs into the game.
 
 ## Guides
 
@@ -47,4 +56,4 @@ Only build a portable distribution when needed. Output: `artifacts/portable/TK2 
 - [Measured race versus time-trial results](docs/PERFORMANCE-CAPTURE-2026-10-09.md)
 - [Readable source & limits](docs/READABLE-SOURCE.md) · [Validation](docs/VALIDATION.md)
 
-Modules start disabled. Gameplay changes run in local/offline races. This test build does not require Disable Leaderboards or block uploads. Native reconstruction is partial, not the original Unity source project. Compilation and simulated checks pass; handling and visuals still need manual in-game testing.
+Gameplay modules start disabled and are intended for local/offline races. Mandatory Online protection permits only HUD size and transparency changes while unapproved mods are active; see [its policy](docs/ONLINE-PROTECTION.md). Native reconstruction is partial, not the original Unity source project. Compilation and simulated checks do not replace manual in-game testing.

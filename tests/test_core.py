@@ -103,6 +103,25 @@ class CoreTests(unittest.TestCase):
             core.toggle_plugin(self.game, path)
         self.assertTrue(path.exists())
 
+    def test_config_toggle_roundtrip_and_protected_configs(self):
+        config = self.game / "BepInEx/config/OtherMod.cfg"
+        config.parent.mkdir(parents=True)
+        config.write_text("[OtherMod]\nEnabled = true\n")
+        with patch.object(core, "game_running", return_value=False):
+            disabled = core.toggle_config(self.game, config)
+            self.assertEqual(disabled.name, "OtherMod.cfg.disabled")
+            self.assertEqual(core.toggle_config(self.game, disabled), config)
+            with self.assertRaises(ValueError): core.toggle_config(self.game, self.game / "BepInEx/config/BepInEx.cfg")
+        self.assertTrue(config.exists())
+
+    def test_config_toggle_rejected_while_game_running(self):
+        config = self.game / "BepInEx/config/OtherMod.cfg"
+        config.parent.mkdir(parents=True)
+        config.write_text("keep")
+        with patch.object(core, "game_running", return_value=True), self.assertRaises(ValueError):
+            core.toggle_config(self.game, config)
+        self.assertEqual(config.read_text(), "keep")
+
     def test_deployment_and_rollback_with_receipt(self):
         artifact = self.root / "artifact"
         artifact.mkdir()

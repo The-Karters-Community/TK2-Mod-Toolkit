@@ -6,10 +6,11 @@ import shutil
 import subprocess
 import sys
 import time
+import zipfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from studio import core, pack, setup, symbols
 
-VERSION = '0.6.3'
+VERSION = '0.6.5'
 
 
 def publish_directory(source, target):
@@ -24,20 +25,34 @@ def publish_directory(source, target):
             time.sleep(.25 * (2 ** attempt))
 
 
+def write_portable_zip(root, package, target):
+    """Write a compatible DEFLATE ZIP at maximum compression to a temp file."""
+    temporary = target.with_name(target.name + ".tmp")
+    try:
+        with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+            for path in sorted(package.rglob("*")):
+                if path.is_file(): archive.write(path, path.relative_to(root).as_posix())
+        temporary.replace(target)
+    finally:
+        if temporary.exists(): temporary.unlink()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--python', type=Path, default=core.ROOT / 'local/portable-build-env/Scripts/python.exe')
     parser.add_argument('--rebuild-plugin', action='store_true')
     parser.add_argument('--game', type=Path, help='Game folder; otherwise discover it in Steam')
     parser.add_argument('--loader', type=Path, help='BepInEx distribution folder; otherwise use vendor/BepInEx or the sibling distribution')
+    parser.add_argument('--include-loader', action='store_true', help='Bundle the 70+ MB BepInEx runtime. Default slim package requires BepInEx to be installed separately.')
     args = parser.parse_args()
     if args.rebuild_plugin or not (pack.ARTIFACT / 'build.json').is_file():
         games = [core.validate_game(args.game)] if args.game else setup.discover()
         if not games: raise ValueError('Game not found. Pass --game with the initialized game folder.')
         core.build_plugin(games[0], pack.PROJECT, print)
-    source = args.loader.resolve() if args.loader else setup.loader_source()
-    if source is None: raise ValueError('Provide the BepInEx distribution before packaging.')
-    if not all((source / name).is_file() for name in setup.CRITICAL): raise ValueError('Loader distribution is incomplete. Use the full Unity IL2CPP x64 distribution.')
+    include_loader = args.include_loader or args.loader is not None
+    source = (args.loader.resolve() if args.loader else setup.loader_source()) if include_loader else None
+    if include_loader and source is None: raise ValueError('Provide the BepInEx distribution when using --include-loader.')
+    if source is not None and not all((source / name).is_file() for name in setup.CRITICAL): raise ValueError('Loader distribution is incomplete. Use the full Unity IL2CPP x64 distribution.')
     artifact = core.contained(core.ROOT, core.ROOT / 'artifacts/portable')
     artifact.mkdir(parents=True, exist_ok=True)
     output = core.contained(artifact, artifact / ('TK2 Mod Toolkit ' + VERSION))
@@ -58,8 +73,9 @@ def main():
     for file in ('mk_catalog.json', 'community_catalog.json'):
         target = staging / 'studio' / file; target.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(core.ROOT / 'studio' / file, target)
     shutil.copytree(pack.ARTIFACT, staging / 'artifacts/TK2.Customization', dirs_exist_ok=True)
-    shutil.copytree(source, staging / 'vendor/BepInEx', dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns('plugins', 'config', 'interop', 'cache', '*.log'))
+    if source is not None:
+        shutil.copytree(source, staging / 'vendor/BepInEx', dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns('plugins', 'config', 'interop', 'cache', '*.log'))
     # The portable player app has a function-name/signature catalog even without
     # the author's local Il2CppDumper files. It contains no original game bodies.
     core.write_json(staging / 'exports/functions.json', symbols.methods())
@@ -74,8 +90,8 @@ def main():
         print(process.stdout + process.stderr)
         raise ValueError('Packaging failed. See local/portable-build.log. Existing output was not replaced.')
     fresh_output = core.contained(fresh_dist, fresh_dist / 'TK2 Mod Toolkit')
-    core.write_json(fresh_output / 'portable-manifest.json', {'version':VERSION, 'playerRequirements':['Windows x64', 'The Karters 2 supported game build', 'Edge or another browser'],
-        'pythonIncluded':True, 'loaderIncluded':True, 'compilerRequiredForPlayerInstall':False, 'authorBuildRequires':'.NET SDK',
+    core.write_json(fresh_output / 'portable-manifest.json', {'version':VERSION, 'playerRequirements':['Windows x64', 'The Karters 2 0.1.4.18', 'BepInEx Unity IL2CPP x64 6.0.0-be.788 (5b766a3)', 'Edge or another browser'],
+        'pythonIncluded':True, 'loaderIncluded':source is not None, 'loaderVersion':setup.SUPPORTED_BEPINEX_VERSION, 'compilerRequiredForPlayerInstall':False, 'authorBuildRequires':'.NET SDK',
         'gameBinaryIncluded':False, 'supportedGameHash':json.loads((pack.ARTIFACT / 'build.json').read_text())['fingerprint']['files']['GameAssembly.dll']})
     previous = None
     if output.exists():
@@ -86,8 +102,9 @@ def main():
     except OSError:
         if previous and not output.exists(): publish_directory(previous, output)
         raise
-    archive = shutil.make_archive(str(artifact / ('TK2-Mod-Toolkit-' + VERSION + '-win-x64')), 'zip', artifact, output.name)
-    print(json.dumps({'executable':str(output / 'TK2 Mod Toolkit.exe'),'archive':archive,'previousOutputBackup':str(previous) if previous else None},indent=2))
+    archive = artifact / ('TK2-Mod-Toolkit-' + VERSION + '-win-x64.zip')
+    write_portable_zip(artifact, output, archive)
+    print(json.dumps({'executable':str(output / 'TK2 Mod Toolkit.exe'),'archive':str(archive),'previousOutputBackup':str(previous) if previous else None},indent=2))
 
 
 if __name__ == '__main__': main()

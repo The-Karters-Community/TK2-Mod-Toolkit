@@ -153,11 +153,23 @@ def plugins(game: Path) -> list[dict]:
             and (p.suffix.lower() == ".dll" or p.name.lower().endswith(".dll.disabled"))]
 
 
+def config_files(game: Path) -> list[dict]:
+    base = game / "BepInEx/config"
+    if not base.exists(): return []
+    protected = {"bepinex.cfg", CONFIG_NAME.lower()}
+    return [{"path": str(p), "relative": str(p.relative_to(base)),
+             "enabled": p.name.lower().endswith(".cfg"),
+             "protected": p.name.lower() in protected,
+             "bytes": p.stat().st_size}
+            for p in sorted(base.rglob("*")) if p.is_file()
+            and (p.name.lower().endswith(".cfg") or p.name.lower().endswith(".cfg.disabled"))]
+
+
 def toggle_plugin(game: Path, path: Path) -> Path:
     validate_game(game)
     require_game_stopped()
     path = contained(game / "BepInEx/plugins", path)
-    if path.name.endswith(".dll.disabled"):
+    if path.name.lower().endswith(".dll.disabled"):
         target = path.with_name(path.name[:-9])
     elif path.suffix.lower() == ".dll":
         target = path.with_name(path.name + ".disabled")
@@ -166,6 +178,26 @@ def toggle_plugin(game: Path, path: Path) -> Path:
     contained(game / "BepInEx/plugins", target)
     if target.exists():
         raise ValueError(f"Both enabled and disabled copies exist: {target}")
+    path.rename(target)
+    return target
+
+
+def toggle_config(game: Path, path: Path) -> Path:
+    validate_game(game)
+    require_game_stopped()
+    base = game / "BepInEx/config"
+    path = contained(base, path)
+    relative = path.relative_to(base).as_posix().lower()
+    if relative in {"bepinex.cfg", CONFIG_NAME.lower()}:
+        raise ValueError("The BepInEx and Toolkit config files are protected.")
+    if path.name.lower().endswith(".cfg.disabled"):
+        target = path.with_name(path.name[:-9])
+    elif path.suffix.lower() == ".cfg":
+        target = path.with_name(path.name + ".disabled")
+    else:
+        raise ValueError("Select a .cfg or .cfg.disabled file")
+    contained(base, target)
+    if target.exists(): raise ValueError(f"Both enabled and disabled config copies exist: {target}")
     path.rename(target)
     return target
 

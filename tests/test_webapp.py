@@ -100,6 +100,30 @@ class GarageTests(unittest.TestCase):
             for file in ('../../outside.cs', 'plugins/TK2.Customization/Example.dll'):
                 with self.assertRaises(ValueError): self.app.action('open-source-folder', {'file': file})
 
+    def test_installation_audit_lists_and_reversibly_toggles_plugin_and_config(self):
+        plugins = self.game / "BepInEx/plugins"
+        config = self.game / "BepInEx/config"
+        plugins.mkdir(parents=True); config.mkdir(parents=True)
+        (plugins / "OldMod.dll").write_bytes(b"plugin")
+        (plugins / "TK2-Mod-Studio").mkdir()
+        (plugins / "TK2-Mod-Studio/TK2.Customization.dll").write_bytes(b"toolkit")
+        (config / "OldMod.cfg").write_text("old options")
+        (config / "local.tk2.customization.cfg").write_text("[OnlineProtection]\nEnabled = true\n")
+        state = self.app.state()
+        self.assertEqual([item["relative"] for item in state["plugins"]], ["OldMod.dll", "TK2-Mod-Studio\\TK2.Customization.dll"])
+        self.assertTrue(state["plugins"][1]["toolkit"])
+        self.assertEqual([item["relative"] for item in state["configs"]], ["OldMod.cfg"])
+        with patch.object(core, "game_running", return_value=False):
+            self.app.action("toggle-plugin", {"path": "OldMod.dll"})
+            self.app.action("toggle-config", {"path": "OldMod.cfg"})
+            with self.assertRaisesRegex(ValueError, "cannot be disabled"):
+                self.app.action("toggle-plugin", {"path": "TK2-Mod-Studio/TK2.Customization.dll"})
+            with self.assertRaises(ValueError): self.app.action("toggle-config", {"path": "../BepInEx.cfg"})
+            self.app.action("toggle-plugin", {"path": "OldMod.dll.disabled"})
+            self.app.action("toggle-config", {"path": "OldMod.cfg.disabled"})
+        self.assertTrue((plugins / "OldMod.dll").exists())
+        self.assertTrue((config / "OldMod.cfg").exists())
+
     def test_failed_author_build_keeps_installed_plugin(self):
         with patch.object(core, 'require_game_stopped'), patch.object(core, 'build_plugin', side_effect=RuntimeError('Build failed')), patch.object(core, 'deploy_plugin') as deploy:
             with self.assertRaises(RuntimeError): self.app.action('build-install', {})
@@ -137,7 +161,7 @@ class GarageTests(unittest.TestCase):
         self.assertEqual(request("GET", "/", {"Host": "example.com"})[0], 403)
         status, html = request("GET", "/")
         self.assertEqual(status, 200); self.assertIn(self.app.token.encode(), html); self.assertNotIn(b"__SESSION_TOKEN__", html)
-        self.assertIn(b"Toolkit 0.6.15", html); self.assertNotIn(b"__APP_VERSION__", html)
+        self.assertIn(f"Toolkit {webapp.APP_VERSION}".encode(), html); self.assertNotIn(b"__APP_VERSION__", html)
         status, component_css = request("GET", "/components.css")
         self.assertEqual(status, 200); self.assertIn(b".module-expand", component_css)
         bad = json.dumps({"values": {"Audio/Enabled": True}, "hash": "stale"})

@@ -25,10 +25,17 @@ public sealed partial class Plugin
 
     private void InstallOnlineProtection()
     {
-        MethodInfo leaderboard = AccessTools.DeclaredMethod(typeof(KartersLeaderboardsManager), "RaceFinished_UploadLeaderboard",
-            new[] { typeof(float), typeof(float[]), typeof(System.Collections.Generic.List<PTK_LeaderboardFacet.CCheckpointTimes>),
-                typeof(Action), typeof(Action) })
-            ?? throw new MissingMethodException(typeof(KartersLeaderboardsManager).FullName, "RaceFinished_UploadLeaderboard(float, float[], List<CCheckpointTimes>, Action, Action)");
+        // IL2CPP interop rewrites managed collection/delegate parameters to
+        // Il2CppSystem and Il2CppStructArray types. Resolve the unique method by
+        // its stable name/shape instead of using the original C# signature.
+        MethodInfo[] leaderboardCandidates = AccessTools.GetDeclaredMethods(typeof(KartersLeaderboardsManager))
+            .Where(method => method.Name == "RaceFinished_UploadLeaderboard" && method.IsStatic &&
+                method.ReturnType == typeof(void) && method.GetParameters().Length == 5)
+            .ToArray();
+        if (leaderboardCandidates.Length != 1)
+            throw new MissingMethodException(typeof(KartersLeaderboardsManager).FullName,
+                $"Expected one static RaceFinished_UploadLeaderboard(void, 5 parameters); found {leaderboardCandidates.Length}.");
+        MethodInfo leaderboard = leaderboardCandidates[0];
 
         string[] roomOperations = { "JoinLobby", "JoinRoom", "JoinRandomRoom", "JoinOrCreateRoom", "JoinRandomOrCreateRoom", "CreateRoom", "ReconnectAndRejoin" };
         MethodInfo[] roomTargets = AccessTools.GetDeclaredMethods(typeof(PhotonNetwork))

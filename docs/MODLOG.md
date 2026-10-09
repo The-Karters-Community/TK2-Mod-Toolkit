@@ -1,5 +1,13 @@
 # Mod log
 
+## IL2CPP-safe online protection hook and install diagnosis 0.6.20 (2026-10-09)
+
+- Fresh game log showed BepInEx `6.0.0-be.788` initialized but rejected Toolkit 0.6.19 during `Plugin.Load`: the leaderboard Harmony target used original managed parameter types that IL2CPP interop transforms.
+- Replaced exact CLR parameter matching with a unique static `void` method/name/five-parameter shape check. Reflection against this installation's `Assembly-CSharp.dll` confirmed one target whose parameters include `Il2CppStructArray<float>`, `Il2CppSystem.Collections.Generic.List<CCheckpointTimes>` and `Il2CppSystem.Action`.
+- Setup readiness now requires the plugin's post-load marker and surfaces explicit plugin load failures; the chainloader's pre-load `Loading` message alone no longer counts as success.
+- Current plugin build succeeded against installed references with zero warnings/errors. The game was running during this fix, so the DLL was not replaced; live load and enforcement remain pending after close/restart.
+- Mandatory online protection still blocks leaderboard and room operations when unapproved modules or plugins are active; only the explicitly reviewed HUD-only modules remain allowlisted.
+
 ## Mandatory online protection 0.6.19 (2026-10-09)
 
 - Locked the Online protection module and both of its actions in the app UI; reset controls cannot turn it off.

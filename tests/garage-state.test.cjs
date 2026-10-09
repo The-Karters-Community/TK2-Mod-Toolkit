@@ -35,7 +35,7 @@ function query(selector) {
   return Object.values(ids).flatMap(descendants).filter(node => names.some(name => node.dataset[name] !== undefined));
 }
 const document = {documentElement: new Node(), getElementById: id => ids[id] || Object.values(ids).flatMap(descendants).find(node => node.id === id), createElement: tag => new Node(tag), createElementNS: (_namespace, tag) => new Node(tag), querySelector: selector => selector.startsWith('meta') ? meta : brand, querySelectorAll: query, addEventListener(){}};
-const fixture = {installed: false, packCurrent: false, pluginCount: 0, game: 'test game', logs: [], backups: [],
+const fixture = {installed: false, packCurrent: false, pluginCount: 0, prebuiltCompatibility:{compatible:true,reason:'Build matches'}, plugins:[], configs:[], game: 'test game', logs: [], backups: [],
   recipes: [{section: 'Recipe.FrameLimiter', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Limit FPS'}],
   extraSettings: [{section: 'MK.BoostTrainer', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Trainer'}],
   extraPacks: {'MK.BoostTrainer': 'mks'},

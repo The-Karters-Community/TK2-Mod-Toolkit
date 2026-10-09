@@ -32,12 +32,31 @@ class SetupTests(unittest.TestCase):
         (self.game / "doorstop_config.ini").write_text('[General]\nenabled=true\ntarget_assembly=BepInEx\\core\\BepInEx.Unity.IL2CPP.dll\n')
         self.assertEqual(setup.readiness(self.game)["stage"], "initialize-loader")
         interop = self.game / "BepInEx/interop/Assembly-CSharp.dll"; interop.parent.mkdir(); interop.write_bytes(b"fixture")
-        (self.game / "BepInEx/LogOutput.log").write_text('Chainloader initialized\n[Error: Test] Failure\n')
+        (self.game / "BepInEx/LogOutput.log").write_text(
+            f"[Message: Preloader] BepInEx {setup.SUPPORTED_BEPINEX_VERSION} - TheKarters2\n"
+            f"[Message: Preloader] Built from commit {setup.SUPPORTED_BEPINEX_COMMIT}\n"
+            "Chainloader initialized\n[Error: Test] Failure\n")
         with patch.object(core, "is_managed_dll", return_value=True):
             result = setup.readiness(self.game)
         self.assertTrue(result["ready"])
+        self.assertTrue(result["loaderCompatible"])
+        self.assertEqual(result["loaderVersion"], setup.SUPPORTED_BEPINEX_VERSION)
         self.assertFalse(result["checks"][-1]["ok"])
         self.assertIn('Failure', result["runtimeErrors"][0])
+
+    def test_rejects_unverified_older_loader_build(self):
+        for relative in setup.CRITICAL:
+            p = self.game / relative; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(b"fixture")
+        (self.game / "doorstop_config.ini").write_text('[General]\nenabled=true\ntarget_assembly=BepInEx\\core\\BepInEx.Unity.IL2CPP.dll\n')
+        interop = self.game / "BepInEx/interop/Assembly-CSharp.dll"; interop.parent.mkdir(); interop.write_bytes(b"fixture")
+        (self.game / "BepInEx/LogOutput.log").write_text(
+            "[Message: Preloader] BepInEx 6.0.0-be.777 - TheKarters2\n"
+            "[Message: Preloader] Built from commit 1111111\nChainloader initialized\n")
+        with patch.object(core, "is_managed_dll", return_value=True): result = setup.readiness(self.game)
+        self.assertFalse(result["ready"])
+        self.assertEqual(result["stage"], "install-loader")
+        self.assertFalse(result["loaderCompatible"])
+        self.assertIn(setup.SUPPORTED_BEPINEX_VERSION, result["message"])
 
     def test_install_loader_preserves_existing_mods_and_configs(self):
         source = self.root / "vendor/BepInEx"
@@ -69,6 +88,16 @@ class SetupTests(unittest.TestCase):
         dll.write_bytes(b"tampered")
         with patch.object(core, "require_game_stopped"), patch.object(setup, "readiness", return_value={"ready":True}), self.assertRaises(ValueError): setup.install_prebuilt(self.game)
 
+    def test_prebuilt_compatibility_names_each_mismatched_runtime_file(self):
+        artifact = self.root / "artifacts/TK2.Customization"; artifact.mkdir(parents=True)
+        for relative in ("GameAssembly.dll", "BepInEx/core/BepInEx.Unity.IL2CPP.dll", "BepInEx/core/Il2CppInterop.Runtime.dll"):
+            path = self.game / relative; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(b"current")
+        core.write_json(artifact / "build.json", {"fingerprint":{"files":{"GameAssembly.dll":"old","BepInEx/core/BepInEx.Unity.IL2CPP.dll":"old","BepInEx/core/Il2CppInterop.Runtime.dll":"old"}}})
+        result = setup.prebuilt_compatibility(self.game)
+        self.assertFalse(result["compatible"])
+        self.assertEqual(len(result["mismatches"]), 3)
+        self.assertIn("BepInEx/core/BepInEx.Unity.IL2CPP.dll", result["reason"])
+
     def test_function_browser_uses_real_va_and_matches_recovered_name(self):
         (self.root / "local").mkdir()
         dump = self.root / "dump.cs"
@@ -86,12 +115,32 @@ class SetupTests(unittest.TestCase):
         source.parent.mkdir(parents=True)
         source.write_text('[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.0")]')
         log = self.game / 'BepInEx/LogOutput.log'
-        log.parent.mkdir(parents=True)
+        log.parent.mkdir(parents=True, exist_ok=True)
         for version, expected in [('0.4.1', False), ('0.6.0', True)]:
-            log.write_text(f'[Info: BepInEx] Loading [TK2 Mod Toolkit Pack {version}]\n')
+            log.write_text(f'[Info: BepInEx] Loading [TK2 Mod Toolkit Pack {version}]\n'
+                           f'[Info: TK2 Mod Toolkit Pack] TK2 Mod Toolkit {version}: startup complete.\n')
             result = setup.readiness(self.game)
-            self.assertEqual(next(c for c in result['checks'] if c['name'] == 'Current pack appeared in game log')['ok'], expected)
+            self.assertEqual(next(c for c in result['checks'] if c['name'] == 'Current pack loaded successfully')['ok'], expected)
             self.assertNotEqual(result['loaderSource'], str(source))
+
+    def test_chainloader_loading_line_is_not_treated_as_success_after_plugin_error(self):
+        for relative in setup.CRITICAL:
+            p = self.game / relative; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(b"fixture")
+        (self.game / "doorstop_config.ini").write_text('[General]\nenabled=true\ntarget_assembly=BepInEx\\core\\BepInEx.Unity.IL2CPP.dll\n')
+        interop = self.game / "BepInEx/interop/Assembly-CSharp.dll"; interop.parent.mkdir(parents=True); interop.write_bytes(b"fixture")
+        source = self.root / 'plugins/TK2.Customization/Plugin.cs'; source.parent.mkdir(parents=True)
+        source.write_text('[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.19")]')
+        log = self.game / "BepInEx/LogOutput.log"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        log.write_text(f"[Message: Preloader] BepInEx {setup.SUPPORTED_BEPINEX_VERSION}\n"
+                       f"[Message: Preloader] Built from commit {setup.SUPPORTED_BEPINEX_COMMIT}\n"
+                       "Chainloader initialized\n[Info: BepInEx] Loading [TK2 Mod Toolkit Pack 0.6.19]\n"
+                       "[Error: BepInEx] Error loading [TK2 Mod Toolkit Pack 0.6.19]: MissingMethodException\n")
+        with patch.object(core, "is_managed_dll", return_value=True): result = setup.readiness(self.game)
+        self.assertTrue(result["ready"], "compatible loader remains repairable")
+        self.assertFalse(result["checks"][-1]["ok"], "chainloader text must not imply plugin success")
+        self.assertIn("MissingMethodException", result["pluginLoadError"])
+        self.assertIn("failed", result["message"])
 
 
 if __name__ == '__main__': unittest.main()
