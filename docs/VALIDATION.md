@@ -1,5 +1,9 @@
 # Validation
 
+## Player-run paired performance capture (2026-10-09)
+
+Runtime 0.6.10 produced 16 valid timing/memory records on the same map with Performance inactive. The first six full windows of each mode show race 84.59 FPS versus time trial 100.70 FPS; all ten measured race spans sum to 1.114 ms/frame including nested collision time. The capture confirms dispatched targets and actual normal-cadence AI motor flags in this baseline. It observes GC Disabled and managed-used growth in both modes, with stable process commitment/residency during each segment. It does not establish a dominant FPS subsystem or leak. [Reproducible measurements and developer next steps](PERFORMANCE-CAPTURE-2026-10-09.md). This analysis changed documentation only; no additional runtime/config deployment or repeated build was needed.
+
 ## Performance diagnostic follow-up (2026-10-09)
 
 The player reports no noticeable FPS/RAM improvement from 0.6.9, including AI interval 4. Activation is confirmed by the latest log; the dominant subsystem is still unmeasured. Runtime 0.6.10 adds bounded offline timing/memory capture, not a further performance claim. [Capture instructions and limitations](PERFORMANCE-DIAGNOSTICS.md).

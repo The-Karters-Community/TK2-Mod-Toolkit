@@ -1,5 +1,7 @@
 # Race performance module
 
+The [completed paired capture](PERFORMANCE-CAPTURE-2026-10-09.md) now measures the selected native paths. Their small costs and the active Default draw distance explain why a large FPS improvement from these controls was unlikely in that run. The overall bottleneck and most memory owners remain unmeasured; no further gameplay throttle was added.
+
 **Follow-up:** the player tested the installed module, including AI interval 4, and reported no noticeable FPS/RAM improvement. The latest log confirms activation, but does not quantify hook execution or subsystem timings. Runtime 0.6.10 adds a separate bounded [diagnostic capture](PERFORMANCE-DIAGNOSTICS.md). Performance was subsequently re-enabled in the saved config; the diagnostic deployment preserves that state. Turn it off for a baseline capture. The 0.6.9 notes below describe the initial installation, not the current settings or a demonstrated fix.
 
 Race performance is an optional Toolkit Essentials module for local offline races. It addresses repeated draw-distance allocations and the game's managed garbage-collection policy. An additional AI physics option uses the game's existing lower-quality motor path. Improvements depend on the track, camera count, opponents, hardware and current bottleneck; no FPS gain is guaranteed.

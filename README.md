@@ -42,6 +42,7 @@ Only build a portable distribution when needed. Output: `artifacts/portable/TK2 
 - [Mirror race](docs/MIRROR-RACE.md)
 - [Race performance & developer handoff](docs/PERFORMANCE-MOD.md) · [Performance investigation](docs/PERFORMANCE-INVESTIGATION-2026-10-09.md)
 - [Performance follow-up and diagnostic capture](docs/PERFORMANCE-DIAGNOSTICS.md)
+- [Measured race versus time-trial results](docs/PERFORMANCE-CAPTURE-2026-10-09.md)
 - [Readable source & limits](docs/READABLE-SOURCE.md) · [Validation](docs/VALIDATION.md)
 
 Modules start disabled. Gameplay changes run in local/offline races. This test build does not require Disable Leaderboards or block uploads. Native reconstruction is partial, not the original Unity source project. Compilation and simulated checks pass; handling and visuals still need manual in-game testing.

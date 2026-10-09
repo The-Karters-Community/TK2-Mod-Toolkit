@@ -1,6 +1,6 @@
 # Performance investigation — 2026-10-09
 
-The strongest current explanation for the reported 68 FPS with seven CPU opponents versus 130 FPS in time trial is additional CPU work from opponent simulation and kart interactions. The graphics presets leave much of that work intact. This is a supported hypothesis, not a timed attribution to a particular function. High memory use is established; a memory leak is not.
+The [subsequent paired runtime capture](PERFORMANCE-CAPTURE-2026-10-09.md) measured about 84.6 FPS in race and 100.7 FPS in time trial. The selected kart/AI/motor methods are too cheap in that capture to explain most frame time. The initial hypothesis that those paths dominate is not supported by the measured timings; engine/player presentation/rendering work and waits remain unmeasured. GC-disabled managed growth is now observed in both modes, but most process memory is outside that heap. A persistent leak is not established. The sections below retain the initial investigation's observations and scope; use the capture report for current measurement status.
 
 ## Evidence and scope
 

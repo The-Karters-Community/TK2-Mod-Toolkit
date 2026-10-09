@@ -1,5 +1,7 @@
 # Performance follow-up and developer capture
 
+The player has completed the capture. [Measured results and revised developer priorities](PERFORMANCE-CAPTURE-2026-10-09.md) establish that the selected kart/AI timers account for only a small part of race frame time, Default draw distance is active, and managed memory accumulates with GC disabled in both modes. The dominant FPS source is still outside the current probe's coverage.
+
 The player tested runtime 0.6.9 with Lower AI physics enabled at interval 4 and reported no noticeable FPS or RAM improvement. The latest BepInEx log confirms the runtime loaded, the performance module was available and its active settings included AI interval 4. It then reports that the module was disabled. There is no logged module suspension. Those entries establish installation and selected settings, not per-hook execution or a quantified benchmark.
 
 The first workaround has not demonstrated a performance fix. Its target allocations are limited to Medium/Near draw distance; GC cannot free assets that remain referenced. The AI motor option leaves collision scans, AI steering/weapons and other updates running. Their relative costs remain unknown. Do not assume collision scans are dominant merely because time trial bypasses them.
