@@ -35,7 +35,7 @@ The bundled prebuilt plugin is fingerprinted against the supported game and load
 
 ## Package contents and exclusions
 
-The package includes the Toolkit UI and authoring sources, module templates, function-signature catalog, compiled Toolkit plugin, app runtime, version manifest, and a rollback-safe update script. The optional loader-included package adds the supported BepInEx distribution but omits user `plugins`, `config`, interop and cache folders.
+The package includes the Toolkit UI and authoring sources, module templates, function-signature catalog, compiled Toolkit plugin, app runtime, `README.md`, `LICENSE`, version manifest, and a rollback-safe update script. The optional loader-included package adds the supported BepInEx distribution but omits user `plugins`, `config`, interop and cache folders.
 
 Original game binaries, saves, generated interop, Ghidra project databases, raw game dumps, local logs, session tokens and recovered third-party plugin sources are excluded. Maintainer-local Ghidra data stays under ignored `local/` or `exports/`; see [readable-source limits](READABLE-SOURCE.md).
 

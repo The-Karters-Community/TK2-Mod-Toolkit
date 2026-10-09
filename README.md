@@ -23,6 +23,12 @@ In **Installation**, select the folder containing `TheKarters2.exe` and `GameAss
 
 Open **Mod packs**, expand a module, enable it, adjust settings and select **Save changes**. Ordinary settings reload from `BepInEx/config/local.tk2.customization.cfg` while the game is running. Changing C# source is different: close the game, use **Build pack** or **Build & install**, then restart the game to load the rebuilt DLL. The module catalog, search, filters, resets, advanced settings and Workshop are described in [Application usage](docs/USAGE.md).
 
+### Troubleshooting and uninstalling
+
+If plugin installation is blocked, first check that the selected folder contains the expected game binaries, that BepInEx is the supported `6.0.0-be.788` build, and that the game is closed. After installing or repairing BepInEx, launch the game once to generate interop and a startup log, close it, then select **Check again**. For load errors, open **Installation → Build output & diagnostics** or inspect `BepInEx/LogOutput.log`.
+
+To remove the Toolkit plugin, close the game and use **Installation → Backups & restore** to restore the transaction created when the Toolkit DLL was installed. This restores the previous DLL, or removes the Toolkit DLL if there was no previous file. Keep or remove the Toolkit config according to whether you want to retain settings; removing the plugin does not require deleting BepInEx or other mods. The app refuses to restore a file that changed after the backup.
+
 ## Run from a source checkout
 
 On Windows, install **Python 3.10 or newer, 64-bit** and clone the repository. The application backend uses Python's standard library; a browser is opened as an app-style window when Edge is available, with a normal-browser fallback.
@@ -145,3 +151,9 @@ Online protection stays on and cannot be disabled in the app. It blocks leaderbo
 When adding a module, keep user settings and implementation in the existing catalog-driven structure, provide defaults/ranges and reset behavior, add focused regression coverage, and review its online-safety classification. Keep generated game data, decompiled third-party sources, captures and machine-local paths out of commits. Record binary version, hashes, evidence sources and limitations when adding native reconstruction. `AGENTS.md` contains repository-specific implementation and validation rules.
 
 See [LICENSE](LICENSE) for the terms applying to this repository. Game files and any bundled third-party software keep their own licenses and are not relicensed by this project.
+
+## Credits and disclosure
+
+The Toolkit uses BepInEx Unity IL2CPP, Il2CppInterop and Harmony APIs; those projects and their licenses remain separate from this repository. The repository's [LICENSE](LICENSE) is All Rights Reserved and does not grant general permission to redistribute or modify the Toolkit. Game names, logos and game content are not owned by this project; the default portable build does not include the game or BepInEx distribution.
+
+OpenAI Codex (GPT-6 series) provided AI coding and documentation assistance during development under the maintainer's direction. The maintainer remains responsible for review, testing, licensing and release decisions.

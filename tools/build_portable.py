@@ -71,7 +71,7 @@ def main():
         shutil.copytree(core.ROOT / directory, staging / directory, dirs_exist_ok=True)
     (staging / 'tools').mkdir(parents=True, exist_ok=True)
     shutil.copy2(core.ROOT / 'tools/update_portable.ps1', staging / 'tools/update_portable.ps1')
-    for file in pack.source_files() + ['plugins/TK2.Customization/TK2.Customization.csproj', 'README.md']:
+    for file in pack.source_files() + ['plugins/TK2.Customization/TK2.Customization.csproj', 'README.md', 'LICENSE']:
         target = staging / file; target.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(core.ROOT / file, target)
     for file in ('mk_catalog.json', 'community_catalog.json'):
         target = staging / 'studio' / file; target.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(core.ROOT / 'studio' / file, target)
