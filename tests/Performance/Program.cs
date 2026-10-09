@@ -243,7 +243,7 @@ Plugin ResetDiagnostic()
     PerformanceDiagnostics.Stop();
     foreach (string field in new[] { "_inRace", "_hooked", "_recording", "_completed", "_faulted" }) DSet(field, false);
     DSet("_file", null); hooks.FailAt = 0;
-    var plugin = Reset(); Time.timeScale = 1; Application.isFocused = true;
+    var plugin = Reset(); Time.timeScale = 1; Application.isFocused = true; TrackBoundaries.Visible = false;
     PerformanceDiagnostics.Install(plugin); return plugin;
 }
 void BeginCapture(Plugin plugin)
@@ -265,6 +265,7 @@ metrics.Calls[0] = 126;
 var observed = Kart(Ant_Player.EPlayerType.E_AI_LOCAL); observed.Motor!.bLowerPhysicsQualityForAI = true; observed.Motor.iLowerQualityPhysicsUpdateEveryOnlyX = 4;
 DCall("ControllerAfter", observed, target, System.Diagnostics.Stopwatch.GetTimestamp());
 Check((int)DField("_aiSamples")! == 1 && (int)DField("_lowerAiSamples")! == 1 && (int)DField("_observedInterval")! == 4, "samples read actual post-native AI motor flags");
+TrackBoundaries.Visible = true; PerformanceDiagnostics.Tick(); TrackBoundaries.Visible = false;
 metrics.Frame(.01); metrics.Frame(.02);
 DSet("_windowStart", System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency - 10);
 DSet("_captureUntil", -1d); PerformanceDiagnostics.Tick();
@@ -274,7 +275,10 @@ using (var json = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadLines(o
     var root = json.RootElement;
     Check(root.GetProperty("methods").GetArrayLength() == 10 && root.GetProperty("frames").GetInt32() >= 2, "report is parseable and contains method and frame evidence");
     Check(root.GetProperty("observedLowerAiMotorSamples").GetInt32() == 1 && root.GetProperty("lastObservedAiMotorInterval").GetInt32() == 4, "report includes observed cadence rather than selected setting only");
+    Check(!root.GetProperty("context").GetProperty("trackBoundariesVisible").GetBoolean() && root.GetProperty("trackBoundaryViewObservedDuringWindow").GetBoolean(),
+        "mid-window overlay use is recorded even when hidden at both window endpoints");
 }
+Check(!(bool)DField("_boundaryVisibleThisWindow")!, "overlay observation resets after report");
 Check(hooks.Targets.Count == 0 && (bool)DField("_completed")!, "bounded capture removes detours");
 PerformanceDiagnostics.Tick(); Check(hooks.Targets.Count == 0, "completed race does not rearm every frame");
 MenuManager.Instance = new(); PerformanceDiagnostics.Tick(); MenuManager.Instance = null;
@@ -292,4 +296,31 @@ p = ResetDiagnostic(); BeginCapture(p); metrics.Frame(.01);
 DSet("_file", BepInEx.Paths.BepInExRootPath); // directory cannot be opened as a report file
 PerformanceDiagnostics.Stop();
 Check(hooks.Targets.Count == 0 && (bool)DField("_faulted")!, "report write failure does not escape shutdown or retain hot hooks");
+var engineApi = new EngineApiStub();
+using (var engine = new PerformanceEngineSamples(engineApi))
+{
+    engine.Start(); engine.Tick(); engine.Tick();
+    using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(engine.Report()));
+    var all = json.RootElement.GetProperty("metrics").EnumerateArray().ToArray();
+    var gpu = all.Single(x => x.GetProperty("name").GetString() == "GPU Frame Time");
+    Check(gpu.GetProperty("samples").GetInt64() == 1 && gpu.GetProperty("invalidSamples").GetInt64() == 1 && gpu.GetProperty("average").GetDouble() == 2,
+        "completed GPU samples are consumed once; nanoseconds become milliseconds and zero GPU timings are invalid");
+    var draws = all.Single(x => x.GetProperty("name").GetString() == "Draw Calls Count");
+    Check(draws.GetProperty("average").GetDouble() == 40 && draws.GetProperty("unit").GetString() == "count", "render counters preserve count units");
+    var physics = all.Single(x => x.GetProperty("name").GetString() == "Physics.Simulate");
+    Check(physics.GetProperty("average").GetDouble() == 0 && physics.GetProperty("zeroSamples").GetInt64() == 1, "valid empty physics work is distinguished from missing GPU timing");
+    Check(all.Single(x => x.GetProperty("name").GetString() == "Animator.Update").GetProperty("status").GetString() == "metric_not_registered", "absent release markers are explicit");
+    engine.ResetWindow();
+    using var empty = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(engine.Report()));
+    Check(empty.RootElement.GetProperty("metrics")[3].GetProperty("average").ValueKind == System.Text.Json.JsonValueKind.Null, "empty engine window has null average rather than fabricated zero");
+    engineApi.ThrowCopy = true; engine.Tick();
+    Check(engineApi.Released == 3, "read failure releases every native recorder");
+    engine.Dispose(); Check(engineApi.Released == 3, "recorder disposal is idempotent");
+}
+engineApi = new EngineApiStub { ThrowFind = true, ThrowRelease = true };
+using (var engine = new PerformanceEngineSamples(engineApi))
+{
+    engine.Start(); Check(engineApi.Released == 1, "partial initialization releases earlier recorders even when release fails");
+    engine.Dispose(); Check(engineApi.Released == 1, "failed initialization cannot double release a native recorder");
+}
 Console.WriteLine($"Production performance and diagnostics: {assertions} assertions passed (stub APIs; no engine/game runtime proof).");

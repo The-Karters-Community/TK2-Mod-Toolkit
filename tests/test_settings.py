@@ -101,7 +101,21 @@ class SettingsMergeTests(unittest.TestCase):
         self.assertIn("PerformanceDiagnostics", next(p for p in pack.catalog_packs() if p["id"] == "garage")["features"])
         self.assertEqual(set(pack.module_sources()["PerformanceDiagnostics"]), {
             "plugins/TK2.Customization/PerformanceDiagnostics.cs", "plugins/TK2.Customization/PerformanceSamples.cs",
-            "plugins/TK2.Customization/PerformanceFeature.cs"})
+            "plugins/TK2.Customization/PerformanceFeature.cs", "plugins/TK2.Customization/PerformanceEngineSamples.cs"})
+
+    def test_track_boundaries_settings_and_export_ownership(self):
+        self.assertFalse(pack.defaults()["TrackBoundaries/Enabled"])
+        self.assertTrue(pack.defaults()["TrackBoundaries/ShowWalls"])
+        self.assertTrue(pack.defaults()["TrackBoundaries/ShowRespawn"])
+        self.assertEqual(pack.defaults()["TrackBoundaries/ToggleKey"], "F10")
+        self.assertEqual(sum(p["features"].count("TrackBoundaries") for p in pack.catalog_packs()), 1)
+        self.assertEqual(set(pack.module_sources()["TrackBoundaries"]), {
+            "plugins/TK2.Customization/TrackBoundaries.cs", "plugins/TK2.Customization/BoundarySelection.cs"})
+        self.assertEqual(pack.validate({"TrackBoundaries/DrawDistance": 1000}), {("TrackBoundaries", "DrawDistance"): "1000"})
+        for value in (24, 1001, True):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                pack.validate({"TrackBoundaries/DrawDistance": value})
+        with self.assertRaises(ValueError): pack.validate({"TrackBoundaries/ToggleKey": "Invalid"})
 
     def test_performance_module_has_pack_membership_and_source_ownership(self):
         from unittest.mock import patch

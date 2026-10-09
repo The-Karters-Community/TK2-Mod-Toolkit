@@ -1,5 +1,11 @@
 # Validation
 
+## Engine capture and selective track boundaries (2026-10-09)
+
+Runtime 0.6.11 adds [engine/GPU capture](PERFORMANCE-ENGINE-CAPTURE.md) and a separate [track boundaries view](TRACK-BOUNDARIES.md). Six native UnityPlayer profiler bindings have current Ghidra/ABI evidence in an isolated scratch project and an exact binary hash guard. Three kart layer masks and the native mesh-hiding component establish selective boundary semantics. The view shares authored debug meshes on collider-free visual children; original rendering, camera masks and physics remain untouched.
+
+Validation: 89 Python tests, 133 frontend assertions, 96-control static GUI smoke, 113 production-source performance assertions and 38 boundary-view assertions pass. Plugin compilation against installed references has zero warnings/errors. These tests use stub engine APIs; native profiler availability, shader appearance and per-track mesh coverage still need a player run. No game was launched automatically, and no original game binary/save or portable distribution was changed. Deployment state is recorded separately in the ignored receipt after the game closes.
+
 ## Player-run paired performance capture (2026-10-09)
 
 Runtime 0.6.10 produced 16 valid timing/memory records on the same map with Performance inactive. The first six full windows of each mode show race 84.59 FPS versus time trial 100.70 FPS; all ten measured race spans sum to 1.114 ms/frame including nested collision time. The capture confirms dispatched targets and actual normal-cadence AI motor flags in this baseline. It observes GC Disabled and managed-used growth in both modes, with stable process commitment/residency during each segment. It does not establish a dominant FPS subsystem or leak. [Reproducible measurements and developer next steps](PERFORMANCE-CAPTURE-2026-10-09.md). This analysis changed documentation only; no additional runtime/config deployment or repeated build was needed.

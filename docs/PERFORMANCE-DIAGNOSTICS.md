@@ -1,5 +1,7 @@
 # Performance follow-up and developer capture
 
+Runtime **0.6.11** extends the ten game-method probes below with [engine, rendering and GPU capture](PERFORMANCE-ENGINE-CAPTURE.md). The original paired results used 0.6.10/schema 1. New reports use schema 2 with per-metric availability and units. Keep **Track boundaries off** for the next paired run, as its visual meshes add rendering work.
+
 The player has completed the capture. [Measured results and revised developer priorities](PERFORMANCE-CAPTURE-2026-10-09.md) establish that the selected kart/AI timers account for only a small part of race frame time, Default draw distance is active, and managed memory accumulates with GC disabled in both modes. The dominant FPS source is still outside the current probe's coverage.
 
 The player tested runtime 0.6.9 with Lower AI physics enabled at interval 4 and reported no noticeable FPS or RAM improvement. The latest BepInEx log confirms the runtime loaded, the performance module was available and its active settings included AI interval 4. It then reports that the module was disabled. There is no logged module suspension. Those entries establish installation and selected settings, not per-hook execution or a quantified benchmark.
@@ -27,7 +29,7 @@ AI motor fields are sampled after the original controller at every 127th observe
 
 `Profiler.GetMonoUsedSizeLong` covers live and uncollected managed objects; this is deliberately read without forcing a collection, so it is not a live-object-only measure. [`GetTotalAllocatedMemoryLong`](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Profiling.Profiler.GetTotalAllocatedMemoryLong.html) covers allocated engine memory and differs from process memory. The mod's .NET CLR heap is measured separately. Release-build counters can be unavailable or zero; null/zero must not be interpreted as proof of no allocations. [Unity 6 managed memory API](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Profiling.Profiler.GetMonoUsedSizeLong.html).
 
-No GPU/render-thread, audio, native physics jobs or asset residency breakdown is captured. If these ten spans account for only a small part of the race slowdown, a developer needs a Unity CPU/GPU profiler capture or native sampling trace, rather than throttling these methods speculatively.
+The original 0.6.10 capture did not include GPU/render-thread or engine markers. Runtime 0.6.11 queries registered release-player metrics for those areas; their availability must be confirmed in the next capture. Audio and asset residency attribution still require a developer profiler or native trace. The ten Harmony spans alone cannot establish the dominant bottleneck.
 
 ## Targets and identity
 

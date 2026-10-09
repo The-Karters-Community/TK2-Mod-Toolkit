@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.10")]
+[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", "0.6.11")]
 public sealed partial class Plugin : BasePlugin
 {
     internal static Plugin? Instance;
@@ -59,10 +59,11 @@ public sealed partial class Plugin : BasePlugin
         NightmareAI.Install(this);
         TryFeature("native performance", () => PerformanceFeature.Install(this));
         TryFeature("performance diagnostics", () => PerformanceDiagnostics.Install(this));
+        TryFeature("track boundaries", () => TrackBoundaries.Install(this));
         _behaviour = AddComponent<StudioBehaviour>();
         Config.Save();
         LiveConfig.Initialize(this);
-        Log.LogInfo("TK2 Mod Toolkit 0.6.10: offline test features available; leaderboard uploads unchanged.");
+        Log.LogInfo("TK2 Mod Toolkit 0.6.11: offline test features available; leaderboard uploads unchanged.");
     }
 
     private void TryFeature(string name, Action install)
@@ -127,6 +128,7 @@ public sealed partial class Plugin : BasePlugin
         RestoreTuning();
         PerformanceFeature.Restore();
         PerformanceDiagnostics.Stop();
+        TrackBoundaries.Restore();
         Harmony.UnpatchSelf();
         Instance = null;
         return true;

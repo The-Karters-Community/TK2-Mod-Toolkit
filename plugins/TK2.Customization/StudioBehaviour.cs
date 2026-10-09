@@ -43,6 +43,7 @@ public sealed class StudioBehaviour : MonoBehaviour
         RecipeHost.Tick();
         PerformanceFeature.Tick();
         PerformanceDiagnostics.Tick();
+        TrackBoundaries.Tick();
         RunFeature(ref _mkFaulted, "MK modules", LegacyMK.Tick);
         RunFeature(ref _communityFaulted, "community commands", CommunityMods.Tick);
         RunFeature(ref _nightmareFaulted, "Nightmare AI", NightmareAI.Tick);
@@ -153,8 +154,9 @@ public sealed class StudioBehaviour : MonoBehaviour
     {
         var p = Plugin.Instance;
         if (p != null) CameraPanel.Draw(p);
+        TrackBoundaries.Draw();
     }
 
-    public void RestoreAll() { RestoreHud(); RestoreVisualPack(); }
+    public void RestoreAll() { RestoreHud(); RestoreVisualPack(); TrackBoundaries.Restore(); }
     public void OnDestroy() { if (Plugin.Instance != null) CameraPanel.Close(Plugin.Instance); RestoreAll(); }
 }

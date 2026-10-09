@@ -29,6 +29,7 @@ internal static class PerformanceDiagnostics
         (typeof(PTK_GraphicsDetailApplier), "LateUpdate") };
     private static readonly Dictionary<MethodBase, int> Slots = new();
     private static readonly PerformanceSamples Samples = new(Targets.Length);
+    private static readonly PerformanceEngineSamples Engine = new();
     private static bool _inRace, _hooked, _recording, _completed, _faulted;
     private static long _lastFrame;
     private static double _warmUntil, _captureUntil, _windowStart;
@@ -36,6 +37,7 @@ internal static class PerformanceDiagnostics
     private static object? _context;
     private static double _processCpu;
     private static int _aiSamples, _lowerAiSamples, _observedInterval;
+    private static bool _boundaryVisibleThisWindow;
 
     internal static void Install(Plugin p)
     {
@@ -110,13 +112,15 @@ internal static class PerformanceDiagnostics
             if (_completed || now < _warmUntil) return;
             if (!_hooked)
             {
-                StartHooks(); now = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                StartHooks(); Engine.Start(); now = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 _captureUntil = now + Math.Clamp(_seconds.Value, 10, 180); _windowStart = now;
-                _processCpu = ProcessCpu(); _context = Context(); Samples.Reset(); _lastFrame = 0; _recording = true;
+                _processCpu = ProcessCpu(); _context = Context(); Samples.Reset(); _boundaryVisibleThisWindow = false; _lastFrame = 0; _recording = true;
             }
             long stamp = Stopwatch.GetTimestamp();
             if (_lastFrame != 0) Samples.Frame((stamp - _lastFrame) / (double)Stopwatch.Frequency);
             _lastFrame = stamp;
+            _boundaryVisibleThisWindow |= TrackBoundaries.Visible;
+            Engine.Tick();
             if (now - _windowStart >= 10 || now >= _captureUntil)
             {
                 WriteWindow(now);
@@ -133,7 +137,10 @@ internal static class PerformanceDiagnostics
             mapId = Ant_CurrentGameConfiguration.GetFinalChoosedMapConfig(-1)?.iConfigID,
             timeTrialCollisionBypass = Ant_CurrentGameConfiguration.GetFinalChoosedGameModeConfig(-1)?.bDisablePlayerPlayerCollisionForTT,
             fixedDeltaTime = Time.fixedDeltaTime, drawDistanceIndex = PTK_GraphicsDetailApplier.EffDraw(),
-            performance = PerformanceFeature.DiagnosticSettings() };
+            performance = PerformanceFeature.DiagnosticSettings(), trackBoundariesVisible = TrackBoundaries.Visible,
+            screenWidth = Screen.width, screenHeight = Screen.height, vSyncCount = QualitySettings.vSyncCount,
+            targetFrameRate = Application.targetFrameRate, graphicsApi = SystemInfo.graphicsDeviceType.ToString(),
+            graphicsDevice = SystemInfo.graphicsDeviceName, unityVersion = Application.unityVersion };
     }
     private static double ProcessCpu() { using var process = Process.GetCurrentProcess(); return process.TotalProcessorTime.TotalMilliseconds; }
     private static long? ReadMemory(Func<long> read) { try { return read(); } catch { return null; } }
@@ -148,7 +155,7 @@ internal static class PerformanceDiagnostics
                 inclusiveMs = Samples.Ticks[i] * 1000d / Stopwatch.Frequency,
                 maxCallMs = Samples.MaxTicks[i] * 1000d / Stopwatch.Frequency };
         using var process = Process.GetCurrentProcess(); process.Refresh();
-        var record = new { schema = 1, utc = DateTime.UtcNow, runtime = "0.6.10", elapsedSeconds = elapsed, context = _context,
+        var record = new { schema = 2, utc = DateTime.UtcNow, runtime = "0.6.11", elapsedSeconds = elapsed, context = _context,
             frames = Samples.Frames, averageFps = Samples.Frames / Samples.FrameSeconds,
             averageFrameMs = Samples.FrameSeconds * 1000 / Samples.Frames, p95FrameMsUpperBound = Samples.FrameP95Ms(),
             p95OverflowAt200Ms = Samples.FrameP95Ms() == null, maxFrameMs = Samples.MaxFrameMs,
@@ -157,16 +164,17 @@ internal static class PerformanceDiagnostics
             il2cppUsedBytes = ReadMemory(Profiler.GetMonoUsedSizeLong), il2cppHeapBytes = ReadMemory(Profiler.GetMonoHeapSizeLong),
             modClrUsedBytes = GC.GetTotalMemory(false), gcMode = GarbageCollector.GCMode.ToString(),
             processCpuMs = cpu - _processCpu, observedAiMotorSamples = _aiSamples, observedLowerAiMotorSamples = _lowerAiSamples,
-            lastObservedAiMotorInterval = _aiSamples == 0 ? (int?)null : _observedInterval, methods,
-            limitation = "Instrumented inclusive wall times overlap; do not sum nested spans. GPU/render/audio/native jobs are not covered. Hooks add overhead. Unity memory values can be unavailable/zero in release builds." };
+            lastObservedAiMotorInterval = _aiSamples == 0 ? (int?)null : _observedInterval, methods, engine = Engine.Report(),
+            trackBoundaryViewObservedDuringWindow = _boundaryVisibleThisWindow,
+            limitation = "Instrumented inclusive wall times overlap; do not sum nested spans. Engine counters expose only registered release metrics; availability and units are reported individually. Hooks and recorders add overhead. Unity memory values can be unavailable/zero in release builds." };
         File.AppendAllText(_file!, JsonSerializer.Serialize(record) + Environment.NewLine);
         Plugin.Instance?.Log.LogInfo($"Performance sample: {record.averageFps:F1} FPS, p95 {record.p95FrameMsUpperBound?.ToString("F2") ?? ">=200"} ms, private {record.privateBytes / 1073741824d:F2} GiB; {_file}");
-        Samples.Reset(); _aiSamples = _lowerAiSamples = _observedInterval = 0; _processCpu = cpu; _recording = true;
+        Samples.Reset(); Engine.ResetWindow(); _boundaryVisibleThisWindow = false; _aiSamples = _lowerAiSamples = _observedInterval = 0; _processCpu = cpu; _recording = true;
     }
     private static void RemoveHooks()
     {
         _recording = false; _lastFrame = 0;
-        try { Hooks.UnpatchSelf(); } finally { _hooked = false; Slots.Clear(); }
+        try { Hooks.UnpatchSelf(); } finally { Engine.Dispose(); _hooked = false; Slots.Clear(); }
     }
     internal static void Stop()
     {

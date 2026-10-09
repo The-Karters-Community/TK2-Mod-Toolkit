@@ -1,5 +1,7 @@
 # TK2 Mod Toolkit
 
+New: [Track boundaries](docs/TRACK-BOUNDARIES.md) selectively reveals authored invisible-wall and respawn meshes. [Engine performance capture](docs/PERFORMANCE-ENGINE-CAPTURE.md) extends the race/time-trial investigation.
+
 <img src="assets/Logo.png" alt="The Karters 2" width="260">
 
 A Windows mod manager and C# workshop for **The Karters 2 Turbo Charged 0.1.4.18**. One BepInEx plugin, live settings, editable modules.

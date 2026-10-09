@@ -19,7 +19,13 @@ FEATURES = [
         ("LowerAIPhysics", "Lower AI physics", "bool", False, None, None, "Use the game's existing lower-accuracy AI physics path. May affect movement and collisions; offline only."),
         ("AIPhysicsInterval", "AI physics interval", "int", 2, 1, 4, "Physics ticks between selected AI motor updates. 1 updates every tick; higher values lower accuracy.", None, "LowerAIPhysics"),
     ]},
-    {"id": "PerformanceDiagnostics", "name": "Performance diagnostics", "category": "Graphics", "description": "Record timing and memory during offline races to investigate slowdowns. Hooks add measurement overhead and stop after the capture.", "origin": "New", "settings": [("CaptureSeconds", "Capture seconds", "int", 60, 10, 180, "Capture per race after a 5-second warmup; results are saved in BepInEx/diagnostics.")]},
+    {"id": "PerformanceDiagnostics", "name": "Performance diagnostics", "category": "Graphics", "description": "Record game, engine, rendering and memory measurements during offline races. Available counters depend on the shipped player; capture stops automatically.", "origin": "New", "settings": [("CaptureSeconds", "Capture seconds", "int", 60, 10, 180, "Capture per race after a 5-second warmup; results are saved in BepInEx/diagnostics.")]},
+    {"id": "TrackBoundaries", "name": "Track boundaries", "category": "Graphics", "description": "Reveal the track's authored debug meshes: cyan invisible walls and orange respawn boundaries. Offline only; F10 toggles visibility. Turn off for performance measurements.", "origin": "New", "settings": [
+        ("ShowWalls", "Invisible walls", "bool", True, None, None),
+        ("ShowRespawn", "Respawn boundaries", "bool", True, None, None),
+        ("DrawDistance", "View distance", "float", 200, 25, 1000, "Distance from a local kart in metres."),
+        ("ToggleKey", "Visibility key", "text", "F10", None, None, "Toggle while this module is enabled.", ["F" + str(i) for i in range(1,13)] + ["None"]),
+    ]},
     {"id": "Physics", "name": "Fast fall", "category": "Driving", "description": "Press Down Arrow or the mapped controller button after the minimum air time. Includes the legacy press, directional input and optional dodge modes.", "origin": "Community legacy port", "gameplay": True, "settings": [("FastFallAcceleration", "Downward acceleration", "float", 100, 0, 500), ("MinimumAirTime", "Air time before activation", "float", .4, 0, 3), ("UseSinglePressInput", "Press once per jump", "bool", True, None, None), ("ControllerAction", "Controller action", "text", "MenuTriangle", None, None), ("ShouldDodgeOnPress", "Dodge on fast fall", "bool", False, None, None), ("DodgeDurationAfterPress", "Dodge duration", "float", .5, .1, 1), ("MinimumJoystickInputBeforeFastFall", "Directional deadzone", "float", .1, 0, 1)]},
     {"id": "Laps", "name": "Custom lap count", "category": "Race rules", "description": "Choose how many laps an offline race requires. Port of the legacy custom-laps idea.", "origin": "Legacy port", "gameplay": True, "settings": [("Count", "Laps", "int", 3, 1, 99)]},
     {"id": "SimpleDriving", "name": "Driving challenge", "category": "Driving", "description": "Disable local jump and drift inputs. Fresh port of the legacy BoringMode idea.", "origin": "Legacy port", "gameplay": True, "settings": [("DisableJump", "Disable jumping", "bool", True, None, None), ("DisableDrift", "Disable drifting", "bool", True, None, None)]},
@@ -112,7 +118,7 @@ def defaults():
 
 
 PACKS = [
-    {"id": "garage", "name": "Toolkit Essentials", "description": "Camera, interface, audio, graphics and race performance controls.", "features": ["UI", "HudOpacity", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics"]},
+    {"id": "garage", "name": "Toolkit Essentials", "description": "Camera, interface, audio, graphics and race performance controls.", "features": ["UI", "HudOpacity", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
     {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
@@ -160,7 +166,8 @@ def module_sources():
         "HudOpacity": ["StudioBehaviour.cs", "PackModules.cs"],
         "Rendering": ["StudioBehaviour.cs", "PackModules.cs"],
         "Performance": ["PerformanceFeature.cs"],
-        "PerformanceDiagnostics": ["PerformanceDiagnostics.cs", "PerformanceSamples.cs", "PerformanceFeature.cs"],
+        "PerformanceDiagnostics": ["PerformanceDiagnostics.cs", "PerformanceSamples.cs", "PerformanceEngineSamples.cs", "PerformanceFeature.cs"],
+        "TrackBoundaries": ["TrackBoundaries.cs", "BoundarySelection.cs"],
         "Audio": ["AudioFeature.cs", "Plugin.cs"],
         "Camera": ["CameraFeature.cs", "CameraSettings.cs", "CameraPanel.cs"],
         "Physics": ["FastFallFeature.cs", "Plugin.cs"],

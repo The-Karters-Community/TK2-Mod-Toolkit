@@ -1,0 +1,3 @@
+Run `dotnet run --project tests/TrackBoundaries/TrackBoundaries.csproj -c Release`.
+
+These tests link the production classifier and renderer lifecycle with Unity and BepInEx stubs. They check native layer-mask semantics, authored-mesh exclusions, local distance, palette and visual-child reuse, hotkeys, unchanged native renderer/material/shadow/layer/camera state, identical authored mesh references, collider-free overlays, no recursive selection of owned children, menu/online/map cleanup, and unsupported materials. They do not establish native rendering appearance, real scene hierarchy coverage, or game performance.

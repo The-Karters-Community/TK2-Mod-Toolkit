@@ -4,7 +4,7 @@ One physical plugin, TK2.Customization.dll, contains these logical packs. New mo
 
 | Pack | Modules |
 |---|---|
-| Toolkit Essentials | HUD size, HUD transparency, audio mixer, camera setup, graphics |
+| Toolkit Essentials | HUD size, HUD transparency, audio mixer, camera setup, graphics, race performance, performance diagnostics, track boundaries |
 | Community Mods | Custom laps, driving challenge, automatic drift boost, basic kart tuning, fast respawn, boost trainer, alternate reserves, Dash and Stash, portal tricks, mirror, Bobby Gang, nearby voice lines, CNK-style boost meter, air brake, kart/boost parameters, practice save states, reverse race, Nightmare AI, fast fall/dodge, health/reserve/elimination chat commands |
 | Your recipes | FrameLimiter and author-created modules in the same DLL |
 

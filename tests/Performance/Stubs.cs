@@ -22,7 +22,7 @@ namespace BepInEx.Configuration
 }
 namespace BepInEx
 {
-    public static class Paths { public static string BepInExRootPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "tk2-diagnostic-test-" + Guid.NewGuid().ToString("N")); }
+    public static class Paths { public static string BepInExRootPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "tk2-diagnostic-test-" + Guid.NewGuid().ToString("N")); public static string GameRootPath = BepInExRootPath; }
 }
 namespace HarmonyLib
 {
@@ -93,7 +93,14 @@ namespace UnityEngine
         }
     }
     public static class Time { public static float unscaledTime, timeScale = 1, fixedDeltaTime = .00833f; }
-    public static class Application { public static bool isFocused = true; }
+    public static class Application { public static bool isFocused = true; public static int targetFrameRate = -1; public static string unityVersion = "stub"; }
+    public static class Screen { public static int width = 1920, height = 1080; }
+    public static class QualitySettings { public static int vSyncCount = 0; }
+    public static class SystemInfo { public static string graphicsDeviceType = "stub", graphicsDeviceName = "stub"; }
+}
+namespace Il2CppInterop.Runtime
+{
+    public static class IL2CPP { public static IntPtr il2cpp_resolve_icall(string name) => IntPtr.Zero; }
 }
 namespace UnityEngine.Profiling
 {
@@ -185,6 +192,7 @@ public sealed class PTK_GraphicsDetailApplier : UnityEngine.MonoBehaviour
 }
 namespace TK2.Customization
 {
+    internal static class TrackBoundaries { public static bool Visible { get; set; } }
     public sealed class LogStub
     {
         public readonly List<string> Errors = new();

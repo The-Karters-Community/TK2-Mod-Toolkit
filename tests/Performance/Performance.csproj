@@ -4,5 +4,6 @@
     <Compile Include="../../plugins/TK2.Customization/PerformanceFeature.cs" Link="PerformanceFeature.cs" />
     <Compile Include="../../plugins/TK2.Customization/PerformanceSamples.cs" Link="PerformanceSamples.cs" />
     <Compile Include="../../plugins/TK2.Customization/PerformanceDiagnostics.cs" Link="PerformanceDiagnostics.cs" />
+    <Compile Include="../../plugins/TK2.Customization/PerformanceEngineSamples.cs" Link="PerformanceEngineSamples.cs" />
   </ItemGroup>
 </Project>
