@@ -7,6 +7,7 @@ void Check(bool ok, string name) { assertions++; if (!ok) throw new Exception(na
 var live = InputOverlayModel.CreateLive(1.6f, -.4f, true, false, true, false, true, false, true, false, true, "KEYBOARD");
 Check(live.Steering == 1 && live.Acceleration == -.4f, "live analog values are bounded and retained");
 Check(live.Jump && live.Boost && live.Brake && live.TargetUp && live.Pickup, "live semantic buttons are preserved");
+Check(!live.Drift && live.Boost, "Boost remains distinct from the game's remapped Drift gameplay field");
 Check(!live.IsReplay && live.Device == "KEYBOARD", "live source and detected device are retained");
 var replay = InputOverlayModel.CreateReplay(float.NaN, float.PositiveInfinity, false, true, false, true, false, true, false, true, false);
 Check(replay.Steering == 0 && replay.Acceleration == 0, "non-finite axes are sanitized");

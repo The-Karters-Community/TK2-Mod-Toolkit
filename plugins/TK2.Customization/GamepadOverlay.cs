@@ -18,7 +18,8 @@ internal static class GamepadOverlay
     private static PTK_PlayerReplayInput_ReplaySerializer? _replayInput;
     private static string _liveDevice = "GAMEPAD / KEYBOARD";
     private static readonly FieldInfo? RewiredPlayer = AccessTools.Field(typeof(Ant_KartInput), "player");
-    private static GUIStyle? _title, _small, _pill;
+    private static GUIStyle? _title, _small, _pill, _section, _secondary, _status;
+    private static Texture2D? _disc;
 
     internal static bool Visible => _enabled?.Value == true && _visible && _hasSample;
 
@@ -86,8 +87,13 @@ internal static class GamepadOverlay
         { _hasSample = false; return; }
         if (_localInput?.inputData == null) { _hasSample = false; return; }
         var data = _localInput.inputData;
+        // inputData is already normalized for gameplay: ProcessRacingInput swaps the
+        // Drift/Boost route while drifting. Read named Rewired actions instead so this
+        // viewer reports the action bound to the physical/keyboard input.
+        bool drift = _localInput.player != null && _localInput.player.GetButton("Drift_left_right");
+        bool boost = _localInput.player != null && _localInput.player.GetButton("Boost");
         _sample = InputOverlayModel.CreateLive(data.fTurningInput, data.fAccelInput,
-            data.bJumpButton_ClickedDown, data.bDriftInput, data.bBoostInput_ClickedDown,
+            data.bJumpButton_ClickedDown, drift, boost,
             data.bUseWeaponInput_ClickDown, data.bIsBreakingInput, data.bBackDirInputButtonDown,
             data.bIsTargetLockUp_ClickUp, data.bIsTargetLockDown_ClickDown,
             data.bWeaponPickupButtomClicked_ClickedDown, _liveDevice);
@@ -139,7 +145,7 @@ internal static class GamepadOverlay
         if (!Visible) return;
         EnsureStyles();
         float scale = Mathf.Clamp(_scale.Value, .7f, 1.4f);
-        const float baseWidth = 352, baseHeight = 180;
+        const float baseWidth = 432, baseHeight = 204;
         float availableScale = Mathf.Min((Screen.width - 24f) / baseWidth, (Screen.height - 24f) / baseHeight);
         scale = Mathf.Max(.35f, Mathf.Min(scale, availableScale));
         float width = baseWidth * scale, height = baseHeight * scale, margin = 18 * scale;
@@ -154,19 +160,21 @@ internal static class GamepadOverlay
         DrawCard(rect, _opacity.Value);
         GUI.BeginGroup(rect);
         float s = scale;
-        GUI.Label(new Rect(16*s, 9*s, 178*s, 22*s), "INPUT FEED", _title);
-        GUI.Label(new Rect(174*s, 11*s, 136*s, 18*s), _sample.IsReplay ? "● REPLAY" : "● LIVE", _small);
-        GUI.Label(new Rect(16*s, 32*s, 240*s, 17*s), _sample.IsReplay ? "RECORDED GHOST ACTIONS" : _sample.Device, _small);
-        DrawSteering(new Rect(16*s, 57*s, 141*s, 54*s), _sample.Steering, s);
-        DrawAcceleration(new Rect(169*s, 57*s, 141*s, 54*s), _sample.Acceleration, s);
-        DrawButton(new Rect(16*s, 120*s, 74*s, 23*s), "JUMP", _sample.Jump, new Color(.18f,.72f,.95f), s);
-        DrawButton(new Rect(96*s, 120*s, 74*s, 23*s), "DRIFT", _sample.Drift, new Color(.75f,.52f,.98f), s);
-        DrawButton(new Rect(176*s, 120*s, 74*s, 23*s), "BOOST", _sample.Boost, new Color(1f,.57f,.12f), s);
-        DrawButton(new Rect(256*s, 120*s, 74*s, 23*s), "ITEM", _sample.Weapon, new Color(.98f,.3f,.34f), s);
-        DrawButton(new Rect(16*s, 149*s, 74*s, 23*s), "BRAKE", _sample.Brake, new Color(.84f,.88f,.94f), s);
-        DrawButton(new Rect(96*s, 149*s, 74*s, 23*s), "LOOK BACK", _sample.LookBack, new Color(.35f,.78f,.68f), s);
-        DrawButton(new Rect(176*s, 149*s, 74*s, 23*s), "TARGET", _sample.TargetUp || _sample.TargetDown, new Color(.38f,.65f,1f), s);
-        DrawButton(new Rect(256*s, 149*s, 74*s, 23*s), "PICKUP", _sample.Pickup, new Color(.97f,.74f,.25f), s);
+        GUI.Label(new Rect(16*s, 9*s, 205*s, 22*s), "INPUT VIEWER", _title);
+        DrawStatus(new Rect(328*s, 9*s, 88*s, 20*s), _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
+        GUI.Label(new Rect(16*s, 32*s, 260*s, 17*s), _sample.IsReplay ? "RECORDED GAME ACTIONS" : _sample.Device, _small);
+        DrawPanel(new Rect(14*s, 56*s, 191*s, 132*s), _opacity.Value);
+        DrawPanel(new Rect(211*s, 56*s, 207*s, 132*s), _opacity.Value);
+        DrawSteering(new Rect(25*s, 66*s, 169*s, 51*s), _sample.Steering, s);
+        DrawAcceleration(new Rect(25*s, 126*s, 169*s, 51*s), _sample.Acceleration, s);
+        GUI.Label(new Rect(224*s, 63*s, 170*s, 17*s), "ACTIONS", _section);
+        DrawButton(new Rect(224*s, 85*s, 87*s, 31*s), "JUMP", _sample.Jump, new Color(.18f,.72f,.95f), s);
+        DrawButton(new Rect(317*s, 85*s, 87*s, 31*s), "DRIFT", _sample.Drift, new Color(.75f,.52f,.98f), s);
+        DrawButton(new Rect(224*s, 122*s, 87*s, 31*s), "BOOST", _sample.Boost, new Color(1f,.57f,.12f), s);
+        DrawButton(new Rect(317*s, 122*s, 87*s, 31*s), "ITEM", _sample.Weapon, new Color(.98f,.3f,.34f), s);
+        GUI.Label(new Rect(224*s, 160*s, 182*s, 16*s),
+            (_sample.Brake ? "BRAKE  " : "") + (_sample.LookBack ? "LOOK BACK  " : "") +
+            (_sample.TargetUp || _sample.TargetDown ? "TARGET  " : "") + (_sample.Pickup ? "PICKUP" : ""), _secondary);
         GUI.EndGroup();
     }
 
@@ -186,38 +194,88 @@ internal static class GamepadOverlay
     private static void DrawSteering(Rect rect, float value, float scale)
     {
         GUI.Label(new Rect(rect.x, rect.y, rect.width, 16*scale), "STEERING", _small);
-        float mid = rect.x + rect.width * .5f, cy = rect.y + 33*scale;
-        DrawBar(new Rect(rect.x, cy-3*scale, rect.width, 7*scale), new Color(.08f,.13f,.2f,1));
-        DrawBar(new Rect(mid-1*scale, cy-5*scale, 2*scale, 11*scale), new Color(.5f,.62f,.76f,1));
-        float knob = mid + value * rect.width * .43f;
-        DrawBar(new Rect(knob-5*scale, cy-5*scale, 10*scale, 11*scale), new Color(.12f,.74f,.96f,1));
-        GUI.Label(new Rect(rect.x, rect.y+40*scale, rect.width, 13*scale), value.ToString("+0.00;-0.00;0.00"), _small);
+        float cx = rect.x + rect.width * .5f, cy = rect.y + 29*scale;
+        DrawCircle(new Vector2(cx, cy), 16*scale, new Color(.07f,.11f,.17f,1), new Color(.26f,.36f,.49f,1), scale);
+        DrawCircle(new Vector2(cx + value * 10*scale, cy), 6*scale,
+            Mathf.Abs(value) > .08f ? new Color(.1f,.76f,1f,1) : new Color(.55f,.65f,.78f,1), Color.clear, scale);
+        GUI.Label(new Rect(rect.x, rect.y+39*scale, rect.width, 12*scale), "STEER  " + value.ToString("+0.00;-0.00;0.00"), _secondary);
     }
 
     private static void DrawAcceleration(Rect rect, float value, float scale)
     {
         GUI.Label(new Rect(rect.x, rect.y, rect.width, 16*scale), "THROTTLE / REVERSE", _small);
-        float center = rect.x + rect.width * .5f, cy = rect.y + 33*scale;
-        DrawBar(new Rect(rect.x, cy-3*scale, rect.width, 7*scale), new Color(.08f,.13f,.2f,1));
-        DrawBar(new Rect(center-1*scale, cy-6*scale, 2*scale, 13*scale), new Color(.5f,.62f,.76f,1));
-        float left = value < 0 ? center + value * rect.width * .43f : center;
-        float right = value > 0 ? center + value * rect.width * .43f : center;
-        if (right > left) DrawBar(new Rect(left, cy-2*scale, right-left, 5*scale), new Color(1f,.58f,.1f,1));
-        GUI.Label(new Rect(rect.x, rect.y+40*scale, rect.width, 13*scale), value.ToString("+0.00;-0.00;0.00"), _small);
+        float x = rect.x + 4*scale, y = rect.y + 20*scale, w = rect.width - 8*scale;
+        DrawBar(new Rect(x, y, w, 8*scale), new Color(.07f,.11f,.17f,1));
+        float fill = w * Mathf.Abs(value);
+        if (fill > 0) DrawBar(new Rect(value >= 0 ? x : x + w - fill, y, fill, 8*scale),
+            value >= 0 ? new Color(1f,.57f,.12f,1) : new Color(.24f,.67f,1f,1));
+        GUI.Label(new Rect(rect.x, rect.y+34*scale, rect.width, 12*scale),
+            (value >= 0 ? "THROTTLE  " : "REVERSE  ") + Mathf.Abs(value).ToString("0.00"), _secondary);
     }
 
     private static void DrawButton(Rect rect, string label, bool pressed, Color accent, float scale)
     {
         Color old = GUI.color;
-        GUI.color = pressed ? new Color(accent.r, accent.g, accent.b, .34f) : new Color(.08f,.12f,.18f,.96f);
+        GUI.color = pressed ? new Color(accent.r, accent.g, accent.b, .28f) : new Color(.055f,.08f,.12f,.98f);
         GUI.DrawTexture(rect, Texture2D.whiteTexture);
-        GUI.color = pressed ? accent : new Color(.26f,.34f,.46f,.9f);
-        GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 1*scale), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.x, rect.yMax-1*scale, rect.width, 1*scale), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.x, rect.y, 1*scale, rect.height), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.xMax-1*scale, rect.y, 1*scale, rect.height), Texture2D.whiteTexture);
-        GUI.color = Color.white;
+        GUI.color = pressed ? accent : new Color(.26f,.35f,.48f,.9f);
+        float border = Mathf.Max(1, scale);
+        GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, border), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.x, rect.yMax-border, rect.width, border), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.x, rect.y, border, rect.height), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.xMax-border, rect.y, border, rect.height), Texture2D.whiteTexture);
+        GUI.color = pressed ? Color.white : new Color(.75f,.82f,.9f,1);
         GUI.Label(rect, label, _pill);
+        GUI.color = old;
+    }
+
+    private static void DrawStatus(Rect rect, string label, bool replay)
+    {
+        Color old = GUI.color;
+        GUI.color = replay ? new Color(.37f,.7f,1f,.2f) : new Color(.17f,.88f,.64f,.2f);
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = replay ? new Color(.55f,.8f,1f,1) : new Color(.36f,1f,.74f,1);
+        GUI.Label(rect, "● " + label, _status);
+        GUI.color = old;
+    }
+
+    private static void DrawPanel(Rect rect, float opacity)
+    {
+        Color old = GUI.color;
+        GUI.color = new Color(.035f,.055f,.08f,Mathf.Clamp01(opacity * .82f));
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = new Color(.18f,.27f,.38f,Mathf.Clamp01(opacity * .95f));
+        GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 1), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.x, rect.yMax-1, rect.width, 1), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.x, rect.y, 1, rect.height), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(rect.xMax-1, rect.y, 1, rect.height), Texture2D.whiteTexture);
+        GUI.color = old;
+    }
+
+    private static void DrawCircle(Vector2 center, float radius, Color fill, Color outline, float scale)
+    {
+        if (_disc == null)
+        {
+            const int size = 64;
+            _disc = new Texture2D(size, size, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + .5f - size * .5f) / (size * .5f);
+                    float dy = (y + .5f - size * .5f) / (size * .5f);
+                    byte alpha = (byte)Mathf.Clamp(Mathf.RoundToInt((1f - Mathf.Sqrt(dx * dx + dy * dy)) * size * 32f + 128f), 0, 255);
+                    pixels[y * size + x] = new Color32(255, 255, 255, alpha);
+                }
+            _disc.SetPixels32(pixels);
+            _disc.Apply(false, true);
+        }
+        Color old = GUI.color;
+        Rect outer = new Rect(center.x-radius, center.y-radius, radius*2, radius*2);
+        if (outline.a > 0) { GUI.color = outline; GUI.DrawTexture(outer, _disc); }
+        float inset = outline.a > 0 ? Mathf.Max(1f, scale) : 0f;
+        GUI.color = fill;
+        GUI.DrawTexture(new Rect(outer.x+inset, outer.y+inset, outer.width-inset*2, outer.height-inset*2), _disc);
         GUI.color = old;
     }
 
@@ -235,6 +293,11 @@ internal static class GamepadOverlay
         _small.normal.textColor = new Color(.68f,.8f,.91f,1);
         _pill = new GUIStyle(GUI.skin.label) { fontSize = 9, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         _pill.normal.textColor = Color.white;
+        _section = new GUIStyle(GUI.skin.label) { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+        _section.normal.textColor = new Color(.52f,.68f,.83f,1);
+        _secondary = new GUIStyle(GUI.skin.label) { fontSize = 9, alignment = TextAnchor.MiddleLeft };
+        _secondary.normal.textColor = new Color(.74f,.81f,.89f,1);
+        _status = new GUIStyle(GUI.skin.label) { fontSize = 9, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
     }
 
     internal static void Restore() { ResetState(); _faulted = false; }
