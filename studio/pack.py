@@ -39,7 +39,7 @@ FEATURES = [
         ("Corner", "Screen position", "text", "TopCenter", None, None, "Choose a screen preset or Custom to place the overlay with the percentage sliders.", ["TopLeft", "TopCenter", "TopRight", "MiddleLeft", "MiddleCenter", "MiddleRight", "BottomLeft", "BottomCenter", "BottomRight", "Custom"]),
         ("PositionX", "Custom horizontal position", "float", 50, 0, 100, "Used with Custom. 0 is the left edge; 100 is the right edge."),
         ("PositionY", "Custom vertical position", "float", 0, 0, 100, "Used with Custom. 0 is the top edge; 100 is the bottom edge."),
-        ("Scale", "Overlay scale", "float", 1, .7, 1.4),
+        ("Scale", "Overlay scale", "float", 1, .25, 2),
         ("Opacity", "Background opacity", "float", .92, .45, 1),
     ]},
     {"id": "Physics", "name": "Fast fall", "category": "Driving", "description": "Press Down Arrow or the mapped controller button after the minimum air time. Includes the legacy press, directional input and optional dodge modes.", "origin": "Community legacy port", "gameplay": True, "settings": [("FastFallAcceleration", "Downward acceleration", "float", 100, 0, 500), ("MinimumAirTime", "Air time before activation", "float", .4, 0, 3), ("UseSinglePressInput", "Press once per jump", "bool", True, None, None), ("ControllerAction", "Controller action", "text", "MenuTriangle", None, None), ("ShouldDodgeOnPress", "Dodge on fast fall", "bool", False, None, None), ("DodgeDurationAfterPress", "Dodge duration", "float", .5, .1, 1), ("MinimumJoystickInputBeforeFastFall", "Directional deadzone", "float", .1, 0, 1)]},

@@ -14,8 +14,8 @@ namespace BepInEx.Configuration
 namespace HarmonyLib
 {
     public sealed class HarmonyMethod { public HarmonyMethod(Type type, string name) { } }
-    public sealed class Harmony { public void Patch(MethodInfo method, HarmonyMethod prefix) { } }
-    public static class AccessTools { public static MethodInfo? DeclaredMethod(Type type, string name, Type[] args) => type.GetMethod(name, args); }
+    public sealed class Harmony { public void Patch(MethodInfo method, HarmonyMethod? prefix = null, HarmonyMethod? postfix = null) { } }
+    public static class AccessTools { public static MethodInfo? DeclaredMethod(Type type, string name, Type[] args) => type.GetMethod(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static); public static FieldInfo? Field(Type type, string name) => type.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static); }
 }
 namespace Il2CppInterop.Runtime.Injection
 { public static class ClassInjector { public static void RegisterTypeInIl2Cpp<T>() { } } }
@@ -39,6 +39,7 @@ namespace UnityEngine
     {
         public GameObject gameObject = null!;
         public T? GetComponent<T>() where T : Component => gameObject.GetComponent<T>();
+        public T? GetComponentInParent<T>() where T : Component => gameObject.GetComponent<T>();
     }
     public class MonoBehaviour : Component
     { public MonoBehaviour() { } public MonoBehaviour(IntPtr pointer) { } public bool enabled = true; }
@@ -59,6 +60,10 @@ namespace UnityEngine
     public class Camera : MonoBehaviour { public bool isActiveAndEnabled => enabled && !Destroyed && gameObject.activeInHierarchy; }
     public class RenderTexture : Object { }
     public struct Vector2 { public float x, y; public Vector2(float a, float b) { x = a; y = b; } }
+    public struct Vector3 { public float x, y, z; public Vector3(float a, float b, float c) { x = a; y = b; z = c; } }
+    public struct Rect { public float width, height; public Rect(float x, float y, float w, float h) { width = w; height = h; } }
+    public class Transform : Component { public Transform? parent; public Vector3 localPosition; }
+    public class RectTransform : Transform { public Rect rect; public Vector2 pivot; }
     public static class Graphics
     {
         public static int Flips, Copies;
@@ -88,3 +93,10 @@ public class Ant_Player : UnityEngine.Component
 public class CameraBrain { public bool bIsSpectatorCamera; public CameraData? Data; public CameraData? GetCamera() => Data; }
 public class CameraData { public UnityEngine.Camera? unityCamera; }
 public class PixelEasyCharMoveKartController : UnityEngine.Component { public Ant_Player? parentPlayer; public void SteerInput(float amount) { } }
+public class PTK_MarkerIndicator : UnityEngine.Component { }
+public class Waypoint_Indicator : UnityEngine.Component
+{
+    private UnityEngine.RectTransform? wpParentRectTransform;
+    public void SetMarkerRoot(UnityEngine.RectTransform root) => wpParentRectTransform = root;
+    private void Update() { }
+}

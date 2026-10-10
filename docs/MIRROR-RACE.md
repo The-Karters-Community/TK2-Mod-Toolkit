@@ -19,10 +19,10 @@ Read-only Ghidra analysis matches the installed `GameAssembly.dll` SHA-256 `e55f
 | `PixelEasyCharMoveKartController.SteerInput(float)` | `0x1805DC260` | Confirms the current steering hook signature. |
 | `Ant_MapData.Awake` | `0x1805CF0A0` | Assigns the current map instance during track setup, before road/progress/minimap initialization. |
 
-The image flip is implemented by the Toolkit's injected `MirrorImageEffect.OnRenderImage` callback. The plugin logs when it attaches before the countdown and when the callback first runs.
+The image flip is implemented by the Toolkit's injected `MirrorImageEffect.OnRenderImage` callback. The plugin logs when it attaches before the countdown and when the callback first runs. The game draws opponent nameplates on a separate screen-space canvas after camera rendering, so Mirror Race also mirrors the projected nameplate container horizontally; its portrait and name move together while keeping their normal readable orientation.
 
 ## Limits and validation
 
 This mirrors the camera output, not a second mirrored track simulation. Camera-rendered text or world-space interface elements may also appear reversed; screen-space overlay UI is outside the camera image. The module is guarded by the Toolkit's offline gameplay check and only reverses steering for local human players.
 
-The plugin builds against current local interop references with `python -m studio.cli build` (0 warnings, 0 errors). `tests/MirrorRace` links the production recipe and image-effect code: 49 assertions cover zero scans/callbacks through menu/loading/disable/online/map-destruction transitions, countdown attachment, mirrored rendering/steering and preservation of native cameras. These stub tests establish code behavior, not engine render timing. Live menu FPS and race/time-trial rendering still need a manual check; the game is never launched automatically by the build.
+The plugin builds against current local interop references with `python -m studio.cli build` (0 warnings, 0 errors). `tests/MirrorRace` links the production recipe and image-effect code and checks menu/loading/disable/online/map-destruction transitions, countdown attachment, mirrored rendering/steering, screen-space nameplate projection, and preservation of native cameras. These stub tests establish code behavior, not engine render timing. Live menu FPS and race/time-trial rendering still need a manual check; the game is never launched automatically by the build.

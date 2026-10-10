@@ -17,6 +17,8 @@ class GamepadOverlayCatalogTests(unittest.TestCase):
         self.assertEqual(pack.defaults()["GamepadOverlay/PositionY"], 0)
         position = next(setting for setting in feature["settings"] if setting[0] == "Corner")
         self.assertEqual(position[7], ["TopLeft", "TopCenter", "TopRight", "MiddleLeft", "MiddleCenter", "MiddleRight", "BottomLeft", "BottomCenter", "BottomRight", "Custom"])
+        scale = next(setting for setting in feature["settings"] if setting[0] == "Scale")
+        self.assertEqual((scale[3], scale[4], scale[5]), (1, .25, 2))
 
     def test_catalog_exposes_safe_controls_before_first_plugin_launch(self):
         validated = pack.validate({
@@ -31,6 +33,9 @@ class GamepadOverlayCatalogTests(unittest.TestCase):
         self.assertEqual(validated[("GamepadOverlay", "Corner")], "BottomRight")
         self.assertEqual(validated[("GamepadOverlay", "PositionX")], "23")
         self.assertEqual(validated[("GamepadOverlay", "PositionY")], "77")
+        self.assertEqual(validated[("GamepadOverlay", "Scale")], "1.2")
+        self.assertEqual(pack.validate({"GamepadOverlay/Scale": .3})[("GamepadOverlay", "Scale")], "0.3")
+        self.assertEqual(pack.validate({"GamepadOverlay/Scale": 1.8})[("GamepadOverlay", "Scale")], "1.8")
         with self.assertRaises(ValueError):
             pack.validate({"GamepadOverlay/Corner": "Unknown"})
 

@@ -35,7 +35,7 @@ internal static class GamepadOverlay
         _corner = plugin.Config.Bind("GamepadOverlay", "Corner", "TopCenter", new ConfigDescription(
             "Preset screen position. Choose Custom to use the percentage sliders.",
             new AcceptableValueList<string>("TopLeft", "TopCenter", "TopRight", "MiddleLeft", "MiddleCenter", "MiddleRight", "BottomLeft", "BottomCenter", "BottomRight", "Custom")));
-        _scale = plugin.Config.Bind("GamepadOverlay", "Scale", 1f, new ConfigDescription("HUD card scale.", new AcceptableValueRange<float>(0.7f, 1.4f)));
+        _scale = plugin.Config.Bind("GamepadOverlay", "Scale", 1f, new ConfigDescription("HUD card scale. The card is scaled uniformly and automatically fits the current screen.", new AcceptableValueRange<float>(0.25f, 2f)));
         _opacity = plugin.Config.Bind("GamepadOverlay", "Opacity", 0.92f, new ConfigDescription("HUD card background opacity.", new AcceptableValueRange<float>(0.45f, 1f)));
         _positionX = plugin.Config.Bind("GamepadOverlay", "PositionX", 50f, new ConfigDescription("Custom horizontal position as a percentage of the available screen area.", new AcceptableValueRange<float>(0, 100)));
         _positionY = plugin.Config.Bind("GamepadOverlay", "PositionY", 0f, new ConfigDescription("Custom vertical position as a percentage of the available screen area.", new AcceptableValueRange<float>(0, 100)));
@@ -190,34 +190,41 @@ internal static class GamepadOverlay
         // instead of the first frame on which a valid input sample appears.
         EnsureStyles();
         if (!Visible) return;
-        float scale = Mathf.Clamp(_scale.Value, .7f, 1.4f);
+        float scale = Mathf.Clamp(_scale.Value, .25f, 2f);
         const float baseWidth = 440, baseHeight = 180;
-        float availableScale = Mathf.Min((Screen.width - 24f) / baseWidth, (Screen.height - 24f) / baseHeight);
-        scale = Mathf.Max(.35f, Mathf.Min(scale, availableScale));
+        float availableScale = Mathf.Max(.1f, Mathf.Min((Screen.width - 24f) / baseWidth, (Screen.height - 24f) / baseHeight));
+        scale = Mathf.Min(scale, availableScale);
         float width = baseWidth * scale, height = baseHeight * scale, margin = 18 * scale;
         string corner = _corner.Value;
         var position = InputOverlayPlacement.Resolve(corner, Screen.width, Screen.height, width, height,
             margin, _positionX.Value, _positionY.Value);
         float x = position.X, y = position.Y;
-        var rect = new Rect(x, y, width, height);
-        DrawCard(rect, _opacity.Value);
-        GUI.BeginGroup(rect);
-        float s = scale;
-        GUI.Label(new Rect(12*s, 7*s, 260*s, 20*s), "INPUT VIEWER", _title);
-        DrawStatus(new Rect(336*s, 7*s, 92*s, 18*s), !_hasSample ? "WAIT" : _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
-        GUI.Label(new Rect(12*s, 27*s, 320*s, 14*s), !_hasSample ? "WAITING FOR INPUT" : _sample.IsReplay ? "RECORDED INPUTS" : _sample.Device, _small);
-        DrawPanel(new Rect(10*s, 46*s, 132*s, 138*s), _opacity.Value);
-        DrawPanel(new Rect(150*s, 46*s, 278*s, 114*s), _opacity.Value);
-        DrawSteering(new Rect(20*s, 52*s, 112*s, 48*s), _sample.Steering, s);
-        DrawButton(new Rect(20*s, 107*s, 112*s, 27*s), "ACCELERATE", _sample.Accelerate, new Color(1f,.57f,.12f), s);
-        DrawButton(new Rect(20*s, 141*s, 112*s, 27*s), "REVERSE", _sample.Reverse, new Color(.24f,.67f,1f), s);
-        GUI.Label(new Rect(162*s, 52*s, 250*s, 14*s), _sample.IsReplay ? "GHOST INPUTS" : "LIVE INPUTS", _section);
-        DrawButton(new Rect(162*s, 73*s, 120*s, 29*s), "JUMP / DRIFT", _sample.JumpDrift, new Color(.18f,.72f,.95f), s);
-        DrawButton(new Rect(290*s, 73*s, 120*s, 29*s), "BOOST", _sample.Boost, new Color(1f,.57f,.12f), s);
-        DrawButton(new Rect(162*s, 108*s, 120*s, 29*s), "BRAKE", _sample.Brake, new Color(.84f,.88f,.94f), s);
-        if (!_sample.IsReplay)
-            DrawButton(new Rect(290*s, 108*s, 120*s, 29*s), "USE WEAPON", _sample.Weapon, new Color(.98f,.3f,.34f), s);
-        GUI.EndGroup();
+        var previousMatrix = GUI.matrix;
+        GUI.matrix = previousMatrix * Matrix4x4.TRS(new Vector3(x, y, 0), Quaternion.identity, new Vector3(scale, scale, 1));
+        GUI.BeginGroup(new Rect(0, 0, baseWidth, baseHeight));
+        try
+        {
+            DrawCard(new Rect(0, 0, baseWidth, baseHeight), _opacity.Value);
+            GUI.Label(new Rect(12, 7, 260, 20), "INPUT VIEWER", _title);
+            DrawStatus(new Rect(336, 7, 92, 18), !_hasSample ? "WAIT" : _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
+            GUI.Label(new Rect(12, 27, 320, 14), !_hasSample ? "WAITING FOR INPUT" : _sample.IsReplay ? "RECORDED INPUTS" : _sample.Device, _small);
+            DrawPanel(new Rect(10, 46, 132, 138), _opacity.Value);
+            DrawPanel(new Rect(150, 46, 278, 114), _opacity.Value);
+            DrawSteering(new Rect(20, 52, 112, 48), _sample.Steering);
+            DrawButton(new Rect(20, 107, 112, 27), "ACCELERATE", _sample.Accelerate, new Color(1f,.57f,.12f));
+            DrawButton(new Rect(20, 141, 112, 27), "REVERSE", _sample.Reverse, new Color(.24f,.67f,1f));
+            GUI.Label(new Rect(162, 52, 250, 14), _sample.IsReplay ? "GHOST INPUTS" : "LIVE INPUTS", _section);
+            DrawButton(new Rect(162, 73, 120, 29), "JUMP / DRIFT", _sample.JumpDrift, new Color(.18f,.72f,.95f));
+            DrawButton(new Rect(290, 73, 120, 29), "BOOST", _sample.Boost, new Color(1f,.57f,.12f));
+            DrawButton(new Rect(162, 108, 120, 29), "BRAKE", _sample.Brake, new Color(.84f,.88f,.94f));
+            if (!_sample.IsReplay)
+                DrawButton(new Rect(290, 108, 120, 29), "USE WEAPON", _sample.Weapon, new Color(.98f,.3f,.34f));
+        }
+        finally
+        {
+            GUI.EndGroup();
+            GUI.matrix = previousMatrix;
+        }
     }
 
     private static void DrawCard(Rect rect, float alpha)
@@ -233,22 +240,22 @@ internal static class GamepadOverlay
         GUI.color = old;
     }
 
-    private static void DrawSteering(Rect rect, float value, float scale)
+    private static void DrawSteering(Rect rect, float value)
     {
-        GUI.Label(new Rect(rect.x, rect.y, rect.width, 13*scale), "STEERING  " + value.ToString("+0.00;-0.00;0.00"), _small);
-        float cx = rect.x + 23*scale, cy = rect.y + 32*scale;
-        DrawCircle(new Vector2(cx, cy), 15*scale, new Color(.07f,.11f,.17f,1), new Color(.26f,.36f,.49f,1), scale);
-        DrawCircle(new Vector2(cx + value * 9*scale, cy), 6*scale,
-            Mathf.Abs(value) > .08f ? new Color(.1f,.76f,1f,1) : new Color(.55f,.65f,.78f,1), Color.clear, scale);
+        GUI.Label(new Rect(rect.x, rect.y, rect.width, 13), "STEERING  " + value.ToString("+0.00;-0.00;0.00"), _small);
+        float cx = rect.x + 23, cy = rect.y + 32;
+        DrawCircle(new Vector2(cx, cy), 15, new Color(.07f,.11f,.17f,1), new Color(.26f,.36f,.49f,1));
+        DrawCircle(new Vector2(cx + value * 9, cy), 6,
+            Mathf.Abs(value) > .08f ? new Color(.1f,.76f,1f,1) : new Color(.55f,.65f,.78f,1), Color.clear);
     }
 
-    private static void DrawButton(Rect rect, string label, bool pressed, Color accent, float scale)
+    private static void DrawButton(Rect rect, string label, bool pressed, Color accent)
     {
         Color old = GUI.color;
         GUI.color = pressed ? new Color(accent.r, accent.g, accent.b, .28f) : new Color(.055f,.08f,.12f,.98f);
         GUI.DrawTexture(rect, Texture2D.whiteTexture);
         GUI.color = pressed ? accent : new Color(.26f,.35f,.48f,.9f);
-        float border = Mathf.Max(1, scale);
+        const float border = 1;
         GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, border), Texture2D.whiteTexture);
         GUI.DrawTexture(new Rect(rect.x, rect.yMax-border, rect.width, border), Texture2D.whiteTexture);
         GUI.DrawTexture(new Rect(rect.x, rect.y, border, rect.height), Texture2D.whiteTexture);
@@ -281,13 +288,13 @@ internal static class GamepadOverlay
         GUI.color = old;
     }
 
-    private static void DrawCircle(Vector2 center, float radius, Color fill, Color outline, float scale)
+    private static void DrawCircle(Vector2 center, float radius, Color fill, Color outline)
     {
         EnsureDisc();
         Color old = GUI.color;
         Rect outer = new Rect(center.x-radius, center.y-radius, radius*2, radius*2);
         if (outline.a > 0) { GUI.color = outline; GUI.DrawTexture(outer, _disc); }
-        float inset = outline.a > 0 ? Mathf.Max(1f, scale) : 0f;
+        float inset = outline.a > 0 ? 1f : 0f;
         GUI.color = fill;
         GUI.DrawTexture(new Rect(outer.x+inset, outer.y+inset, outer.width-inset*2, outer.height-inset*2), _disc);
         GUI.color = old;

@@ -15,6 +15,7 @@ public sealed class MirrorRace : IModRecipe
     public bool ChangesGameplay => true;
 
     private static MirrorRace? _instance;
+    private static readonly FieldInfo? MarkerCanvasRoot = AccessTools.Field(typeof(Waypoint_Indicator), "wpParentRectTransform");
     private readonly HashSet<int> _localCameras = new();
     private readonly HashSet<MirrorImageEffect> _effects = new();
     private readonly HashSet<MirrorImageEffect> _activeEffects = new();
@@ -34,6 +35,10 @@ public sealed class MirrorRace : IModRecipe
         MethodInfo steer = AccessTools.DeclaredMethod(typeof(PixelEasyCharMoveKartController), "SteerInput", new[] { typeof(float) })
             ?? throw new MissingMethodException(typeof(PixelEasyCharMoveKartController).FullName, "SteerInput(float)");
         harmony.Patch(steer, prefix: new HarmonyMethod(typeof(MirrorRace), nameof(BeforeSteerInput)));
+
+        MethodInfo markerUpdate = AccessTools.DeclaredMethod(typeof(Waypoint_Indicator), "Update", Type.EmptyTypes)
+            ?? throw new MissingMethodException(typeof(Waypoint_Indicator).FullName, "Update()");
+        harmony.Patch(markerUpdate, postfix: new HarmonyMethod(typeof(MirrorRace), nameof(AfterWaypointUpdate)));
     }
 
     public void Tick()
@@ -96,6 +101,30 @@ public sealed class MirrorRace : IModRecipe
         if (module == null || !module._active || !module.RaceContextAllowed || __instance.parentPlayer == null || !__instance.gameObject.activeInHierarchy) return;
         if (__instance.parentPlayer.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL) __0 = -__0;
     }
+
+    private static void AfterWaypointUpdate(Waypoint_Indicator __instance)
+    {
+        var module = _instance;
+        if (module == null || !module._active || !module.RaceContextAllowed || __instance == null) return;
+        try
+        {
+            // These waypoint indicators belong to opponent nameplates. Their UI is
+            // projected into a separate screen-space canvas after the camera image
+            // has been mirrored, so move the shared icon/text container as a unit.
+            if (__instance.GetComponentInParent<PTK_MarkerIndicator>() == null) return;
+            if (MarkerCanvasRoot?.GetValue(__instance) is not RectTransform root || root.parent is not RectTransform parent) return;
+            Vector3 position = root.localPosition;
+            position.x = MirrorMarkerLocalX(position.x, parent.rect.width, parent.pivot.x);
+            root.localPosition = position;
+        }
+        catch
+        {
+            // Some world-space marker prefabs do not have a screen-space root.
+        }
+    }
+
+    internal static float MirrorMarkerLocalX(float localX, float parentWidth, float parentPivotX) =>
+        parentWidth * (1f - 2f * parentPivotX) - localX;
 
     public void Restore()
     {
