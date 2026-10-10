@@ -183,5 +183,33 @@ class GarageTests(unittest.TestCase):
         self.assertIn("velocity", json.loads(body)["code"])
         self.assertEqual(request("GET", "/api/pseudocode?id=../../outside.c", auth)[0], 400)
 
+    def test_client_presence_tracks_multiple_windows_and_rejects_bad_identity(self):
+        first, second = "window-client-0001", "window-client-0002"
+        self.assertFalse(self.app.should_shutdown_for_idle_windows())
+        self.assertEqual(self.app.client_presence(first, True), 1)
+        self.assertFalse(self.app.should_shutdown_for_idle_windows())
+        self.assertEqual(self.app.client_presence(second, True), 2)
+        self.assertEqual(self.app.client_presence(first, False), 1)
+        self.assertFalse(self.app.should_shutdown_for_idle_windows())
+        self.assertEqual(self.app.client_presence(second, False), 0)
+        self.assertTrue(self.app.should_shutdown_for_idle_windows())
+        with self.assertRaises(ValueError): self.app.client_presence("bad", True)
+        with self.assertRaises(ValueError): self.app.client_presence(first, "open")
+
+    def test_http_client_presence_requires_session_token(self):
+        server = webapp.Server(self.app, 0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        body = json.dumps({"clientId": "window-client-0001", "open": True})
+        def request(headers):
+            connection = HTTPConnection("127.0.0.1", server.server_port)
+            connection.request("POST", "/api/client-presence", body, headers)
+            response = connection.getresponse(); result = response.status, response.read(); connection.close(); return result
+        self.assertEqual(request({"Content-Type": "application/json"})[0], 403)
+        status, payload = request({"Content-Type": "application/json", "X-TK2-Token": self.app.token})
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(payload)["clients"], 1)
+
 
 if __name__ == "__main__": unittest.main()

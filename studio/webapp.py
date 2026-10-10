@@ -6,26 +6,64 @@ import json
 import mimetypes
 import os
 from pathlib import Path
+import re
 import secrets
 import socket
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from urllib.parse import urlsplit, parse_qs
 from . import core, pack, settings, setup, symbols, releases, pseudocode
 from .version import APP_VERSION
 
 WEB = core.ROOT / "studio/web"
+CLIENT_ID = re.compile(r"^[A-Za-z0-9_-]{12,80}$")
+CLIENT_IDLE_SECONDS = 600
+
+
 class Application:
     def __init__(self, game=None):
         found = setup.discover() if game is None else []
         self.game = core.validate_game(Path(game)) if game is not None else (found[0] if found else None)
         self.token = secrets.token_urlsafe(32)
         self.lock = threading.RLock()
+        self._client_lock = threading.Lock()
+        self._clients = {}
+        self._clients_seen = False
         self.release_checker = releases.ReleaseChecker(APP_VERSION, core.ROOT, bool(getattr(sys, "frozen", False)))
         previous_log = core.ROOT / "local/garage-build.log"
         self.logs = previous_log.read_text(encoding="utf-8", errors="replace").splitlines()[-80:] if previous_log.is_file() else []
+
+    def client_presence(self, client_id, opened):
+        if not isinstance(client_id, str) or not CLIENT_ID.fullmatch(client_id):
+            raise ValueError("Invalid Toolkit window identity.")
+        if not isinstance(opened, bool):
+            raise ValueError("Invalid Toolkit window state.")
+        now = time.monotonic()
+        with self._client_lock:
+            expired = [identity for identity, seen in self._clients.items()
+                       if now - seen > CLIENT_IDLE_SECONDS]
+            for identity in expired:
+                self._clients.pop(identity, None)
+            if opened:
+                if client_id not in self._clients and len(self._clients) >= 32:
+                    raise ValueError("Too many Toolkit windows are connected.")
+                self._clients[client_id] = now
+                self._clients_seen = True
+            else:
+                self._clients.pop(client_id, None)
+            return len(self._clients)
+
+    def should_shutdown_for_idle_windows(self):
+        now = time.monotonic()
+        with self._client_lock:
+            expired = [identity for identity, seen in self._clients.items()
+                       if now - seen > CLIENT_IDLE_SECONDS]
+            for identity in expired:
+                self._clients.pop(identity, None)
+            return self._clients_seen and not self._clients
 
     def log(self, message):
         self.logs.append(str(message))
@@ -295,6 +333,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get("Content-Type") != "application/json": raise ValueError("Expected JSON")
             body = json.loads(self.rfile.read(length))
             action = urlsplit(self.path).path.removeprefix("/api/")
+            if action == "client-presence":
+                clients = self.server.app.client_presence(body.get("clientId"), body.get("open"))
+                self.reply(200, {"clients": clients})
+                return
             if action == "shutdown":
                 # Another window must not stop the process halfway through a build/install.
                 with self.server.app.lock:
@@ -321,6 +363,20 @@ def open_window(url):
     if edge:
         subprocess.Popen([str(edge), "--app=" + url, "--window-size=1320,900"], creationflags=core.CREATE_NO_WINDOW)
     else: webbrowser.open(url)
+
+
+def stop_server_when_windows_close(server):
+    """Exit the detached local backend after its UI windows have gone away."""
+    while True:
+        time.sleep(2)
+        if not server.app.should_shutdown_for_idle_windows():
+            continue
+        # Give another window being opened during a close/reopen transition time
+        # to register its heartbeat before deciding that the app is gone.
+        time.sleep(3)
+        if server.app.should_shutdown_for_idle_windows():
+            server.shutdown()
+            return
 
 
 def main():
@@ -387,6 +443,9 @@ def main():
                 time.sleep(.1)
     core.write_json(session, {"origin": server.origin, "token": server.app.token})
     if not args.no_browser: open_window(server.origin)
+    if not args.no_browser:
+        threading.Thread(target=stop_server_when_windows_close, args=(server,), daemon=True,
+                         name="ToolkitWindowMonitor").start()
     try: server.serve_forever()
     finally:
         server.server_close()

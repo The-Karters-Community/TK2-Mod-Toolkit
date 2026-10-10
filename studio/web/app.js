@@ -32,6 +32,14 @@ async function api(path, body) {
   if (!response.ok) {const error = new Error(data.error || 'Request failed. Try again.'); error.details = data; throw error;}
   return data;
 }
+const windowClientId = globalThis.crypto?.randomUUID?.() || `tk2-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+function reportWindowPresence(open) {
+  fetch('/api/client-presence', {method: 'POST', headers: {'X-TK2-Token': token, 'Content-Type': 'application/json'},
+    body: JSON.stringify({clientId: windowClientId, open}), ...(!open ? {keepalive: true} : {})}).catch(() => {});
+}
+reportWindowPresence(true);
+const windowPresenceTimer = setInterval(() => reportWindowPresence(true), 15000);
+window.addEventListener('pagehide', () => {clearInterval(windowPresenceTimer); reportWindowPresence(false);});
 function el(tag, cls, text) {const node = document.createElement(tag); if (cls) node.className = cls; if (text !== undefined) node.textContent = text; return node;}
 function updateSaveState() {
   const count = settingEdits.size + recipeEdits.size + extraEdits.size;
