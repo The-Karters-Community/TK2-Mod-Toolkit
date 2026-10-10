@@ -8,9 +8,9 @@ internal static class OnlineProtectionPolicy
 {
     private const string ProtectionSection = "OnlineProtection";
     private const string PluginGuid = "local.tk2.customization";
-    // These modules change only local presentation, sound mix, camera framing,
-    // or measurement. Keep this explicit: module IDs with unknown behavior
-    // must continue to require online protection.
+    // These modules are explicitly approved for online use. The gamepad viewer
+    // can expose recorded opponent controls but does not modify gameplay.
+    // Keep this explicit: unknown module IDs remain protected.
     private static readonly HashSet<string> WhitelistedModules = new(StringComparer.Ordinal)
     {
         "UI",
@@ -19,6 +19,7 @@ internal static class OnlineProtectionPolicy
         "Audio",
         "Camera",
         "BobbyGang",
+        "GamepadOverlay",
         "PerformanceDiagnostics",
     };
 
@@ -29,16 +30,10 @@ internal static class OnlineProtectionPolicy
         IEnumerable<string> pluginGuids)
     {
         var snapshot = settings.ToArray();
-        bool replaySettingPresent = snapshot.Any(setting => setting.Section == "GamepadOverlay" && setting.Key == "ShowReplayInputs");
-        bool replayInputInspection = !replaySettingPresent || snapshot.Any(setting => setting.Section == "GamepadOverlay" &&
-            setting.Key == "ShowReplayInputs" && setting.Enabled);
         foreach (var setting in snapshot)
         {
             if (!setting.Enabled || !string.Equals(setting.Key, "Enabled", StringComparison.Ordinal)) continue;
             if (string.Equals(setting.Section, ProtectionSection, StringComparison.Ordinal) || IsWhitelistedModule(setting.Section)) continue;
-            // The local-only live meter is presentation. Showing recorded opponent/leaderboard
-            // actions adds racing information and remains protected until the user turns it off.
-            if (setting.Section == "GamepadOverlay" && !replayInputInspection) continue;
             return true;
         }
 

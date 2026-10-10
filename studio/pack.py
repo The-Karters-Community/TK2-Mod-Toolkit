@@ -34,11 +34,11 @@ FEATURES = [
     ]},
     {"id": "GamepadOverlay", "name": "Gamepad viewer", "category": "Interface", "description": "Show live local racing controls or the action values recorded on a playing leaderboard ghost. Uses the game's Rewired mappings, so supported controllers and keyboard input share the same action-aware display.", "origin": "New", "settings": [
         ("StartVisible", "Show automatically", "bool", True, None, None, "Show while local race or replay input is available."),
-        ("ShowReplayInputs", "Show leaderboard ghost inputs", "bool", True, None, None, "Display recorded actions during replay. This reveals extra racing information, so online protection blocks uploads and online-room actions until this option is off."),
+        ("ShowReplayInputs", "Show leaderboard ghost inputs", "bool", True, None, None, "Display recorded actions during leaderboard ghost playback."),
         ("ToggleKey", "Toggle hotkey", "text", "F9", None, None, "Toggle the in-game input card. Choose None to disable the hotkey.", ["F" + str(i) for i in range(1,13)] + ["None"]),
         ("Corner", "Screen position", "text", "TopCenter", None, None, "Choose a screen preset or Custom to place the overlay with the percentage sliders.", ["TopLeft", "TopCenter", "TopRight", "MiddleLeft", "MiddleCenter", "MiddleRight", "BottomLeft", "BottomCenter", "BottomRight", "Custom"]),
         ("PositionX", "Custom horizontal position", "float", 50, 0, 100, "Used with Custom. 0 is the left edge; 100 is the right edge."),
-        ("PositionY", "Custom vertical position", "float", 50, 0, 100, "Used with Custom. 0 is the top edge; 100 is the bottom edge."),
+        ("PositionY", "Custom vertical position", "float", 0, 0, 100, "Used with Custom. 0 is the top edge; 100 is the bottom edge."),
         ("Scale", "Overlay scale", "float", 1, .7, 1.4),
         ("Opacity", "Background opacity", "float", .92, .45, 1),
     ]},

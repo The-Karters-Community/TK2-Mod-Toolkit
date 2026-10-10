@@ -14,7 +14,7 @@ class GamepadOverlayCatalogTests(unittest.TestCase):
         self.assertEqual(pack.defaults()["GamepadOverlay/ToggleKey"], "F9")
         self.assertEqual(pack.defaults()["GamepadOverlay/Corner"], "TopCenter")
         self.assertEqual(pack.defaults()["GamepadOverlay/PositionX"], 50)
-        self.assertEqual(pack.defaults()["GamepadOverlay/PositionY"], 50)
+        self.assertEqual(pack.defaults()["GamepadOverlay/PositionY"], 0)
         position = next(setting for setting in feature["settings"] if setting[0] == "Corner")
         self.assertEqual(position[7], ["TopLeft", "TopCenter", "TopRight", "MiddleLeft", "MiddleCenter", "MiddleRight", "BottomLeft", "BottomCenter", "BottomRight", "Custom"])
 

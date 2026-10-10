@@ -29,6 +29,7 @@ class Application:
         self.game = core.validate_game(Path(game)) if game is not None else (found[0] if found else None)
         self.token = secrets.token_urlsafe(32)
         self.lock = threading.RLock()
+        self._game_launch_requested_at = None
         self._client_lock = threading.Lock()
         self._clients = {}
         self._clients_seen = False
@@ -165,10 +166,17 @@ class Application:
             if action == "launch-game":
                 if self.game is None: raise ValueError("Choose a game folder first.")
                 if core.game_running(): raise ValueError("The Karters 2 is already running.")
+                if self._game_launch_requested_at is not None and time.monotonic() - self._game_launch_requested_at < 45:
+                    raise ValueError("Steam is still starting The Karters 2. Wait for it to appear before launching again.")
                 executable = self.game / "TheKarters2.exe"
                 if not executable.is_file(): raise ValueError("The selected folder no longer contains TheKarters2.exe.")
-                subprocess.Popen([str(executable)], cwd=str(self.game), creationflags=core.CREATE_NO_WINDOW)
-                return {"message": "The Karters 2 is starting."}
+                # Let Steam own the process launch. Starting the Unity executable
+                # directly can trigger Steam's own relaunch and single-instance guard.
+                if not hasattr(os, "startfile"):
+                    raise ValueError("Launch the game through Steam on Windows.")
+                os.startfile("steam://rungameid/2269950")
+                self._game_launch_requested_at = time.monotonic()
+                return {"message": "Steam is starting The Karters 2."}
             if action == "settings": return self.save_settings(body)
             if action == "toggle-plugin":
                 if self.game is None: raise ValueError("Choose a game first.")

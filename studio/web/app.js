@@ -55,10 +55,31 @@ function recordEdit(edits, key, before, value) {
   else edits.set(key, {base, value, revision: ++revision});
   updateSaveState();
 }
+const gamepadPresetCoordinates = {
+  TopLeft: [0, 0], TopCenter: [50, 0], TopRight: [100, 0],
+  MiddleLeft: [0, 50], MiddleCenter: [50, 50], MiddleRight: [100, 50],
+  BottomLeft: [0, 100], BottomCenter: [50, 100], BottomRight: [100, 100]
+};
+function settingDisplayValue(key) {
+  const axis = key === 'GamepadOverlay/PositionX' ? 0 : key === 'GamepadOverlay/PositionY' ? 1 : -1;
+  const preset = axis >= 0 ? gamepadPresetCoordinates[state.settings['GamepadOverlay/Corner']] : undefined;
+  return preset ? preset[axis] : state.settings[key];
+}
 function changeSetting(key, value, updateLibrary = true) {
-  recordEdit(settingEdits, key, state.settings[key], value); state.settings[key] = value; syncModuleState(key.split('/')[0]); syncDependencies();
+  let changes = [[key, value]];
+  if (key === 'GamepadOverlay/Corner') {
+    const coordinates = gamepadPresetCoordinates[value] || gamepadPresetCoordinates[state.settings['GamepadOverlay/Corner']] || [state.settings['GamepadOverlay/PositionX'] ?? 50, state.settings['GamepadOverlay/PositionY'] ?? 0];
+    changes = [[key, value], ['GamepadOverlay/PositionX', coordinates[0]], ['GamepadOverlay/PositionY', coordinates[1]]];
+  } else if (key === 'GamepadOverlay/PositionX' || key === 'GamepadOverlay/PositionY') {
+    const x = key.endsWith('PositionX') ? value : settingDisplayValue('GamepadOverlay/PositionX') ?? 50;
+    const y = key.endsWith('PositionY') ? value : settingDisplayValue('GamepadOverlay/PositionY') ?? 0;
+    changes = [['GamepadOverlay/Corner', 'Custom'], ['GamepadOverlay/PositionX', x], ['GamepadOverlay/PositionY', y]];
+  }
+  changes.forEach(([changedKey, changedValue]) => {recordEdit(settingEdits, changedKey, state.settings[changedKey], changedValue); state.settings[changedKey] = changedValue;});
+  syncModuleState(key.split('/')[0]); syncDependencies();
+  if (key.startsWith('GamepadOverlay/') && ['Corner', 'PositionX', 'PositionY'].some(name => key.endsWith('/' + name))) syncControls();
   if (updateLibrary && key.endsWith('/Enabled')) {renderCategoryFilters(); if (category === 'Enabled') {renderFeatures(); renderRecipes();}}
-  else if (updateLibrary) scheduleLivePreview(key, settingEdits);
+  else if (updateLibrary) changes.forEach(([changedKey]) => scheduleLivePreview(changedKey, settingEdits));
 }
 function changeEntry(entry, value, extra = false, updateLibrary = true) {
   recordEdit(extra ? extraEdits : recipeEdits, entry.section + '/' + entry.key, entry.value, value); entry.value = value;
@@ -265,7 +286,7 @@ function featureSettings(feature, search) {
     const controls = el('div', 'settings-grid');
     settings.forEach(([key, label, kind, fallback, low, high, description, choices, requires]) => {
       const fullKey = feature.id + '/' + key;
-      const control = settingsControl(fullKey, label, kind, state.settings[fullKey] ?? fallback, low, high, description, choices, value => changeSetting(fullKey, value), 'setting', fallback);
+      const control = settingsControl(fullKey, label, kind, settingDisplayValue(fullKey) ?? fallback, low, high, description, choices, value => changeSetting(fullKey, value), 'setting', fallback);
       if (feature.locked) control.querySelectorAll('input,select,button').forEach(input => {input.disabled = true;});
       if (requires) {
         const requireKey = requires.includes('/') ? requires : feature.id + '/' + requires;
@@ -487,7 +508,7 @@ function mergeState(next) {
   state = next;
 }
 function syncControls() {
-  document.querySelectorAll('[data-setting]').forEach(input => {const value = state.settings[input.dataset.setting]; if (input === document.activeElement || value === undefined) return; if (input.type === 'checkbox') input.checked = Boolean(value); else input.value = value;});
+  document.querySelectorAll('[data-setting]').forEach(input => {const value = settingDisplayValue(input.dataset.setting); if (input === document.activeElement || value === undefined) return; if (input.type === 'checkbox') input.checked = Boolean(value); else input.value = value;});
   ['recipe', 'extra'].forEach(kind => {document.querySelectorAll('[data-' + kind + ']').forEach(input => {const entry = (state[kind === 'extra' ? 'extraSettings' : 'recipes'] || []).find(entry => entry.section + '/' + entry.key === input.dataset[kind]); if (entry && input !== document.activeElement) {if (input.type === 'checkbox') input.checked = entry.value.toLowerCase() === 'true'; else input.value = entry.value;}});});
   state.features.forEach(feature => syncModuleState(feature.id)); syncDependencies(); renderCategoryFilters(); updateSaveState();
 }

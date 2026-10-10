@@ -38,7 +38,7 @@ const fixture = {installed: false, packCurrent: false, pluginCount: 0, prebuiltC
   recipes: [{section: 'Recipe.FrameLimiter', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Limit FPS'}],
   extraSettings: [{section: 'MK.BoostTrainer', key: 'Enabled', type: 'Boolean', value: 'false', choices: [], range: '', description: 'Trainer'}],
   extraPacks: {'MK.BoostTrainer': 'mks'},
-  settings: {'OnlineProtection/Enabled': true, 'OnlineProtection/BlockLeaderboardUploads': true, 'OnlineProtection/BlockOnlineLobbyJoins': true, 'Audio/Enabled': false, 'Audio/MasterVolume': 1, 'Physics/Enabled': false, 'Camera/Enabled': false, 'Camera/FieldOfView': 65, 'Camera/AimAtKart':true, 'Camera/PanelHotkey':'F8', 'Audio/LargeCount':120, 'BobbyGang/OriginalName':'Legacy Racer', 'BobbyGang/ReplacementName':'Bobby'}, configHash: 'first-hash',
+  settings: {'OnlineProtection/Enabled': true, 'OnlineProtection/BlockLeaderboardUploads': true, 'OnlineProtection/BlockOnlineLobbyJoins': true, 'Audio/Enabled': false, 'Audio/MasterVolume': 1, 'Physics/Enabled': false, 'Camera/Enabled': false, 'Camera/FieldOfView': 65, 'Camera/AimAtKart':true, 'Camera/PanelHotkey':'F8', 'Audio/LargeCount':120, 'BobbyGang/OriginalName':'Legacy Racer', 'BobbyGang/ReplacementName':'Bobby', 'GamepadOverlay/Corner':'TopCenter', 'GamepadOverlay/PositionX':50, 'GamepadOverlay/PositionY':50}, configHash: 'first-hash',
   packs: [{id:'garage', name:'Toolkit Essentials', features:['OnlineProtection','Audio','Camera']}, {id:'mks', name:"Community Mods", features:['Physics','BobbyGang']}, {id:'community', name:'Community Pack', features:[]}],
   moduleSources: {Camera:['plugins/TK2.Customization/CameraFeature.cs','plugins/TK2.Customization/CameraSettings.cs'], Audio:['plugins/TK2.Customization/AudioFeature.cs'], BobbyGang:['plugins/TK2.Customization/LegacyMK.cs'], 'Recipe.FrameLimiter':['plugins/TK2.Customization/Recipes/FrameLimiter.cs']},
   files: ['src/Reconstructed/KartLogic.cs','plugins/TK2.Customization/CameraFeature.cs','plugins/TK2.Customization/CameraSettings.cs','plugins/TK2.Customization/AudioFeature.cs','plugins/TK2.Customization/Recipes/FrameLimiter.cs'], features: [
@@ -114,6 +114,16 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   for (const choice of ['MiddleLeft','MiddleCenter','MiddleRight','Custom']) assert.ok(positions.children.some(option => option.value === choice), `${choice} is selectable in the current Toolkit UI`);
   const positionX = run(`settingsControl('GamepadOverlay/PositionX','Custom horizontal position','float',50,0,100,'Adjust horizontal position.',null,()=>{},'setting',50)`);
   assert.equal(positionX.field.type, 'number'); assert.ok(positionX.field.slider, 'Custom placement has a fine adjustment slider');
+  assert.equal(run('settingDisplayValue("GamepadOverlay/PositionY")'), 0, 'a saved TopCenter preset displays its actual top-edge coordinate');
+  run(`changeSetting('GamepadOverlay/Corner','TopRight')`);
+  assert.equal(run('state.settings["GamepadOverlay/PositionX"]'), 100, 'TopRight synchronizes horizontal position');
+  assert.equal(run('settingDisplayValue("GamepadOverlay/PositionY")'), 0, 'TopRight synchronizes vertical position');
+  run(`changeSetting('GamepadOverlay/PositionX',72)`);
+  assert.equal(run('state.settings["GamepadOverlay/Corner"]'), 'Custom', 'editing a coordinate selects Custom automatically');
+  assert.equal(run('state.settings["GamepadOverlay/PositionX"]'), 72);
+  assert.equal(run('state.settings["GamepadOverlay/PositionY"]'), 0, 'editing one coordinate preserves the other axis');
+  assert.deepEqual(JSON.parse(run('JSON.stringify([...settingEdits.keys()].filter(key => key.startsWith("GamepadOverlay/")))')), ['GamepadOverlay/Corner','GamepadOverlay/PositionX','GamepadOverlay/PositionY'], 'preset and custom placement changes save all coupled values');
+  run(`settingEdits.clear();state.settings['GamepadOverlay/Corner']='TopCenter';state.settings['GamepadOverlay/PositionX']=50;state.settings['GamepadOverlay/PositionY']=0;syncControls()`);
   run(`state.setup={ready:true};state.installed=true;state.packCurrent=false;renderInstallation()`);
   assert.equal(ids['plugin-update-top'].hidden, false, 'available plugin updates are shown in the top bar');
   assert.equal(ids['install-state'].textContent, 'Plugin update available');

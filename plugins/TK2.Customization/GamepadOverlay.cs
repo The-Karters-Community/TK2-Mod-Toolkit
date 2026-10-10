@@ -12,7 +12,7 @@ internal static class GamepadOverlay
     private static ConfigEntry<string> _hotkey = null!, _corner = null!;
     private static ConfigEntry<float> _scale = null!, _opacity = null!;
     private static ConfigEntry<float> _positionX = null!, _positionY = null!;
-    private static bool _visible, _hasSample, _faulted;
+    private static bool _visible, _hasSample, _faulted, _replayActive;
     private static float _nextResolve;
     private static float _ghostJumpPulseUntil, _ghostBoostPulseUntil;
     private static InputOverlayModel _sample;
@@ -24,13 +24,13 @@ internal static class GamepadOverlay
     private static GUIStyle? _title, _small, _pill, _section, _secondary, _status;
     private static Texture2D? _disc;
 
-    internal static bool Visible => _enabled?.Value == true && _visible && _hasSample;
+    internal static bool Visible => _enabled?.Value == true && _visible && (_hasSample || _localInput != null || _replayActive);
 
     internal static void Install(Plugin plugin)
     {
         _enabled = plugin.Config.Bind("GamepadOverlay", "Enabled", false, "Show live driving inputs or recorded leaderboard-ghost inputs in a compact in-game HUD card.");
         _startVisible = plugin.Config.Bind("GamepadOverlay", "StartVisible", true, "Show automatically during a local race or replay when this module is enabled.");
-        _showReplayInputs = plugin.Config.Bind("GamepadOverlay", "ShowReplayInputs", true, "Show hidden control actions recorded in leaderboard ghosts. While enabled, mandatory online protection blocks uploads and online-room actions.");
+        _showReplayInputs = plugin.Config.Bind("GamepadOverlay", "ShowReplayInputs", true, "Show control actions recorded in leaderboard ghosts.");
         _hotkey = plugin.Config.Bind("GamepadOverlay", "ToggleKey", "F9", "Toggle the input card during a race or replay. Set to None to disable.");
         _corner = plugin.Config.Bind("GamepadOverlay", "Corner", "TopCenter", new ConfigDescription(
             "Preset screen position. Choose Custom to use the percentage sliders.",
@@ -38,7 +38,22 @@ internal static class GamepadOverlay
         _scale = plugin.Config.Bind("GamepadOverlay", "Scale", 1f, new ConfigDescription("HUD card scale.", new AcceptableValueRange<float>(0.7f, 1.4f)));
         _opacity = plugin.Config.Bind("GamepadOverlay", "Opacity", 0.92f, new ConfigDescription("HUD card background opacity.", new AcceptableValueRange<float>(0.45f, 1f)));
         _positionX = plugin.Config.Bind("GamepadOverlay", "PositionX", 50f, new ConfigDescription("Custom horizontal position as a percentage of the available screen area.", new AcceptableValueRange<float>(0, 100)));
-        _positionY = plugin.Config.Bind("GamepadOverlay", "PositionY", 50f, new ConfigDescription("Custom vertical position as a percentage of the available screen area.", new AcceptableValueRange<float>(0, 100)));
+        _positionY = plugin.Config.Bind("GamepadOverlay", "PositionY", 0f, new ConfigDescription("Custom vertical position as a percentage of the available screen area.", new AcceptableValueRange<float>(0, 100)));
+        // Cache the local kart when it is created or processes input. A timed
+        // FindObjectsByType scan can otherwise stall the first visible HUD frame.
+        foreach (string methodName in new[] { "Awake", "Start", "ProcessRacingInput" })
+        {
+            MethodInfo? target = AccessTools.DeclaredMethod(typeof(Ant_KartInput), methodName, Type.EmptyTypes);
+            if (target != null)
+            {
+                try { plugin.Harmony.Patch(target, postfix: new HarmonyMethod(typeof(GamepadOverlay), nameof(LocalInputPostfix))); }
+                catch (Exception ex)
+                {
+                    if (methodName == "ProcessRacingInput") throw;
+                    plugin.Log.LogWarning($"Gamepad viewer could not hook Ant_KartInput.{methodName}: {ex.Message}");
+                }
+            }
+        }
         ResetState();
     }
 
@@ -68,8 +83,9 @@ internal static class GamepadOverlay
             try { replayActive = manager.IsPlayingReplay(); }
             catch { replayActive = false; }
         }
+        _replayActive = replayActive && _showReplayInputs.Value;
 
-        if (replayActive && _showReplayInputs.Value)
+        if (_replayActive)
         {
             ResolveReplayIfNeeded(manager);
             if (_replayInput != null && _replayInput.bReplayDataReceived)
@@ -84,11 +100,7 @@ internal static class GamepadOverlay
             return;
         }
 
-        if (_localInput != null && _localInput.inputData == null) _localInput = null;
-        ResolveLocalIfNeeded();
-        if (Ant_CurrentGameConfiguration.eCurrentRaceState != Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING)
-        { _hasSample = false; return; }
-        if (_localInput?.inputData == null) { _hasSample = false; return; }
+        if (_localInput == null || _localInput.inputData == null) { _hasSample = false; return; }
         var data = _localInput.inputData;
         // Discrete inputData fields are mostly click events, and the game deliberately
         // combines Jump/Drift and swaps the boost route during a drift. Sample the
@@ -102,17 +114,20 @@ internal static class GamepadOverlay
         _hasSample = true;
     }
 
-    private static void ResolveLocalIfNeeded()
+    private static void LocalInputPostfix(Ant_KartInput __instance)
     {
-        // Cache valid scene objects for the duration of a race. Only enumerate
-        // all karts while the local input is missing or was destroyed.
-        if (!InputOverlayResolution.ShouldResolve(_localInput != null, Time.unscaledTime, _nextResolve)) return;
-        _nextResolve = InputOverlayResolution.NextRetryAt(Time.unscaledTime);
-        foreach (var input in UnityEngine.Object.FindObjectsByType<Ant_KartInput>(FindObjectsSortMode.None))
+        if (_enabled?.Value != true || __instance == null) return;
+        try
         {
-            if (input != null && input.antPlayer != null && input.antPlayer.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL)
-            { _localInput = input; _liveDevice = DetectLastDevice(input); break; }
+            var player = __instance.antPlayer;
+            if (player == null || player.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL) return;
+            if (_localInput != __instance)
+            {
+                _localInput = __instance;
+                _liveDevice = DetectLastDevice(__instance);
+            }
         }
+        catch { /* A partially-created kart can be retried by its next lifecycle hook. */ }
     }
 
     private static void ResolveReplayIfNeeded(PTK_ReplayManager? manager)
@@ -189,8 +204,8 @@ internal static class GamepadOverlay
         GUI.BeginGroup(rect);
         float s = scale;
         GUI.Label(new Rect(12*s, 7*s, 260*s, 20*s), "INPUT VIEWER", _title);
-        DrawStatus(new Rect(336*s, 7*s, 92*s, 18*s), _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
-        GUI.Label(new Rect(12*s, 27*s, 320*s, 14*s), _sample.IsReplay ? "RECORDED INPUTS" : _sample.Device, _small);
+        DrawStatus(new Rect(336*s, 7*s, 92*s, 18*s), !_hasSample ? "WAIT" : _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
+        GUI.Label(new Rect(12*s, 27*s, 320*s, 14*s), !_hasSample ? "WAITING FOR INPUT" : _sample.IsReplay ? "RECORDED INPUTS" : _sample.Device, _small);
         DrawPanel(new Rect(10*s, 46*s, 132*s, 138*s), _opacity.Value);
         DrawPanel(new Rect(150*s, 46*s, 278*s, 114*s), _opacity.Value);
         DrawSteering(new Rect(20*s, 52*s, 112*s, 48*s), _sample.Steering, s);
@@ -318,5 +333,5 @@ internal static class GamepadOverlay
     }
 
     internal static void Restore() { ResetState(); _faulted = false; }
-    private static void ResetState() { _visible = _startVisible?.Value == true; _hasSample = false; _nextResolve = 0; _localInput = null; _replayInput = null; _resolvedReplayTarget = null; _ghostJumpPulseUntil = _ghostBoostPulseUntil = 0; }
+    private static void ResetState() { _visible = _startVisible?.Value == true; _hasSample = false; _replayActive = false; _nextResolve = 0; _localInput = null; _replayInput = null; _resolvedReplayTarget = null; _ghostJumpPulseUntil = _ghostBoostPulseUntil = 0; }
 }
