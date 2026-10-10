@@ -36,6 +36,7 @@ function el(tag, cls, text) {const node = document.createElement(tag); if (cls) 
 function updateSaveState() {
   const count = settingEdits.size + recipeEdits.size + extraEdits.size;
   settingsDirty = count > 0; $('save-settings').disabled = busy || !settingsDirty;
+  $('launch-game').disabled = busy || !state?.game;
   $('save-settings').textContent = actionInFlight === 'settings' ? 'Saving…' : 'Save changes';
   $('settings-state').textContent = count ? `${count} unsaved setting${count === 1 ? '' : 's'}${livePreviewEnabled ? ' · eligible edits auto-save after a short pause.' : '.'}` : 'All changes saved.';
 }
@@ -623,6 +624,10 @@ $('save-settings').onclick = () => {
   });
   if (invalid) {settingsError(new Error(`${invalid.getAttribute('aria-label') || 'A setting'} is outside its allowed range${invalid.min && invalid.max ? ` (${invalid.min} to ${invalid.max})` : ''}.`)); return;}
   const snapshot = settingsSnapshot(); return runAction('settings', snapshot.body, snapshot);
+};
+$('launch-game').onclick = () => {
+  if (settingsDirty || sourceDirty) {notice('Save your pending edits before launching the game.', true); return;}
+  runAction('launch-game');
 };
 $('reload-settings').onclick = async () => {
   if (!confirm('Discard your edits to the conflicting settings and reload their current values? Other edits will be kept.')) return;

@@ -51,3 +51,13 @@ internal static class InputOverlayPlacement
 
     private static float Lerp(float start, float end, float fraction) => start + (end - start) * Math.Clamp(fraction, 0, 1);
 }
+
+internal static class InputOverlayResolution
+{
+    internal const float RetryDelaySeconds = 1f;
+
+    internal static bool ShouldResolve(bool hasCachedTarget, float now, float retryAt) =>
+        !hasCachedTarget && now >= retryAt;
+
+    internal static float NextRetryAt(float now) => now + RetryDelaySeconds;
+}

@@ -124,6 +124,13 @@ class Application:
                 if self.game is None: raise ValueError("Choose a game first")
                 os.startfile(self.game)
                 return {"message": "Game folder opened. Start the game yourself."}
+            if action == "launch-game":
+                if self.game is None: raise ValueError("Choose a game folder first.")
+                if core.game_running(): raise ValueError("The Karters 2 is already running.")
+                executable = self.game / "TheKarters2.exe"
+                if not executable.is_file(): raise ValueError("The selected folder no longer contains TheKarters2.exe.")
+                subprocess.Popen([str(executable)], cwd=str(self.game), creationflags=core.CREATE_NO_WINDOW)
+                return {"message": "The Karters 2 is starting."}
             if action == "settings": return self.save_settings(body)
             if action == "toggle-plugin":
                 if self.game is None: raise ValueError("Choose a game first.")

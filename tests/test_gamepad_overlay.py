@@ -15,6 +15,8 @@ class GamepadOverlayCatalogTests(unittest.TestCase):
         self.assertEqual(pack.defaults()["GamepadOverlay/Corner"], "TopCenter")
         self.assertEqual(pack.defaults()["GamepadOverlay/PositionX"], 50)
         self.assertEqual(pack.defaults()["GamepadOverlay/PositionY"], 50)
+        position = next(setting for setting in feature["settings"] if setting[0] == "Corner")
+        self.assertEqual(position[7], ["TopLeft", "TopCenter", "TopRight", "MiddleLeft", "MiddleCenter", "MiddleRight", "BottomLeft", "BottomCenter", "BottomRight", "Custom"])
 
     def test_catalog_exposes_safe_controls_before_first_plugin_launch(self):
         validated = pack.validate({

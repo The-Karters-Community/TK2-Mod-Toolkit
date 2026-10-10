@@ -86,6 +86,9 @@ function edit(key, value) {let node = control(key); if (!node) {descendants(ids[
 const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/settings').at(-1).options.body);
 (async () => {
   await settle();
+  assert.equal(ids['launch-game'].disabled, false, 'launch is available after a game installation is selected');
+  await ids['launch-game'].click(); await settle();
+  assert.ok(calls.some(call => call.url === '/api/launch-game'), 'Launch game calls the selected-installation endpoint');
   assert.equal(ids['feature-list'].children.length, 2, 'modules must be grouped into packs');
   assert.equal(ids['feature-list'].children[0].dataset.pack, 'garage');
   const categories = descendants(ids.filters).filter(node => node.dataset.category !== undefined).map(node => node.dataset.category);
@@ -107,6 +110,10 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   assert.ok(characterName.field.children.some(option => option.value === 'Saved custom racer' && /Saved custom/.test(option.text)), 'legacy custom names remain selectable');
   const replacementName = run(`settingsControl('BobbyGang/ReplacementName','Replacement name','text','My racer',null,null,'Replacement text.',null,()=>{},'setting','Bobby')`);
   assert.equal(replacementName.field.tagName, 'INPUT'); assert.equal(replacementName.field.type, 'text', 'replacement character name remains editable');
+  const positions = run(`settingsControl('GamepadOverlay/Corner','Screen position','text','Custom',null,null,'Choose a preset or Custom.',['TopLeft','TopCenter','TopRight','MiddleLeft','MiddleCenter','MiddleRight','BottomLeft','BottomCenter','BottomRight','Custom'],()=>{},'setting','TopCenter')`).field;
+  for (const choice of ['MiddleLeft','MiddleCenter','MiddleRight','Custom']) assert.ok(positions.children.some(option => option.value === choice), `${choice} is selectable in the current Toolkit UI`);
+  const positionX = run(`settingsControl('GamepadOverlay/PositionX','Custom horizontal position','float',50,0,100,'Adjust horizontal position.',null,()=>{},'setting',50)`);
+  assert.equal(positionX.field.type, 'number'); assert.ok(positionX.field.slider, 'Custom placement has a fine adjustment slider');
   run(`state.setup={ready:true};state.installed=true;state.packCurrent=false;renderInstallation()`);
   assert.equal(ids['plugin-update-top'].hidden, false, 'available plugin updates are shown in the top bar');
   assert.equal(ids['install-state'].textContent, 'Plugin update available');

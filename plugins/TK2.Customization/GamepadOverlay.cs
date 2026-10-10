@@ -18,6 +18,7 @@ internal static class GamepadOverlay
     private static InputOverlayModel _sample;
     private static Ant_KartInput? _localInput;
     private static PTK_PlayerReplayInput_ReplaySerializer? _replayInput;
+    private static Ant_Player? _resolvedReplayTarget;
     private static string _liveDevice = "GAMEPAD / KEYBOARD";
     private static readonly FieldInfo? RewiredPlayer = AccessTools.Field(typeof(Ant_KartInput), "player");
     private static GUIStyle? _title, _small, _pill, _section, _secondary, _status;
@@ -46,7 +47,7 @@ internal static class GamepadOverlay
         if (!_enabled.Value) { ResetState(); return; }
         if (Enum.TryParse(_hotkey.Value, true, out KeyCode key) && key != KeyCode.None && Input.GetKeyDown(key))
             _visible = !_visible;
-        try { SampleInput(); _faulted = false; }
+        try { EnsureDisc(); SampleInput(); _faulted = false; }
         catch (Exception ex)
         {
             _hasSample = false;
@@ -60,11 +61,6 @@ internal static class GamepadOverlay
 
     private static void SampleInput()
     {
-        if (Time.unscaledTime >= _nextResolve)
-        {
-            ResolveInputs();
-            _nextResolve = Time.unscaledTime + .25f;
-        }
         bool replayActive = false;
         PTK_ReplayManager manager = PTK_ReplayManager.Instance;
         if (manager != null)
@@ -75,6 +71,7 @@ internal static class GamepadOverlay
 
         if (replayActive && _showReplayInputs.Value)
         {
+            ResolveReplayIfNeeded(manager);
             if (_replayInput != null && _replayInput.bReplayDataReceived)
             {
                 var input = _replayInput;
@@ -87,6 +84,8 @@ internal static class GamepadOverlay
             return;
         }
 
+        if (_localInput != null && _localInput.inputData == null) _localInput = null;
+        ResolveLocalIfNeeded();
         if (Ant_CurrentGameConfiguration.eCurrentRaceState != Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING)
         { _hasSample = false; return; }
         if (_localInput?.inputData == null) { _hasSample = false; return; }
@@ -103,18 +102,31 @@ internal static class GamepadOverlay
         _hasSample = true;
     }
 
-    private static void ResolveInputs()
+    private static void ResolveLocalIfNeeded()
     {
-        _localInput = null;
+        // Cache valid scene objects for the duration of a race. Only enumerate
+        // all karts while the local input is missing or was destroyed.
+        if (!InputOverlayResolution.ShouldResolve(_localInput != null, Time.unscaledTime, _nextResolve)) return;
+        _nextResolve = InputOverlayResolution.NextRetryAt(Time.unscaledTime);
         foreach (var input in UnityEngine.Object.FindObjectsByType<Ant_KartInput>(FindObjectsSortMode.None))
         {
             if (input != null && input.antPlayer != null && input.antPlayer.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL)
             { _localInput = input; _liveDevice = DetectLastDevice(input); break; }
         }
-        _replayInput = null;
-        PTK_ReplayManager manager = PTK_ReplayManager.Instance;
+    }
+
+    private static void ResolveReplayIfNeeded(PTK_ReplayManager? manager)
+    {
+        Ant_Player? expected = manager?.antPlayerGhost;
+        if (expected != _resolvedReplayTarget)
+        {
+            _resolvedReplayTarget = expected;
+            _replayInput = null;
+            _nextResolve = 0;
+        }
+        if (!InputOverlayResolution.ShouldResolve(_replayInput != null, Time.unscaledTime, _nextResolve)) return;
+        _nextResolve = InputOverlayResolution.NextRetryAt(Time.unscaledTime);
         if (manager == null) return;
-        Ant_Player expected = manager.antPlayerGhost;
         foreach (var input in UnityEngine.Object.FindObjectsByType<PTK_PlayerReplayInput_ReplaySerializer>(FindObjectsSortMode.None))
         {
             if (input == null) continue;
@@ -158,10 +170,13 @@ internal static class GamepadOverlay
 
     internal static void Draw()
     {
-        if (!Visible) return;
+        if (_enabled?.Value != true) return;
+        // GUI skin styles are initialized on an early menu/countdown OnGUI pass
+        // instead of the first frame on which a valid input sample appears.
         EnsureStyles();
+        if (!Visible) return;
         float scale = Mathf.Clamp(_scale.Value, .7f, 1.4f);
-        const float baseWidth = 510, baseHeight = 244;
+        const float baseWidth = 440, baseHeight = 180;
         float availableScale = Mathf.Min((Screen.width - 24f) / baseWidth, (Screen.height - 24f) / baseHeight);
         scale = Mathf.Max(.35f, Mathf.Min(scale, availableScale));
         float width = baseWidth * scale, height = baseHeight * scale, margin = 18 * scale;
@@ -173,20 +188,20 @@ internal static class GamepadOverlay
         DrawCard(rect, _opacity.Value);
         GUI.BeginGroup(rect);
         float s = scale;
-        GUI.Label(new Rect(16*s, 9*s, 275*s, 22*s), "INPUT VIEWER", _title);
-        DrawStatus(new Rect(400*s, 9*s, 96*s, 20*s), _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
-        GUI.Label(new Rect(16*s, 32*s, 340*s, 17*s), _sample.IsReplay ? "RECORDED GAME ACTIONS" : _sample.Device, _small);
-        DrawPanel(new Rect(14*s, 56*s, 153*s, 170*s), _opacity.Value);
-        DrawPanel(new Rect(174*s, 56*s, 322*s, 170*s), _opacity.Value);
-        DrawSteering(new Rect(30*s, 65*s, 122*s, 78*s), _sample.Steering, s);
-        DrawButton(new Rect(27*s, 150*s, 126*s, 28*s), "ACCELERATE", _sample.Accelerate, new Color(1f,.57f,.12f), s);
-        DrawButton(new Rect(27*s, 185*s, 126*s, 28*s), "REVERSE", _sample.Reverse, new Color(.24f,.67f,1f), s);
-        GUI.Label(new Rect(188*s, 63*s, 278*s, 17*s), _sample.IsReplay ? "GHOST INPUTS" : "LIVE INPUTS", _section);
-        DrawButton(new Rect(188*s, 85*s, 144*s, 26*s), "JUMP / DRIFT", _sample.JumpDrift, new Color(.18f,.72f,.95f), s);
-        DrawButton(new Rect(342*s, 85*s, 144*s, 26*s), "BOOST", _sample.Boost, new Color(1f,.57f,.12f), s);
-        DrawButton(new Rect(188*s, 116*s, 144*s, 26*s), "BRAKE", _sample.Brake, new Color(.84f,.88f,.94f), s);
+        GUI.Label(new Rect(12*s, 7*s, 260*s, 20*s), "INPUT VIEWER", _title);
+        DrawStatus(new Rect(336*s, 7*s, 92*s, 18*s), _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
+        GUI.Label(new Rect(12*s, 27*s, 320*s, 14*s), _sample.IsReplay ? "RECORDED INPUTS" : _sample.Device, _small);
+        DrawPanel(new Rect(10*s, 46*s, 132*s, 138*s), _opacity.Value);
+        DrawPanel(new Rect(150*s, 46*s, 278*s, 114*s), _opacity.Value);
+        DrawSteering(new Rect(20*s, 52*s, 112*s, 48*s), _sample.Steering, s);
+        DrawButton(new Rect(20*s, 107*s, 112*s, 27*s), "ACCELERATE", _sample.Accelerate, new Color(1f,.57f,.12f), s);
+        DrawButton(new Rect(20*s, 141*s, 112*s, 27*s), "REVERSE", _sample.Reverse, new Color(.24f,.67f,1f), s);
+        GUI.Label(new Rect(162*s, 52*s, 250*s, 14*s), _sample.IsReplay ? "GHOST INPUTS" : "LIVE INPUTS", _section);
+        DrawButton(new Rect(162*s, 73*s, 120*s, 29*s), "JUMP / DRIFT", _sample.JumpDrift, new Color(.18f,.72f,.95f), s);
+        DrawButton(new Rect(290*s, 73*s, 120*s, 29*s), "BOOST", _sample.Boost, new Color(1f,.57f,.12f), s);
+        DrawButton(new Rect(162*s, 108*s, 120*s, 29*s), "BRAKE", _sample.Brake, new Color(.84f,.88f,.94f), s);
         if (!_sample.IsReplay)
-            DrawButton(new Rect(342*s, 116*s, 144*s, 26*s), "USE WEAPON", _sample.Weapon, new Color(.98f,.3f,.34f), s);
+            DrawButton(new Rect(290*s, 108*s, 120*s, 29*s), "USE WEAPON", _sample.Weapon, new Color(.98f,.3f,.34f), s);
         GUI.EndGroup();
     }
 
@@ -205,12 +220,11 @@ internal static class GamepadOverlay
 
     private static void DrawSteering(Rect rect, float value, float scale)
     {
-        GUI.Label(new Rect(rect.x, rect.y, rect.width, 16*scale), "STEERING", _small);
-        float cx = rect.x + rect.width * .5f, cy = rect.y + 31*scale;
-        DrawCircle(new Vector2(cx, cy), 25*scale, new Color(.07f,.11f,.17f,1), new Color(.26f,.36f,.49f,1), scale);
-        DrawCircle(new Vector2(cx + value * 17*scale, cy), 8*scale,
+        GUI.Label(new Rect(rect.x, rect.y, rect.width, 13*scale), "STEERING  " + value.ToString("+0.00;-0.00;0.00"), _small);
+        float cx = rect.x + 23*scale, cy = rect.y + 32*scale;
+        DrawCircle(new Vector2(cx, cy), 15*scale, new Color(.07f,.11f,.17f,1), new Color(.26f,.36f,.49f,1), scale);
+        DrawCircle(new Vector2(cx + value * 9*scale, cy), 6*scale,
             Mathf.Abs(value) > .08f ? new Color(.1f,.76f,1f,1) : new Color(.55f,.65f,.78f,1), Color.clear, scale);
-        GUI.Label(new Rect(rect.x, rect.y+62*scale, rect.width, 13*scale), value.ToString("+0.00;-0.00;0.00"), _secondary);
     }
 
     private static void DrawButton(Rect rect, string label, bool pressed, Color accent, float scale)
@@ -254,22 +268,7 @@ internal static class GamepadOverlay
 
     private static void DrawCircle(Vector2 center, float radius, Color fill, Color outline, float scale)
     {
-        if (_disc == null)
-        {
-            const int size = 64;
-            _disc = new Texture2D(size, size, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
-            var pixels = new Color32[size * size];
-            for (int y = 0; y < size; y++)
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = (x + .5f - size * .5f) / (size * .5f);
-                    float dy = (y + .5f - size * .5f) / (size * .5f);
-                    byte alpha = (byte)Mathf.Clamp(Mathf.RoundToInt((1f - Mathf.Sqrt(dx * dx + dy * dy)) * size * 32f + 128f), 0, 255);
-                    pixels[y * size + x] = new Color32(255, 255, 255, alpha);
-                }
-            _disc.SetPixels32(pixels);
-            _disc.Apply(false, true);
-        }
+        EnsureDisc();
         Color old = GUI.color;
         Rect outer = new Rect(center.x-radius, center.y-radius, radius*2, radius*2);
         if (outline.a > 0) { GUI.color = outline; GUI.DrawTexture(outer, _disc); }
@@ -277,6 +276,24 @@ internal static class GamepadOverlay
         GUI.color = fill;
         GUI.DrawTexture(new Rect(outer.x+inset, outer.y+inset, outer.width-inset*2, outer.height-inset*2), _disc);
         GUI.color = old;
+    }
+
+    private static void EnsureDisc()
+    {
+        if (_disc != null) return;
+        const int size = 64;
+        _disc = new Texture2D(size, size, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
+        var pixels = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float dx = (x + .5f - size * .5f) / (size * .5f);
+                float dy = (y + .5f - size * .5f) / (size * .5f);
+                byte alpha = (byte)Mathf.Clamp(Mathf.RoundToInt((1f - Mathf.Sqrt(dx * dx + dy * dy)) * size * 32f + 128f), 0, 255);
+                pixels[y * size + x] = new Color32(255, 255, 255, alpha);
+            }
+        _disc.SetPixels32(pixels);
+        _disc.Apply(false, true);
     }
 
     private static void DrawBar(Rect rect, Color color)
@@ -301,5 +318,5 @@ internal static class GamepadOverlay
     }
 
     internal static void Restore() { ResetState(); _faulted = false; }
-    private static void ResetState() { _visible = _startVisible?.Value == true; _hasSample = false; _nextResolve = 0; _localInput = null; _replayInput = null; _ghostJumpPulseUntil = _ghostBoostPulseUntil = 0; }
+    private static void ResetState() { _visible = _startVisible?.Value == true; _hasSample = false; _nextResolve = 0; _localInput = null; _replayInput = null; _resolvedReplayTarget = null; _ghostJumpPulseUntil = _ghostBoostPulseUntil = 0; }
 }

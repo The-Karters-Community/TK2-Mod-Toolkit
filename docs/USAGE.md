@@ -13,7 +13,7 @@ The current test pack targets game 0.1.4.18, GameAssembly SHA-256 `e55fab2cdcbf3
 
 ## Configure packs
 
-Choose a pack, expand a module and turn it on. Each setting shows its default and allowed values. Use Expand all or Collapse all on the separate row above the modules to open or close the displayed module panels, recipe sections and nested parameter groups. Use search to find a parameter; large tuning modules contain collapsible groups. An advanced value remains inactive until its Override switch is on. Reset module/pack changes the controls to defaults and switches affected modules off. Save changes applies your edits; reset does not secretly write a file.
+Choose a pack, expand a module and turn it on. Each setting shows its default and allowed values. Use Expand all or Collapse all on the separate row above the modules to open or close the displayed module panels, recipe sections and nested parameter groups. Use search to find a parameter; large tuning modules contain collapsible groups. An advanced value remains inactive until its Override switch is on. Reset module/pack changes the controls to defaults and switches affected modules off. Save changes applies your edits; reset does not secretly write a file. **Launch game** beside Save changes starts the selected installation; save pending settings or source edits first.
 
 Character names lets you pick a built-in racer as the matching name, then type any replacement text. Older saved custom match names remain available in the selector. When the installed plugin differs from the bundled version, the app header shows an Update plugin action; it uses the same backed-up install flow as the Installation page.
 
