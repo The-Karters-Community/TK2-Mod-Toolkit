@@ -9,6 +9,10 @@
 .search-label{justify-self:end;width:100%;max-width:240px}
 .search-label input{width:100%}
 .module-library-meta{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:10px 0 22px;padding:0 2px;color:var(--muted);font-size:12px}
+.library-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.library-actions>#show-enabled{font-size:11px;padding:7px 11px}
+.library-actions>#show-enabled[aria-pressed=true]{border-color:var(--focus);background:color-mix(in oklab,var(--focus) 14%,var(--surface));color:var(--text)}
+.library-actions>#disable-all-enabled{font-size:11px;padding:7px 10px}
 .accordion-actions{display:flex;gap:7px}
 .accordion-actions button{padding:7px 11px;font-size:11px}
 .feature-category{display:grid;gap:8px;margin:12px 0 18px}
@@ -50,7 +54,7 @@
 @media(min-width:1500px){.settings-grid{grid-template-columns:repeat(3,minmax(0,1fr));column-gap:24px}}
 @media(max-width:520px){.topbar-status{width:100%;justify-content:space-between}.module-heading{gap:6px}.module-expand{gap:7px;padding-inline:4px}.module-state{min-width:36px;padding-inline:6px}.module-body{margin-inline:6px;padding-inline:12px}.setting select{max-width:none}}
 @media(max-width:1100px){.toolbar{grid-template-columns:minmax(0,1fr);align-items:start}.filters{width:100%}.search-label{justify-self:end}}
-@media(max-width:780px){.module-library-meta{align-items:flex-start;flex-direction:column;gap:9px;margin:8px 0 18px}.accordion-actions{align-self:flex-end}}
-@media(max-width:520px){.module-library-meta{align-items:stretch}.accordion-actions{align-self:stretch}.accordion-actions button{flex:1;min-height:38px}.search-label{justify-self:stretch;max-width:none}}
+@media(max-width:780px){.module-library-meta{align-items:flex-start;flex-direction:column;gap:9px;margin:8px 0 18px}.library-actions{width:100%;justify-content:flex-end}}
+@media(max-width:520px){.module-library-meta{align-items:stretch}.library-actions{align-items:stretch;justify-content:flex-start}.library-actions>#show-enabled,.library-actions>#disable-all-enabled{flex:1;min-height:38px}.accordion-actions{width:100%}.accordion-actions button{flex:1;min-height:38px}.search-label{justify-self:stretch;max-width:none}}
 @media(max-width:780px){.compat-audit-columns{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.module{transition:none}}

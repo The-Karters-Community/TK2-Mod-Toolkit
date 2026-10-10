@@ -80,7 +80,7 @@ const context = {document, console, location:{hash:'#mods'}, history:{replaceSta
 vm.createContext(context); vm.runInContext(fs.readFileSync(path.join(root, 'studio/web/app.js'), 'utf8'), context);
 const run = expression => vm.runInContext(expression, context), settle = () => new Promise(resolve => setImmediate(resolve));
 const control = key => query('[data-setting]').find(node => node.dataset.setting === key);
-function edit(key, value) {const node = control(key); node.value = value; node.oninput();}
+function edit(key, value) {let node = control(key); if (!node) {descendants(ids['feature-list']).find(item => item.dataset.accordionKey === key.split('/')[0])?.click(); node = control(key);} node.value = value; node.oninput();}
 const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/settings').at(-1).options.body);
 (async () => {
   await settle();
@@ -89,6 +89,8 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   const categories = descendants(ids.filters).filter(node => node.dataset.category !== undefined).map(node => node.dataset.category);
   assert.ok(categories.includes('Audio') && categories.includes('Camera') && categories.includes('Safety') && categories.includes('Gameplay'), 'module filters come from catalog categories plus gameplay');
   assert.ok(!categories.includes('Visual'), 'legacy hard-coded categories are not retained');
+  assert.ok(!categories.includes('Enabled'), 'enabled modules are managed separately from category filters');
+  assert.equal(ids['show-enabled'].textContent, 'Enabled modules · 1', 'enabled count includes locked mandatory modules');
   assert.ok(descendants(ids['feature-list']).some(node => node.dataset.featureCategory === 'Audio'), 'modules are grouped into named category sections');
   assert.equal(control('Audio/MasterVolume'), undefined, 'collapsed module controls are lazy-rendered for a large catalog');
   descendants(ids['feature-list']).find(node => node.dataset.accordionKey === 'OnlineProtection').click();
@@ -140,10 +142,19 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   edit('Camera/FieldOfView', '68'); stateFailure = true; await ids['save-settings'].click();
   assert.equal(run('settingsDirty'), false, 'successful save stays successful if follow-up polling fails');
   assert.equal(ids['settings-error'].hidden, true); stateFailure = false;
-  control('Audio/MasterVolume').valid = false;
+  edit('Audio/MasterVolume', '.4'); control('Audio/MasterVolume').valid = false;
   const toggle = control('Camera/Enabled'); toggle.checked = true; toggle.onchange(); await ids['save-settings'].click();
   assert.deepEqual(latestSave().values, {'Camera/Enabled':true}, 'a second toggle save needs no retoggle workaround');
   assert.equal(run('settingsDirty'), false, 'an untouched legacy value must not block another module toggle');
+  ids['show-enabled'].click();
+  assert.equal(ids['show-enabled'].textContent, 'Enabled modules · 2');
+  assert.ok(descendants(ids['feature-list']).some(node => node.dataset.feature === 'Camera'), 'Enabled view includes a newly enabled module');
+  const enabledCamera = control('Camera/Enabled'); enabledCamera.checked = false; enabledCamera.onchange();
+  assert.equal(ids['show-enabled'].textContent, 'Enabled modules · 1', 'count updates immediately when a draft toggle changes');
+  assert.ok(!descendants(ids['feature-list']).some(node => node.dataset.feature === 'Camera'), 'disabled module leaves Enabled view immediately');
+  await ids['save-settings'].click();
+  assert.ok(!descendants(ids['feature-list']).some(node => node.dataset.feature === 'Camera'), 'successful save keeps the filtered list in sync without changing tabs');
+  ids['show-enabled'].click();
   control('Audio/MasterVolume').valid = true;
   assert.equal(run('state.settings["Audio/MasterVolume"]'), .4);
   // An edit while a request is in flight must survive its response.
@@ -252,7 +263,8 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   assert.equal(control('KartParameters/GroundFrictionFactor').disabled,true,'unrelated override stays disabled');
   await ids['save-settings'].click();
   parameterToggle.checked = false; parameterToggle.onchange(); await ids['save-settings'].click();
-  assert.equal(parameterValue.disabled,true,'finishing a save must not enable an inactive custom value');
+  edit('KartParameters/MaxAccelForward', String(run("state.settings['KartParameters/MaxAccelForward']")));
+  assert.equal(control('KartParameters/MaxAccelForward').disabled,true,'finishing a save must not enable an inactive custom value');
   fixture.settings['KartParameters/OverrideMaxAccelForward'] = true; await run('refresh(true,true)');
   assert.equal(parameterValue.disabled,false,'external override changes synchronize dependency availability');
   ids['mod-search'].value = 'MaxAccelForward'; ids['mod-search'].oninput();
@@ -319,5 +331,15 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   fixture.packs = [{id:'garage', name:'Toolkit Essentials', features:['Audio','Camera']}, {id:'community', name:'Community Mods', features:['Physics','KartParameters']}];
   await run('refresh(true)');
   assert.equal(run("extraPackId({section:'MK.BoostTrainer'})"),'community','legacy extra settings route into the consolidated Community Mods pack');
+  fixture.settings['Audio/Enabled'] = true; fixture.settings['Physics/Enabled'] = true;
+  fixture.extraSettings[0].value = 'true'; fixture.recipes[0].value = 'true';
+  await run('refresh(true)'); ids['show-enabled'].click();
+  assert.equal(ids['disable-all-enabled'].hidden, false, 'Enabled view exposes bulk disable');
+  ids['disable-all-enabled'].click();
+  assert.equal(run('state.settings["Audio/Enabled"]'), false); assert.equal(run('state.settings["Physics/Enabled"]'), false);
+  assert.equal(run('state.extraSettings[0].value'), 'false'); assert.equal(run('state.recipes[0].value'), 'false');
+  assert.equal(run('state.settings["OnlineProtection/Enabled"]'), true, 'bulk disable leaves mandatory protection locked on');
+  assert.equal(ids['show-enabled'].textContent, 'Enabled modules · 1');
+  await ids['save-settings'].click();
   console.log(`Offline frontend state: ${assertions} assertions passed. Visual browser verification remains pending.`);
 })().catch(error => {console.error(error);process.exitCode = 1;});

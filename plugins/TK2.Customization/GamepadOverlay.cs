@@ -13,6 +13,9 @@ internal static class GamepadOverlay
     private static ConfigEntry<float> _scale = null!, _opacity = null!;
     private static bool _visible, _hasSample, _faulted;
     private static float _nextResolve;
+    private static float _ghostJumpPulseUntil, _ghostBoostPulseUntil, _ghostWeaponPulseUntil;
+    private static float _ghostTargetUpPulseUntil, _ghostTargetDownPulseUntil, _ghostPickupPulseUntil;
+    private static float _liveTargetUpPulseUntil, _liveTargetDownPulseUntil, _livePickupPulseUntil;
     private static InputOverlayModel _sample;
     private static Ant_KartInput? _localInput;
     private static PTK_PlayerReplayInput_ReplaySerializer? _replayInput;
@@ -73,10 +76,13 @@ internal static class GamepadOverlay
             {
                 var input = _replayInput;
                 _sample = InputOverlayModel.CreateReplay(input.fTurningInput_Get, input.fAccelInput_Get,
-                    input.bJumpButton_Get_Click, input.bDriftInput_Get, input.bBoostInput_Get_Click,
-                    input.bUseWeaponInput_Get_Click, input.bIsBreakingInput_Get,
-                    input.bBackDirInputButtonDown_Get, input.bIsTargetLockUp_Get_Clcik,
-                    input.bIsTargetLockDown_Get_Click, input.bWeaponPickupButtomClicked_Get);
+                    Pulse(input.bJumpButton_Get_Click, ref _ghostJumpPulseUntil), input.bDriftInput_Get,
+                    Pulse(input.bBoostInput_Get_Click, ref _ghostBoostPulseUntil),
+                    Pulse(input.bUseWeaponInput_Get_Click, ref _ghostWeaponPulseUntil), input.bIsBreakingInput_Get,
+                    input.bBackDirInputButtonDown_Get,
+                    Pulse(input.bIsTargetLockUp_Get_Clcik, ref _ghostTargetUpPulseUntil),
+                    Pulse(input.bIsTargetLockDown_Get_Click, ref _ghostTargetDownPulseUntil),
+                    Pulse(input.bWeaponPickupButtomClicked_Get, ref _ghostPickupPulseUntil));
                 _hasSample = true;
             }
             else _hasSample = false;
@@ -87,16 +93,21 @@ internal static class GamepadOverlay
         { _hasSample = false; return; }
         if (_localInput?.inputData == null) { _hasSample = false; return; }
         var data = _localInput.inputData;
-        // inputData is already normalized for gameplay: ProcessRacingInput swaps the
-        // Drift/Boost route while drifting. Read named Rewired actions instead so this
-        // viewer reports the action bound to the physical/keyboard input.
-        bool drift = _localInput.player != null && _localInput.player.GetButton("Drift_left_right");
-        bool boost = _localInput.player != null && _localInput.player.GetButton("Boost");
+        // Discrete inputData fields are mostly click events, and the game deliberately
+        // combines Jump/Drift and swaps the boost route during a drift. Sample the
+        // player's mapped actions so held keyboard/controller buttons remain lit.
+        var player = _localInput.player;
+        bool jumpDrift = MappedButton(player, "Jump") || MappedButton(player, "Drift_left_right");
+        bool boost = MappedButton(player, "Boost");
+        bool weapon = MappedButton(player, "UseWeapon");
+        bool menu = MappedButton(player, "Menu");
+        bool playerList = MappedButton(player, "InGamePlayersList");
         _sample = InputOverlayModel.CreateLive(data.fTurningInput, data.fAccelInput,
-            data.bJumpButton_ClickedDown, drift, boost,
-            data.bUseWeaponInput_ClickDown, data.bIsBreakingInput, data.bBackDirInputButtonDown,
-            data.bIsTargetLockUp_ClickUp, data.bIsTargetLockDown_ClickDown,
-            data.bWeaponPickupButtomClicked_ClickedDown, _liveDevice);
+            jumpDrift, boost,
+            weapon, data.bIsBreakingInput, data.bBackDirInputButtonDown,
+            Pulse(data.bIsTargetLockUp_ClickUp, ref _liveTargetUpPulseUntil),
+            Pulse(data.bIsTargetLockDown_ClickDown, ref _liveTargetDownPulseUntil),
+            Pulse(data.bWeaponPickupButtomClicked_ClickedDown, ref _livePickupPulseUntil), menu, playerList, _liveDevice);
         _hasSample = true;
     }
 
@@ -140,12 +151,25 @@ internal static class GamepadOverlay
         catch { return "GAMEPAD / KEYBOARD"; }
     }
 
+    private static bool MappedButton(Rewired.Player? player, string action)
+    {
+        if (player == null) return false;
+        try { return player.GetButton(action); }
+        catch { return false; }
+    }
+
+    private static bool Pulse(bool pressed, ref float until)
+    {
+        if (pressed) until = Time.unscaledTime + .18f;
+        return Time.unscaledTime < until;
+    }
+
     internal static void Draw()
     {
         if (!Visible) return;
         EnsureStyles();
         float scale = Mathf.Clamp(_scale.Value, .7f, 1.4f);
-        const float baseWidth = 432, baseHeight = 204;
+        const float baseWidth = 510, baseHeight = 300;
         float availableScale = Mathf.Min((Screen.width - 24f) / baseWidth, (Screen.height - 24f) / baseHeight);
         scale = Mathf.Max(.35f, Mathf.Min(scale, availableScale));
         float width = baseWidth * scale, height = baseHeight * scale, margin = 18 * scale;
@@ -160,21 +184,26 @@ internal static class GamepadOverlay
         DrawCard(rect, _opacity.Value);
         GUI.BeginGroup(rect);
         float s = scale;
-        GUI.Label(new Rect(16*s, 9*s, 205*s, 22*s), "INPUT VIEWER", _title);
-        DrawStatus(new Rect(328*s, 9*s, 88*s, 20*s), _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
-        GUI.Label(new Rect(16*s, 32*s, 260*s, 17*s), _sample.IsReplay ? "RECORDED GAME ACTIONS" : _sample.Device, _small);
-        DrawPanel(new Rect(14*s, 56*s, 191*s, 132*s), _opacity.Value);
-        DrawPanel(new Rect(211*s, 56*s, 207*s, 132*s), _opacity.Value);
-        DrawSteering(new Rect(25*s, 66*s, 169*s, 51*s), _sample.Steering, s);
-        DrawAcceleration(new Rect(25*s, 126*s, 169*s, 51*s), _sample.Acceleration, s);
-        GUI.Label(new Rect(224*s, 63*s, 170*s, 17*s), "ACTIONS", _section);
-        DrawButton(new Rect(224*s, 85*s, 87*s, 31*s), "JUMP", _sample.Jump, new Color(.18f,.72f,.95f), s);
-        DrawButton(new Rect(317*s, 85*s, 87*s, 31*s), "DRIFT", _sample.Drift, new Color(.75f,.52f,.98f), s);
-        DrawButton(new Rect(224*s, 122*s, 87*s, 31*s), "BOOST", _sample.Boost, new Color(1f,.57f,.12f), s);
-        DrawButton(new Rect(317*s, 122*s, 87*s, 31*s), "ITEM", _sample.Weapon, new Color(.98f,.3f,.34f), s);
-        GUI.Label(new Rect(224*s, 160*s, 182*s, 16*s),
-            (_sample.Brake ? "BRAKE  " : "") + (_sample.LookBack ? "LOOK BACK  " : "") +
-            (_sample.TargetUp || _sample.TargetDown ? "TARGET  " : "") + (_sample.Pickup ? "PICKUP" : ""), _secondary);
+        GUI.Label(new Rect(16*s, 9*s, 275*s, 22*s), "INPUT VIEWER", _title);
+        DrawStatus(new Rect(400*s, 9*s, 96*s, 20*s), _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
+        GUI.Label(new Rect(16*s, 32*s, 340*s, 17*s), _sample.IsReplay ? "RECORDED GAME ACTIONS" : _sample.Device, _small);
+        DrawPanel(new Rect(14*s, 56*s, 153*s, 226*s), _opacity.Value);
+        DrawPanel(new Rect(174*s, 56*s, 322*s, 226*s), _opacity.Value);
+        GUI.Label(new Rect(27*s, 65*s, 126*s, 17*s), "STEERING", _section);
+        DrawSteering(new Rect(30*s, 81*s, 122*s, 78*s), _sample.Steering, s);
+        DrawButton(new Rect(27*s, 169*s, 126*s, 28*s), "ACCELERATE", _sample.Accelerate, new Color(1f,.57f,.12f), s);
+        DrawButton(new Rect(27*s, 204*s, 126*s, 28*s), "REVERSE", _sample.Reverse, new Color(.24f,.67f,1f), s);
+        GUI.Label(new Rect(188*s, 63*s, 278*s, 17*s), "ACTIONS  ·  HELD INPUTS STAY LIT", _section);
+        DrawButton(new Rect(188*s, 85*s, 144*s, 26*s), "JUMP / DRIFT", _sample.JumpDrift, new Color(.18f,.72f,.95f), s);
+        DrawButton(new Rect(342*s, 85*s, 144*s, 26*s), "BOOST", _sample.Boost, new Color(1f,.57f,.12f), s);
+        DrawButton(new Rect(188*s, 116*s, 144*s, 26*s), "USE WEAPON", _sample.Weapon, new Color(.98f,.3f,.34f), s);
+        DrawButton(new Rect(342*s, 116*s, 144*s, 26*s), "BRAKE", _sample.Brake, new Color(.84f,.88f,.94f), s);
+        DrawButton(new Rect(188*s, 147*s, 144*s, 26*s), "REAR VIEW", _sample.LookBack, new Color(.35f,.78f,.68f), s);
+        DrawButton(new Rect(342*s, 147*s, 144*s, 26*s), "PLAYER LIST", _sample.PlayerList, new Color(.38f,.65f,1f), s);
+        DrawButton(new Rect(188*s, 178*s, 144*s, 26*s), "IN-GAME MENU", _sample.Menu, new Color(.65f,.72f,.8f), s);
+        DrawButton(new Rect(342*s, 178*s, 144*s, 26*s), "TARGET UP", _sample.TargetUp, new Color(.97f,.74f,.25f), s);
+        DrawButton(new Rect(188*s, 209*s, 144*s, 26*s), "TARGET DOWN", _sample.TargetDown, new Color(.97f,.74f,.25f), s);
+        DrawButton(new Rect(342*s, 209*s, 144*s, 26*s), "PICK UP ITEM", _sample.Pickup, new Color(.97f,.74f,.25f), s);
         GUI.EndGroup();
     }
 
@@ -194,23 +223,11 @@ internal static class GamepadOverlay
     private static void DrawSteering(Rect rect, float value, float scale)
     {
         GUI.Label(new Rect(rect.x, rect.y, rect.width, 16*scale), "STEERING", _small);
-        float cx = rect.x + rect.width * .5f, cy = rect.y + 29*scale;
-        DrawCircle(new Vector2(cx, cy), 16*scale, new Color(.07f,.11f,.17f,1), new Color(.26f,.36f,.49f,1), scale);
-        DrawCircle(new Vector2(cx + value * 10*scale, cy), 6*scale,
+        float cx = rect.x + rect.width * .5f, cy = rect.y + 31*scale;
+        DrawCircle(new Vector2(cx, cy), 25*scale, new Color(.07f,.11f,.17f,1), new Color(.26f,.36f,.49f,1), scale);
+        DrawCircle(new Vector2(cx + value * 17*scale, cy), 8*scale,
             Mathf.Abs(value) > .08f ? new Color(.1f,.76f,1f,1) : new Color(.55f,.65f,.78f,1), Color.clear, scale);
-        GUI.Label(new Rect(rect.x, rect.y+39*scale, rect.width, 12*scale), "STEER  " + value.ToString("+0.00;-0.00;0.00"), _secondary);
-    }
-
-    private static void DrawAcceleration(Rect rect, float value, float scale)
-    {
-        GUI.Label(new Rect(rect.x, rect.y, rect.width, 16*scale), "THROTTLE / REVERSE", _small);
-        float x = rect.x + 4*scale, y = rect.y + 20*scale, w = rect.width - 8*scale;
-        DrawBar(new Rect(x, y, w, 8*scale), new Color(.07f,.11f,.17f,1));
-        float fill = w * Mathf.Abs(value);
-        if (fill > 0) DrawBar(new Rect(value >= 0 ? x : x + w - fill, y, fill, 8*scale),
-            value >= 0 ? new Color(1f,.57f,.12f,1) : new Color(.24f,.67f,1f,1));
-        GUI.Label(new Rect(rect.x, rect.y+34*scale, rect.width, 12*scale),
-            (value >= 0 ? "THROTTLE  " : "REVERSE  ") + Mathf.Abs(value).ToString("0.00"), _secondary);
+        GUI.Label(new Rect(rect.x, rect.y+62*scale, rect.width, 13*scale), value.ToString("+0.00;-0.00;0.00"), _secondary);
     }
 
     private static void DrawButton(Rect rect, string label, bool pressed, Color accent, float scale)
@@ -301,5 +318,5 @@ internal static class GamepadOverlay
     }
 
     internal static void Restore() { ResetState(); _faulted = false; }
-    private static void ResetState() { _visible = _startVisible?.Value == true; _hasSample = false; _nextResolve = 0; _localInput = null; _replayInput = null; }
+    private static void ResetState() { _visible = _startVisible?.Value == true; _hasSample = false; _nextResolve = 0; _localInput = null; _replayInput = null; _ghostJumpPulseUntil = _ghostBoostPulseUntil = _ghostWeaponPulseUntil = _ghostTargetUpPulseUntil = _ghostTargetDownPulseUntil = _ghostPickupPulseUntil = _liveTargetUpPulseUntil = _liveTargetDownPulseUntil = _livePickupPulseUntil = 0; }
 }

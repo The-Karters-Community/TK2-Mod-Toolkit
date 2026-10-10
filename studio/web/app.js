@@ -7,6 +7,7 @@ const token = document.querySelector('meta[name="tk2-session"]').content;
 let state, category = 'All', source, sourceDirty = false, settingsDirty = false, busy = false, actionInFlight;
 let noticeTimer, revision = 0, refreshSequence = 0, conflictKeys = [];
 const settingEdits = new Map(), recipeEdits = new Map(), extraEdits = new Map(), expandedModules = new Set();
+let visibleModules = 0, visibleRecipeModules = 0;
 const workshopTabs = ['editor', 'api', 'sharing', 'tutorial'];
 const exportSelection = new Set();
 let previewPackage;
@@ -44,8 +45,14 @@ function recordEdit(edits, key, before, value) {
   else edits.set(key, {base, value, revision: ++revision});
   updateSaveState();
 }
-function changeSetting(key, value) {recordEdit(settingEdits, key, state.settings[key], value); state.settings[key] = value; syncModuleState(key.split('/')[0]); syncDependencies();}
-function changeEntry(entry, value, extra = false) {recordEdit(extra ? extraEdits : recipeEdits, entry.section + '/' + entry.key, entry.value, value); entry.value = value;}
+function changeSetting(key, value, updateLibrary = true) {
+  recordEdit(settingEdits, key, state.settings[key], value); state.settings[key] = value; syncModuleState(key.split('/')[0]); syncDependencies();
+  if (updateLibrary && key.endsWith('/Enabled')) {renderCategoryFilters(); if (category === 'Enabled') {renderFeatures(); renderRecipes();}}
+}
+function changeEntry(entry, value, extra = false, updateLibrary = true) {
+  recordEdit(extra ? extraEdits : recipeEdits, entry.section + '/' + entry.key, entry.value, value); entry.value = value;
+  if (updateLibrary && entry.key === 'Enabled') {renderCategoryFilters(); if (category === 'Enabled') {renderFeatures(); renderRecipes();}}
+}
 function switchControl(label, value, disabled, change) {
   const wrapper = el('label', 'switch'); const input = el('input'); input.type = 'checkbox'; input.checked = value; input.disabled = disabled; input.setAttribute('aria-label', label);
   input.onchange = () => change(input.checked); wrapper.append(input, el('span')); return wrapper;
@@ -93,15 +100,49 @@ function featureGroup(feature) {return feature.gameplay ? 'Gameplay' : feature.c
 function renderCategoryFilters() {
   if (!state) return;
   const filters = $('filters'); filters.replaceChildren();
-  const enabledCount = state.features.filter(feature => feature.locked || state.settings[feature.id + '/Enabled']).length;
+  const counts = moduleCounts();
   const categories = [...new Set(state.features.map(featureGroup))].sort((a, b) => a.localeCompare(b));
-  const options = [['All', `All · ${state.features.length}`], ['Enabled', `Enabled · ${enabledCount}`], ...categories.map(name => [name, name])];
+  const options = [['All', 'All'], ...categories.map(name => [name, name])];
   options.forEach(([id, label]) => {
     const button = el('button', 'chip', label); button.dataset.category = id;
     button.classList.toggle('selected', category === id); button.setAttribute('aria-pressed', String(category === id));
     button.onclick = () => {category = id; renderCategoryFilters(); renderFeatures(); renderRecipes();};
     filters.append(button);
   });
+  const enabled = $('show-enabled');
+  enabled.textContent = `Enabled modules · ${counts.enabled}`;
+  enabled.setAttribute('aria-pressed', String(category === 'Enabled'));
+  enabled.classList.toggle('selected', category === 'Enabled');
+  $('disable-all-enabled').hidden = category !== 'Enabled';
+  $('disable-all-enabled').disabled = busy || counts.unlocked === 0;
+}
+function countEnabledSections(entries, onlyEnabled = false) {
+  const sections = new Map();
+  (entries || []).forEach(entry => {
+    if (!sections.has(entry.section)) sections.set(entry.section, []);
+    sections.get(entry.section).push(entry);
+  });
+  let count = 0;
+  sections.forEach(settings => {
+    const toggle = settings.find(entry => entry.key === 'Enabled' && entry.type === 'Boolean');
+    if (!onlyEnabled || toggle?.value.toLowerCase() === 'true') count++;
+  });
+  return count;
+}
+function moduleCounts() {
+  const featureEnabled = state.features.filter(feature => feature.locked || state.settings[feature.id + '/Enabled']).length;
+  const featureUnlocked = state.features.filter(feature => !feature.locked && state.settings[feature.id + '/Enabled']).length;
+  const extraCount = countEnabledSections(state.extraSettings || []);
+  const recipeCount = countEnabledSections(state.recipes || []);
+  return {
+    all: state.features.length + extraCount + recipeCount,
+    enabled: featureEnabled + countEnabledSections(state.extraSettings || [], true) + countEnabledSections(state.recipes || [], true),
+    unlocked: featureUnlocked + countEnabledSections(state.extraSettings || [], true) + countEnabledSections(state.recipes || [], true)
+  };
+}
+function updateModuleCount() {
+  const total = visibleModules + visibleRecipeModules, search = $('mod-search').value.trim();
+  $('module-count').textContent = `${total} module${total === 1 ? '' : 's'} shown${search ? ' for “' + search + '”' : ''}.`;
 }
 function packsForState() {
   const packs = (state.packs || []).map(pack => ({...pack, features: (pack.features || []).map(id => typeof id === 'object' ? id : state.features.find(feature => feature.id === id)).filter(Boolean)}));
@@ -256,7 +297,7 @@ function renderFeatures() {
   const search = $('mod-search').value.toLowerCase().trim(); let count = 0, moduleCount = 0;
   packsForState().forEach(pack => {
     const features = pack.features.filter(feature => {
-      const matches = category === 'All' || category === 'Enabled' && state.settings[feature.id + '/Enabled'] || category === featureGroup(feature);
+      const matches = category === 'All' || category === 'Enabled' && (feature.locked || state.settings[feature.id + '/Enabled']) || category === featureGroup(feature);
       return matches && [pack.name, feature.name, feature.description, ...feature.settings.map(setting => setting[1])].join(' ').toLowerCase().includes(search);
     });
     const extras = (state.extraSettings || []).filter(entry => extraPackId(entry) === pack.id);
@@ -279,7 +320,7 @@ function renderFeatures() {
     });
     appendEntryGroups(section, extraGroups, true); list.append(section);
   });
-  $('module-count').textContent = `${moduleCount} module${moduleCount === 1 ? '' : 's'} shown${search ? ' for “' + $('mod-search').value.trim() + '”' : ''}.`;
+  visibleModules = moduleCount; updateModuleCount();
   if (!count) list.append(el('p', 'empty-state', category === 'Enabled' ? 'No modules are enabled. Choose All to add one.' : 'No settings match. Try another search or filter.'));
 }
 function extraGroupsForFilter(entries, search, packName = '') {
@@ -321,11 +362,12 @@ function appendEntryGroups(container, groups, extra = false) {
 }
 function renderRecipes() {
   const list = $('recipe-controls'); list.replaceChildren();
-  const entries = state.recipes || []; if (!entries.length) return;
+  const entries = state.recipes || []; visibleRecipeModules = 0; if (!entries.length) {updateModuleCount(); return;}
   const search = $('mod-search').value.toLowerCase().trim(), groups = extraGroupsForFilter(entries, search, 'Your recipes');
-  if (!groups.size) return;
+  visibleRecipeModules = groups.size;
+  if (!groups.size) {updateModuleCount(); return;}
   const section = el('section', 'mod-pack'), header = el('header', 'pack-heading'); header.append(el('h2', '', 'Your recipes')); section.append(header);
-  appendEntryGroups(section, groups); list.append(section);
+  appendEntryGroups(section, groups); list.append(section); updateModuleCount();
 }
 function renderFiles() {
   $('reconstructed-files').replaceChildren(); $('pack-files').replaceChildren();
@@ -413,7 +455,7 @@ function mergeState(next) {
 function syncControls() {
   document.querySelectorAll('[data-setting]').forEach(input => {const value = state.settings[input.dataset.setting]; if (input === document.activeElement || value === undefined) return; if (input.type === 'checkbox') input.checked = Boolean(value); else input.value = value;});
   ['recipe', 'extra'].forEach(kind => {document.querySelectorAll('[data-' + kind + ']').forEach(input => {const entry = (state[kind === 'extra' ? 'extraSettings' : 'recipes'] || []).find(entry => entry.section + '/' + entry.key === input.dataset[kind]); if (entry && input !== document.activeElement) {if (input.type === 'checkbox') input.checked = entry.value.toLowerCase() === 'true'; else input.value = entry.value;}});});
-  state.features.forEach(feature => syncModuleState(feature.id)); syncDependencies(); updateSaveState();
+  state.features.forEach(feature => syncModuleState(feature.id)); syncDependencies(); renderCategoryFilters(); updateSaveState();
 }
 async function refresh(preserveSettings = true, quiet = false) {
   const sequence = ++refreshSequence, next = await api('state'); if (sequence !== refreshSequence) return;
@@ -475,7 +517,7 @@ function setBusy(value) {
   document.querySelectorAll('[data-edit-module]').forEach(button => {button.disabled = value || !state?.moduleSources?.[button.dataset.editModule]?.length;});
   // Keep controls mounted and editable during a settings save.
   document.querySelectorAll('[data-setting], [data-recipe], [data-extra]').forEach(input => {const feature = state?.features.find(item => item.id === input.dataset.setting?.split('/')[0]); input.disabled = value && actionInFlight !== 'settings' || feature?.available === false || !state?.game;});
-  syncDependencies(); if (state) {renderInstallation(); updateSharingButtons();}
+  syncDependencies(); if (state) {renderInstallation(); renderCategoryFilters(); updateSharingButtons();}
 }
 function settingsError(error) {
   conflictKeys = error.details?.conflicts || error.details?.conflictKeys || []; if (!Array.isArray(conflictKeys)) conflictKeys = Object.keys(conflictKeys);
@@ -494,6 +536,7 @@ async function runAction(action, body = {}, snapshot) {
       // The write already succeeded. A failed follow-up poll must not turn it
       // into a misleading save error; the idle poll will retry.
       await refresh(true, true).catch(() => {});
+      renderCategoryFilters(); renderFeatures(); renderRecipes();
     }
     else if (action === 'diagnose') {await refresh(true, true); notice(result.message);}
     else {await refresh(true); notice(result.message || 'Done');}
@@ -510,6 +553,17 @@ function showView(name) {
 document.querySelectorAll('.nav').forEach(button => button.onclick = () => showView(button.dataset.view));
 document.querySelector('.brand').onclick = event => {event.preventDefault(); showView('mods');};
 $('mod-search').oninput = () => {renderFeatures(); renderRecipes();};
+$('show-enabled').onclick = () => {category = category === 'Enabled' ? 'All' : 'Enabled'; renderCategoryFilters(); renderFeatures(); renderRecipes();};
+$('disable-all-enabled').onclick = () => {
+  if (busy) return;
+  let disabled = 0;
+  state.features.filter(feature => !feature.locked && state.settings[feature.id + '/Enabled']).forEach(feature => {changeSetting(feature.id + '/Enabled', false, false); disabled++;});
+  ['extraSettings', 'recipes'].forEach(field => {
+    (state[field] || []).forEach(entry => {if (entry.key === 'Enabled' && entry.type === 'Boolean' && entry.value.toLowerCase() === 'true') {changeEntry(entry, 'false', field === 'extraSettings', false); disabled++;}});
+  });
+  renderCategoryFilters(); renderFeatures(); renderRecipes();
+  notice(`${disabled} unlocked module${disabled === 1 ? '' : 's'} disabled. Online protection remains on; save changes to apply.`);
+};
 $('expand-all-accordions').onclick = () => setAllAccordions(true);
 $('collapse-all-accordions').onclick = () => setAllAccordions(false);
 $('workshop-install').onclick = () => runAction('build-install');
