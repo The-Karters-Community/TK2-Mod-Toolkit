@@ -13,16 +13,22 @@ class GamepadOverlayCatalogTests(unittest.TestCase):
         self.assertTrue(pack.defaults()["GamepadOverlay/ShowReplayInputs"])
         self.assertEqual(pack.defaults()["GamepadOverlay/ToggleKey"], "F9")
         self.assertEqual(pack.defaults()["GamepadOverlay/Corner"], "TopCenter")
+        self.assertEqual(pack.defaults()["GamepadOverlay/PositionX"], 50)
+        self.assertEqual(pack.defaults()["GamepadOverlay/PositionY"], 50)
 
     def test_catalog_exposes_safe_controls_before_first_plugin_launch(self):
         validated = pack.validate({
             "GamepadOverlay/ToggleKey": "F10",
             "GamepadOverlay/Corner": "BottomRight",
+            "GamepadOverlay/PositionX": 23,
+            "GamepadOverlay/PositionY": 77,
             "GamepadOverlay/Scale": 1.2,
             "GamepadOverlay/Opacity": .7,
         })
         self.assertEqual(validated[("GamepadOverlay", "ToggleKey")], "F10")
         self.assertEqual(validated[("GamepadOverlay", "Corner")], "BottomRight")
+        self.assertEqual(validated[("GamepadOverlay", "PositionX")], "23")
+        self.assertEqual(validated[("GamepadOverlay", "PositionY")], "77")
         with self.assertRaises(ValueError):
             pack.validate({"GamepadOverlay/Corner": "Unknown"})
 

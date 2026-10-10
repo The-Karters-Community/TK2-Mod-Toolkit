@@ -48,6 +48,8 @@ const fixture = {installed: false, packCurrent: false, pluginCount: 0, prebuiltC
     {id:'Camera', name:'Camera', category:'Camera', description:'Keep your kart in view', origin:'New', settings:[['FieldOfView','Field of view','float',65,35,110],['AimAtKart','Aim at kart','bool',true,null,null],['PanelHotkey','Panel hotkey','text','F8',null,null,'Camera key',['F8','C','F6']]]}
   ]};
 const calls = []; let sourceConflict = false, settingsFailure, stateFailure = false, deferSave, pendingSave, hashCounter = 0, deferFunctions, pendingFunctions, functionFailure;
+let timerId = 0; const timers = new Map();
+async function fireTimer(delay) {const item = [...timers.entries()].reverse().find(([, timer]) => timer.delay === delay); assert.ok(item, `timer for ${delay}ms is scheduled`); timers.delete(item[0]); await item[1].callback(); await settle();}
 function saveResponse(body) {
   Object.assign(fixture.settings, body.values);
   [['recipes','recipes'],['extraSettings','extraSettings']].forEach(([field, payload]) => fixture[field].forEach(entry => {const key = entry.section + '/' + entry.key; if (Object.hasOwn(body[payload], key)) entry.value = body[payload][key];}));
@@ -56,7 +58,7 @@ function saveResponse(body) {
 }
 const context = {document, console, location:{hash:'#mods'}, history:{replaceState(_a,_b,hash){context.location.hash = hash;}},
   localStorage:{data:{}, getItem(key){return this.data[key] || null;}, setItem(key,value){this.data[key] = value;}},
-  matchMedia:()=>({matches:false,addEventListener(){}}), setTimeout:()=>1, clearTimeout(){}, setInterval:()=>1,
+  matchMedia:()=>({matches:false,addEventListener(){}}), setTimeout:(callback,delay=0)=>{const id=++timerId;timers.set(id,{callback,delay});return id;}, clearTimeout:id=>timers.delete(id), setInterval:()=>1,
   window:{addEventListener(){}}, confirm:()=>true, Event:class{},
   fetch: async (url, options) => {
     calls.push({url, options}); let data, ok = true;
@@ -155,6 +157,12 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   await ids['save-settings'].click();
   assert.ok(!descendants(ids['feature-list']).some(node => node.dataset.feature === 'Camera'), 'successful save keeps the filtered list in sync without changing tabs');
   ids['show-enabled'].click();
+  fixture.settings['Audio/Enabled'] = true; await run('refresh(true)');
+  ids['apply-adjustments'].click(); edit('Audio/MasterVolume', '.55'); await fireTimer(600);
+  assert.deepEqual(latestSave().values, {'Audio/MasterVolume':.55}, 'live preview saves only the changed enabled-module setting');
+  assert.equal(run('settingsDirty'), false, 'live preview acknowledges the persisted edit');
+  assert.match(ids['apply-adjustments'].textContent, /On/);
+  ids['apply-adjustments'].click(); edit('Audio/MasterVolume', '.4'); await ids['save-settings'].click();
   control('Audio/MasterVolume').valid = true;
   assert.equal(run('state.settings["Audio/MasterVolume"]'), .4);
   // An edit while a request is in flight must survive its response.

@@ -6,6 +6,7 @@ const $ = id => document.getElementById(id);
 const token = document.querySelector('meta[name="tk2-session"]').content;
 let state, category = 'All', source, sourceDirty = false, settingsDirty = false, busy = false, actionInFlight;
 let noticeTimer, revision = 0, refreshSequence = 0, conflictKeys = [];
+let livePreviewEnabled = localStorage.getItem('tk2-live-preview') === 'true', livePreviewTimer;
 const settingEdits = new Map(), recipeEdits = new Map(), extraEdits = new Map(), expandedModules = new Set();
 let visibleModules = 0, visibleRecipeModules = 0;
 const workshopTabs = ['editor', 'api', 'sharing', 'tutorial'];
@@ -36,7 +37,7 @@ function updateSaveState() {
   const count = settingEdits.size + recipeEdits.size + extraEdits.size;
   settingsDirty = count > 0; $('save-settings').disabled = busy || !settingsDirty;
   $('save-settings').textContent = actionInFlight === 'settings' ? 'Saving…' : 'Save changes';
-  $('settings-state').textContent = count ? `${count} unsaved setting${count === 1 ? '' : 's'}.` : 'All changes saved.';
+  $('settings-state').textContent = count ? `${count} unsaved setting${count === 1 ? '' : 's'}${livePreviewEnabled ? ' · eligible edits auto-save after a short pause.' : '.'}` : 'All changes saved.';
 }
 function recordEdit(edits, key, before, value) {
   const previous = edits.get(key), base = previous ? previous.base : before;
@@ -48,10 +49,31 @@ function recordEdit(edits, key, before, value) {
 function changeSetting(key, value, updateLibrary = true) {
   recordEdit(settingEdits, key, state.settings[key], value); state.settings[key] = value; syncModuleState(key.split('/')[0]); syncDependencies();
   if (updateLibrary && key.endsWith('/Enabled')) {renderCategoryFilters(); if (category === 'Enabled') {renderFeatures(); renderRecipes();}}
+  else if (updateLibrary) scheduleLivePreview(key, settingEdits);
 }
 function changeEntry(entry, value, extra = false, updateLibrary = true) {
   recordEdit(extra ? extraEdits : recipeEdits, entry.section + '/' + entry.key, entry.value, value); entry.value = value;
   if (updateLibrary && entry.key === 'Enabled') {renderCategoryFilters(); if (category === 'Enabled') {renderFeatures(); renderRecipes();}}
+  else if (updateLibrary) scheduleLivePreview(entry.section + '/' + entry.key, extra ? extraEdits : recipeEdits);
+}
+function scheduleLivePreview(key, edits) {
+  if (!livePreviewEnabled || key.endsWith('/Enabled')) return;
+  if (!edits.has(key) || !livePreviewEligible(key)) return;
+  clearTimeout(livePreviewTimer);
+  livePreviewTimer = setTimeout(() => {
+    const keys = new Set([...settingEdits.keys(), ...recipeEdits.keys(), ...extraEdits.keys()].filter(livePreviewEligible));
+    if (!keys.size) return;
+    if (busy) {scheduleLivePreview(key, edits); return;}
+    const snapshot = settingsSnapshot(keys);
+    return runAction('settings', snapshot.body, snapshot);
+  }, 600);
+}
+function livePreviewEligible(key) {
+  if (key.endsWith('/Enabled')) return false;
+  const section = key.slice(0, key.lastIndexOf('/'));
+  const feature = state.features.find(item => item.id === section);
+  return feature ? !feature.locked && feature.available !== false && state.settings[section + '/Enabled'] === true :
+    [...(state.recipes || []), ...(state.extraSettings || [])].some(entry => entry.section === section && entry.key === 'Enabled' && entry.value.toLowerCase() === 'true');
 }
 function switchControl(label, value, disabled, change) {
   const wrapper = el('label', 'switch'); const input = el('input'); input.type = 'checkbox'; input.checked = value; input.disabled = disabled; input.setAttribute('aria-label', label);
@@ -115,6 +137,9 @@ function renderCategoryFilters() {
   enabled.classList.toggle('selected', category === 'Enabled');
   $('disable-all-enabled').hidden = category !== 'Enabled';
   $('disable-all-enabled').disabled = busy || counts.unlocked === 0;
+  const preview = $('apply-adjustments');
+  preview.textContent = `Apply as you adjust · ${livePreviewEnabled ? 'On' : 'Off'}`;
+  preview.setAttribute('aria-pressed', String(livePreviewEnabled));
 }
 function countEnabledSections(entries, onlyEnabled = false) {
   const sections = new Map();
@@ -181,7 +206,7 @@ function settingsControl(key, label, kind, value, low, high, description, choice
   const tools = el('div', 'value-tools'), reset = el('button', 'value-reset', 'Reset');
   reset.setAttribute('aria-label', 'Reset ' + label + ' to default'); reset.title = `Default: ${defaultText}`;
   reset.disabled = defaultValue === undefined || input.disabled;
-  reset.onclick = () => {onChange(defaultValue); if (input.type === 'checkbox') input.checked = Boolean(defaultValue); else input.value = defaultValue; syncControls(); notice(label + ' restored. Save changes to apply.');};
+  reset.onclick = () => {onChange(defaultValue); if (input.type === 'checkbox') input.checked = Boolean(defaultValue); else input.value = defaultValue; syncControls(); notice(label + ' restored.' + (livePreviewEnabled ? ' Applying live preview.' : ' Save changes to apply.'));};
   tools.append(input, reset); input.linkedControls = [reset]; control.field = input; control.tools = tools;
   if (['float','int'].includes(kind) && low !== null && low !== undefined && high !== null && high !== undefined && Number(high) - Number(low) <= 10000) {
     const slider = el('input', 'value-slider'); slider.type = 'range'; slider.min = low; slider.max = high;
@@ -465,10 +490,10 @@ async function refresh(preserveSettings = true, quiet = false) {
   mergeState(next);
   if (!quiet || changed) render(); else {syncControls(); renderInstallation();}
 }
-function settingsSnapshot() {
+function settingsSnapshot(onlyKeys) {
   const body = {values: {}, baseValues: {}, recipes: {}, baseRecipes: {}, extraSettings: {}, baseExtraSettings: {}, hash: state.configHash}, revisions = {};
   [['values', 'baseValues', settingEdits], ['recipes', 'baseRecipes', recipeEdits], ['extraSettings', 'baseExtraSettings', extraEdits]].forEach(([values, bases, edits]) => {
-    revisions[values] = new Map(); edits.forEach((edit, key) => {body[values][key] = edit.value; body[bases][key] = edit.base; revisions[values].set(key, edit.revision);});
+    revisions[values] = new Map(); edits.forEach((edit, key) => {if (onlyKeys && !onlyKeys.has(key)) return; body[values][key] = edit.value; body[bases][key] = edit.base; revisions[values].set(key, edit.revision);});
   }); return {body, revisions};
 }
 function acknowledgeSettings(snapshot, result) {
@@ -553,6 +578,12 @@ function showView(name) {
 document.querySelectorAll('.nav').forEach(button => button.onclick = () => showView(button.dataset.view));
 document.querySelector('.brand').onclick = event => {event.preventDefault(); showView('mods');};
 $('mod-search').oninput = () => {renderFeatures(); renderRecipes();};
+$('apply-adjustments').onclick = () => {
+  livePreviewEnabled = !livePreviewEnabled; localStorage.setItem('tk2-live-preview', String(livePreviewEnabled));
+  if (!livePreviewEnabled) clearTimeout(livePreviewTimer);
+  renderCategoryFilters();
+  notice(livePreviewEnabled ? 'Live preview is on for edits to enabled modules. Module on/off changes still need Save changes.' : 'Live preview is off. All edits wait for Save changes.');
+};
 $('show-enabled').onclick = () => {category = category === 'Enabled' ? 'All' : 'Enabled'; renderCategoryFilters(); renderFeatures(); renderRecipes();};
 $('disable-all-enabled').onclick = () => {
   if (busy) return;

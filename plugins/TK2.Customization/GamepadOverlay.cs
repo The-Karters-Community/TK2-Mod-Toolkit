@@ -11,11 +11,10 @@ internal static class GamepadOverlay
     private static ConfigEntry<bool> _enabled = null!, _startVisible = null!, _showReplayInputs = null!;
     private static ConfigEntry<string> _hotkey = null!, _corner = null!;
     private static ConfigEntry<float> _scale = null!, _opacity = null!;
+    private static ConfigEntry<float> _positionX = null!, _positionY = null!;
     private static bool _visible, _hasSample, _faulted;
     private static float _nextResolve;
-    private static float _ghostJumpPulseUntil, _ghostBoostPulseUntil, _ghostWeaponPulseUntil;
-    private static float _ghostTargetUpPulseUntil, _ghostTargetDownPulseUntil, _ghostPickupPulseUntil;
-    private static float _liveTargetUpPulseUntil, _liveTargetDownPulseUntil, _livePickupPulseUntil;
+    private static float _ghostJumpPulseUntil, _ghostBoostPulseUntil;
     private static InputOverlayModel _sample;
     private static Ant_KartInput? _localInput;
     private static PTK_PlayerReplayInput_ReplaySerializer? _replayInput;
@@ -32,9 +31,13 @@ internal static class GamepadOverlay
         _startVisible = plugin.Config.Bind("GamepadOverlay", "StartVisible", true, "Show automatically during a local race or replay when this module is enabled.");
         _showReplayInputs = plugin.Config.Bind("GamepadOverlay", "ShowReplayInputs", true, "Show hidden control actions recorded in leaderboard ghosts. While enabled, mandatory online protection blocks uploads and online-room actions.");
         _hotkey = plugin.Config.Bind("GamepadOverlay", "ToggleKey", "F9", "Toggle the input card during a race or replay. Set to None to disable.");
-        _corner = plugin.Config.Bind("GamepadOverlay", "Corner", "TopCenter", "Screen position for the input card.");
+        _corner = plugin.Config.Bind("GamepadOverlay", "Corner", "TopCenter", new ConfigDescription(
+            "Preset screen position. Choose Custom to use the percentage sliders.",
+            new AcceptableValueList<string>("TopLeft", "TopCenter", "TopRight", "MiddleLeft", "MiddleCenter", "MiddleRight", "BottomLeft", "BottomCenter", "BottomRight", "Custom")));
         _scale = plugin.Config.Bind("GamepadOverlay", "Scale", 1f, new ConfigDescription("HUD card scale.", new AcceptableValueRange<float>(0.7f, 1.4f)));
         _opacity = plugin.Config.Bind("GamepadOverlay", "Opacity", 0.92f, new ConfigDescription("HUD card background opacity.", new AcceptableValueRange<float>(0.45f, 1f)));
+        _positionX = plugin.Config.Bind("GamepadOverlay", "PositionX", 50f, new ConfigDescription("Custom horizontal position as a percentage of the available screen area.", new AcceptableValueRange<float>(0, 100)));
+        _positionY = plugin.Config.Bind("GamepadOverlay", "PositionY", 50f, new ConfigDescription("Custom vertical position as a percentage of the available screen area.", new AcceptableValueRange<float>(0, 100)));
         ResetState();
     }
 
@@ -76,13 +79,8 @@ internal static class GamepadOverlay
             {
                 var input = _replayInput;
                 _sample = InputOverlayModel.CreateReplay(input.fTurningInput_Get, input.fAccelInput_Get,
-                    Pulse(input.bJumpButton_Get_Click, ref _ghostJumpPulseUntil), input.bDriftInput_Get,
-                    Pulse(input.bBoostInput_Get_Click, ref _ghostBoostPulseUntil),
-                    Pulse(input.bUseWeaponInput_Get_Click, ref _ghostWeaponPulseUntil), input.bIsBreakingInput_Get,
-                    input.bBackDirInputButtonDown_Get,
-                    Pulse(input.bIsTargetLockUp_Get_Clcik, ref _ghostTargetUpPulseUntil),
-                    Pulse(input.bIsTargetLockDown_Get_Click, ref _ghostTargetDownPulseUntil),
-                    Pulse(input.bWeaponPickupButtomClicked_Get, ref _ghostPickupPulseUntil));
+                    Pulse(input.bJumpButton_Get_Click, ref _ghostJumpPulseUntil) || input.bDriftInput_Get,
+                    Pulse(input.bBoostInput_Get_Click, ref _ghostBoostPulseUntil), input.bIsBreakingInput_Get);
                 _hasSample = true;
             }
             else _hasSample = false;
@@ -100,14 +98,8 @@ internal static class GamepadOverlay
         bool jumpDrift = MappedButton(player, "Jump") || MappedButton(player, "Drift_left_right");
         bool boost = MappedButton(player, "Boost");
         bool weapon = MappedButton(player, "UseWeapon");
-        bool menu = MappedButton(player, "Menu");
-        bool playerList = MappedButton(player, "InGamePlayersList");
         _sample = InputOverlayModel.CreateLive(data.fTurningInput, data.fAccelInput,
-            jumpDrift, boost,
-            weapon, data.bIsBreakingInput, data.bBackDirInputButtonDown,
-            Pulse(data.bIsTargetLockUp_ClickUp, ref _liveTargetUpPulseUntil),
-            Pulse(data.bIsTargetLockDown_ClickDown, ref _liveTargetDownPulseUntil),
-            Pulse(data.bWeaponPickupButtomClicked_ClickedDown, ref _livePickupPulseUntil), menu, playerList, _liveDevice);
+            jumpDrift, boost, weapon, data.bIsBreakingInput, _liveDevice);
         _hasSample = true;
     }
 
@@ -169,17 +161,14 @@ internal static class GamepadOverlay
         if (!Visible) return;
         EnsureStyles();
         float scale = Mathf.Clamp(_scale.Value, .7f, 1.4f);
-        const float baseWidth = 510, baseHeight = 300;
+        const float baseWidth = 510, baseHeight = 244;
         float availableScale = Mathf.Min((Screen.width - 24f) / baseWidth, (Screen.height - 24f) / baseHeight);
         scale = Mathf.Max(.35f, Mathf.Min(scale, availableScale));
         float width = baseWidth * scale, height = baseHeight * scale, margin = 18 * scale;
         string corner = _corner.Value;
-        float x = corner.EndsWith("Right", StringComparison.OrdinalIgnoreCase) ? Screen.width - width - margin :
-            corner == "TopCenter" ? (Screen.width - width) * .5f : margin;
-        float y = corner.StartsWith("Bottom", StringComparison.OrdinalIgnoreCase) ? Screen.height - height - margin :
-            corner == "TopCenter" ? 210 * scale : margin;
-        x = Mathf.Clamp(x, margin, Mathf.Max(margin, Screen.width - width - margin));
-        y = Mathf.Clamp(y, margin, Mathf.Max(margin, Screen.height - height - margin));
+        var position = InputOverlayPlacement.Resolve(corner, Screen.width, Screen.height, width, height,
+            margin, _positionX.Value, _positionY.Value);
+        float x = position.X, y = position.Y;
         var rect = new Rect(x, y, width, height);
         DrawCard(rect, _opacity.Value);
         GUI.BeginGroup(rect);
@@ -187,23 +176,17 @@ internal static class GamepadOverlay
         GUI.Label(new Rect(16*s, 9*s, 275*s, 22*s), "INPUT VIEWER", _title);
         DrawStatus(new Rect(400*s, 9*s, 96*s, 20*s), _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
         GUI.Label(new Rect(16*s, 32*s, 340*s, 17*s), _sample.IsReplay ? "RECORDED GAME ACTIONS" : _sample.Device, _small);
-        DrawPanel(new Rect(14*s, 56*s, 153*s, 226*s), _opacity.Value);
-        DrawPanel(new Rect(174*s, 56*s, 322*s, 226*s), _opacity.Value);
-        GUI.Label(new Rect(27*s, 65*s, 126*s, 17*s), "STEERING", _section);
-        DrawSteering(new Rect(30*s, 81*s, 122*s, 78*s), _sample.Steering, s);
-        DrawButton(new Rect(27*s, 169*s, 126*s, 28*s), "ACCELERATE", _sample.Accelerate, new Color(1f,.57f,.12f), s);
-        DrawButton(new Rect(27*s, 204*s, 126*s, 28*s), "REVERSE", _sample.Reverse, new Color(.24f,.67f,1f), s);
-        GUI.Label(new Rect(188*s, 63*s, 278*s, 17*s), "ACTIONS  ·  HELD INPUTS STAY LIT", _section);
+        DrawPanel(new Rect(14*s, 56*s, 153*s, 170*s), _opacity.Value);
+        DrawPanel(new Rect(174*s, 56*s, 322*s, 170*s), _opacity.Value);
+        DrawSteering(new Rect(30*s, 65*s, 122*s, 78*s), _sample.Steering, s);
+        DrawButton(new Rect(27*s, 150*s, 126*s, 28*s), "ACCELERATE", _sample.Accelerate, new Color(1f,.57f,.12f), s);
+        DrawButton(new Rect(27*s, 185*s, 126*s, 28*s), "REVERSE", _sample.Reverse, new Color(.24f,.67f,1f), s);
+        GUI.Label(new Rect(188*s, 63*s, 278*s, 17*s), _sample.IsReplay ? "GHOST INPUTS" : "LIVE INPUTS", _section);
         DrawButton(new Rect(188*s, 85*s, 144*s, 26*s), "JUMP / DRIFT", _sample.JumpDrift, new Color(.18f,.72f,.95f), s);
         DrawButton(new Rect(342*s, 85*s, 144*s, 26*s), "BOOST", _sample.Boost, new Color(1f,.57f,.12f), s);
-        DrawButton(new Rect(188*s, 116*s, 144*s, 26*s), "USE WEAPON", _sample.Weapon, new Color(.98f,.3f,.34f), s);
-        DrawButton(new Rect(342*s, 116*s, 144*s, 26*s), "BRAKE", _sample.Brake, new Color(.84f,.88f,.94f), s);
-        DrawButton(new Rect(188*s, 147*s, 144*s, 26*s), "REAR VIEW", _sample.LookBack, new Color(.35f,.78f,.68f), s);
-        DrawButton(new Rect(342*s, 147*s, 144*s, 26*s), "PLAYER LIST", _sample.PlayerList, new Color(.38f,.65f,1f), s);
-        DrawButton(new Rect(188*s, 178*s, 144*s, 26*s), "IN-GAME MENU", _sample.Menu, new Color(.65f,.72f,.8f), s);
-        DrawButton(new Rect(342*s, 178*s, 144*s, 26*s), "TARGET UP", _sample.TargetUp, new Color(.97f,.74f,.25f), s);
-        DrawButton(new Rect(188*s, 209*s, 144*s, 26*s), "TARGET DOWN", _sample.TargetDown, new Color(.97f,.74f,.25f), s);
-        DrawButton(new Rect(342*s, 209*s, 144*s, 26*s), "PICK UP ITEM", _sample.Pickup, new Color(.97f,.74f,.25f), s);
+        DrawButton(new Rect(188*s, 116*s, 144*s, 26*s), "BRAKE", _sample.Brake, new Color(.84f,.88f,.94f), s);
+        if (!_sample.IsReplay)
+            DrawButton(new Rect(342*s, 116*s, 144*s, 26*s), "USE WEAPON", _sample.Weapon, new Color(.98f,.3f,.34f), s);
         GUI.EndGroup();
     }
 
@@ -318,5 +301,5 @@ internal static class GamepadOverlay
     }
 
     internal static void Restore() { ResetState(); _faulted = false; }
-    private static void ResetState() { _visible = _startVisible?.Value == true; _hasSample = false; _nextResolve = 0; _localInput = null; _replayInput = null; _ghostJumpPulseUntil = _ghostBoostPulseUntil = _ghostWeaponPulseUntil = _ghostTargetUpPulseUntil = _ghostTargetDownPulseUntil = _ghostPickupPulseUntil = _liveTargetUpPulseUntil = _liveTargetDownPulseUntil = _livePickupPulseUntil = 0; }
+    private static void ResetState() { _visible = _startVisible?.Value == true; _hasSample = false; _nextResolve = 0; _localInput = null; _replayInput = null; _ghostJumpPulseUntil = _ghostBoostPulseUntil = 0; }
 }
