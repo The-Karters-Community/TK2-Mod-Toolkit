@@ -23,7 +23,9 @@ The in-app updater is configured for `The-Karters-Community/TK2-Mod-Toolkit`. It
 4. Test the unpacked package in a relocated folder. Verify startup, installation discovery, module/source catalogs and update metadata. Do not test against the production game folder if the test would modify its files; use a disposable copy where possible.
 5. Commit and push the exact tested source commit. The release script refuses a dirty worktree or a local HEAD different from `origin/main`.
 
-The build runs `npm ci` when Vite dependencies are missing, compiles `studio/web/` into `studio/web-dist/`, and packages the built files. The Windows app uses pywebview with the system WebView2 runtime when available; it falls back to Edge app mode. The normal archive is `artifacts/portable/TK2-Mod-Toolkit-<version>-win-x64.zip`. The default package bundles the application runtime but not BepInEx. `-IncludeLoader` adds the validated loader distribution while preserving the same archive name, so choose one package variant for a release asset.
+The build runs `npm ci` at the repository root, compiles `studio/ui/` into `studio/web-dist/`, and packages the built files. The Windows app uses pywebview with the system WebView2 runtime when available; it falls back to Edge app mode. The normal archive is `artifacts/portable/TK2-Mod-Toolkit-<version>-win-x64.zip`. The default package bundles the application runtime but not BepInEx. `-IncludeLoader` adds the validated loader distribution while preserving the same archive name, so choose one package variant for a release asset.
+
+Only compiled UI assets are staged into the player package. React source, npm dependencies, source maps and frontend tooling stay out of it. The ZIP still contains the Python/desktop runtime and C# authoring material needed by Workshop; changing frontend frameworks does not remove those costs.
 
 ## Create the GitHub release
 
@@ -43,4 +45,4 @@ The script validates the versioned archive, Git status and remote branch head, t
 
 The updater currently accepts one asset with the exact name `TK2-Mod-Toolkit-<version>-win-x64.zip`. It installs the whole application folder. **Compact/delta packages and dual full-plus-compact update releases are not implemented.** If both the slim app ZIP and the loader-included ZIP are uploaded, the current updater cannot distinguish them; do not publish both with the same required name.
 
-As of October 10, 2026, the public repository has no published Releases, so the latest-release API returns no stable asset and in-app automatic update installation has not yet been exercised against a live release. Before announcing the first release, publish a test version and update an older packaged copy. Verify the update prompt, digest, embedded manifest, preserved `local/` folder, relaunch and rollback path.
+Before publishing each update, test it against an older packaged copy. Verify the update prompt, digest, embedded manifest, preserved `local/` folder, relaunch and rollback path.

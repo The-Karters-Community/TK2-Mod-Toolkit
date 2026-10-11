@@ -11,15 +11,10 @@ try {
     if (-not $nodeCommand -or -not $npmCommand) { throw 'Node.js 20.19+ and npm are required to build the Vite frontend.' }
     $nodeParts = ((& $nodeCommand.Source --version).TrimStart('v') -split '\.') | ForEach-Object { [int]$_ }
     if ($nodeParts[0] -lt 20 -or $nodeParts[0] -eq 21 -or ($nodeParts[0] -eq 20 -and $nodeParts[1] -lt 19) -or ($nodeParts[0] -eq 22 -and $nodeParts[1] -lt 12)) { throw 'Vite requires Node.js 20.19+ or 22.12+.' }
-    Push-Location (Join-Path $repoRoot 'studio/web')
-    try {
-        if (-not (Test-Path -LiteralPath 'node_modules/vite/bin/vite.js')) {
-            & $npmCommand.Source ci
-            if ($LASTEXITCODE -ne 0) { throw 'Could not install locked Vite frontend dependencies.' }
-        }
-        & $npmCommand.Source run build
-        if ($LASTEXITCODE -ne 0) { throw 'Vite frontend build failed.' }
-    } finally { Pop-Location }
+    & $npmCommand.Source ci
+    if ($LASTEXITCODE -ne 0) { throw 'Could not install locked frontend dependencies at the repository root.' }
+    & $npmCommand.Source run build
+    if ($LASTEXITCODE -ne 0) { throw 'React frontend build failed.' }
     $buildPython = Join-Path $repoRoot 'local/portable-build-env/Scripts/python.exe'
     if (-not (Test-Path -LiteralPath $buildPython)) {
         & $pythonCommand.Source -m venv (Join-Path $repoRoot 'local/portable-build-env')

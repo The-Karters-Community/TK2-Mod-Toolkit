@@ -7,6 +7,7 @@ exports/
 artifacts/
 *.user
 *.suo
-studio/web/node_modules/
+**/node_modules/
 
 studio/web-dist/
+node_modules

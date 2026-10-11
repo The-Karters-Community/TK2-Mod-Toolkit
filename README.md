@@ -29,6 +29,8 @@ If plugin installation is blocked, first check that the selected folder contains
 
 To remove the Toolkit plugin, close the game and use **Installation → Backups & restore** to restore the transaction created when the Toolkit DLL was installed. This restores the previous DLL, or removes the Toolkit DLL if there was no previous file. Keep or remove the Toolkit config according to whether you want to retain settings; removing the plugin does not require deleting BepInEx or other mods. The app refuses to restore a file that changed after the backup.
 
+Release ZIPs and in-app updates include the compiled interface and application runtime. Players do **not** need Node.js, npm, Python or a build step. The commands below are for contributors.
+
 ## Run from a source checkout
 
 On Windows, install **Python 3.10 or newer, 64-bit**, **Node.js 20.19 or newer with npm**, and clone the repository. Vite builds the frontend into static assets served by the authenticated local backend. Packaged builds use a pywebview desktop host with WebView2; source checkouts use it when `pywebview` is installed and otherwise open in Edge app mode.
@@ -38,14 +40,12 @@ git clone https://github.com/The-Karters-Community/TK2-Mod-Toolkit.git
 cd TK2-Mod-Toolkit
 python --version
 python -m pip install -r tools/requirements-app.txt  # optional native WebView2 desktop window
-cd studio/web
 npm ci
 npm run build
-cd ../..
 python launch.py
 ```
 
-You can also double-click **Launch Studio.cmd**; it installs missing frontend dependencies and rebuilds the Vite frontend before opening. A failed build stops startup instead of serving stale assets. Install `tools/requirements-app.txt` to use the native WebView2 window; without it, the launcher opens Edge app mode. For frontend changes that appear immediately while editing, use the two-terminal Vite workflow in [Contributing](CONTRIBUTING.md). The [frontend ownership map](studio/web/README.md) explains where each view, control and stylesheet belongs. The app does not install or launch the game by itself.
+You can also double-click **Launch Studio.cmd**; it installs missing frontend dependencies and rebuilds the Vite frontend before opening. A failed build stops startup instead of serving stale assets. Install `tools/requirements-app.txt` to use the native WebView2 window; without it, the launcher opens Edge app mode. For frontend changes that appear immediately while editing, use the two-terminal Vite workflow in [Contributing](CONTRIBUTING.md). The [frontend ownership map](docs/ARCHITECTURE.md) explains where each view, control and stylesheet belongs. The app does not install or launch the game by itself.
 
 To compile or install the plugin from source, also install a **.NET SDK that can target `net6.0`**, install the supported BepInEx build in the game, run the game once to generate interop assemblies, then close the game. Select the game in Installation and use **Build & install** in Workshop, or run `python -m studio.cli --game 'D:\Games\The Karters 2 Turbo Charged' build`. The plugin project requires game-specific interop references; build it through the Toolkit or this CLI rather than invoking `dotnet build` directly. A normal player using the prebuilt plugin does not need the .NET SDK.
 
@@ -53,7 +53,7 @@ To compile or install the plugin from source, also install a **.NET SDK that can
 
 | Path | Purpose |
 | --- | --- |
-| `studio/` | Toolkit app: local HTTP backend, settings/catalog logic, release checker, and responsive HTML/CSS/JavaScript interface in `studio/web/`. |
+| `studio/` | Toolkit app: local HTTP backend, settings/catalog logic, release checker, and React interface in `studio/ui/`. |
 | `plugins/TK2.Customization/` | The BepInEx plugin and its C# modules, hooks, online-safety policy, configuration handling and recipe host. |
 | `src/Reconstructed/` | Small, readable C# semantic reconstructions of selected native game methods, adapters and provenance records. |
 | `templates/` | Starter projects and examples for user-authored modules and recipes. |
@@ -64,7 +64,7 @@ To compile or install the plugin from source, also install a **.NET SDK that can
 | `artifacts/` | Ignored build output: compiled plugin and portable app packages. Regenerate these locally; they are not checked into Git. |
 | `local/`, `exports/` | Ignored machine-specific work: Ghidra projects, generated game data, captures, logs, backups and recovered third-party sources. Keep these out of commits. |
 
-The top-level **`PRODUCT.md`** describes the application scope and **`DESIGN.md`** captures design direction. See [the documentation index](#guides-and-reference) for the main guides.
+The **`.agents/context/PRODUCT.md`** describes the application scope and **`.agents/context/DESIGN.md`** captures design direction. See [the documentation index](#guides-and-reference) for the main guides.
 
 ## Build the plugin and portable app
 
@@ -95,12 +95,15 @@ From the repository root:
 
 ```powershell
 python -m unittest discover -s tests -p 'test_*.py'
-node tests/garage-state.test.cjs
+npm test
+npm run format:check
+npm run build
+python tools/smoke_garage.py
 ```
 
 The plugin's focused C# checks are separate projects under `tests/` (for example `dotnet run --project tests/ReadableLogic/ReadableLogic.csproj` and `dotnet run --project tests/OnlineProtection/OnlineProtection.csproj`). They compile against local stubs or extracted logic where documented. Use `python -m studio.cli build` with the initialized game's interop to validate a real plugin build. Passing automated checks proves only the behavior they cover; it does not replace in-game rendering, race, online-hook or clean-machine validation.
 
-`python tools/smoke_gui.py` is an optional legacy Tk GUI smoke test. It also reads `MKsKartersMods.cfg` from a configured game installation; it currently stops if that file is absent. It does not launch the game.
+`python tools/smoke_garage.py` verifies built interface assets and the UI size budget. It does not launch the game. `python -m studio` opens the same application as `python launch.py`.
 
 ## Releases and in-app updates
 

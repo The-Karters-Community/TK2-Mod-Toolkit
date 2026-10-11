@@ -125,7 +125,7 @@ Reproduce the checks:
 
 ```powershell
 python -m unittest discover -s tests -p 'test_*.py'
-node tests/garage-state.test.cjs
+npm test
 python tools/smoke_garage.py
 ```
 

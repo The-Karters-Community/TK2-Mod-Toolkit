@@ -11,9 +11,9 @@ Unzip the portable distribution into a writable folder and open `TK2 Mod Toolkit
 
 The current test pack targets game 0.1.4.18, GameAssembly SHA-256 `e55fab2cdcbf3852160183504a847b1a1b7af61c24bc9619e3736e3753aee130`. Other builds need author migration and validation; installing against an arbitrary changed binary is rejected.
 
-## Configure packs
+## Configure modules
 
-Choose a pack, expand a module and turn it on. Each setting shows its default and allowed values. Use Expand all or Collapse all on the separate row above the modules to open or close the displayed module panels, recipe sections and nested parameter groups. Use search to find a parameter; large tuning modules contain collapsible groups. An advanced value remains inactive until its Override switch is on. Reset module/pack changes the controls to defaults and switches affected modules off. Save changes applies your edits; reset does not secretly write a file. **Launch game** beside Save changes starts the selected installation; save pending settings or source edits first.
+Open Mod library, filter by category or search, expand a module and turn it on. Enabled shows its current count and filters the library; Disable enabled stages all unlocked modules off. Each setting shows its default and allowed values. Use Expand all or Collapse all on the separate row above the modules to open or close the displayed module panels, recipe sections and nested parameter groups. Use search to find a parameter; large tuning modules contain collapsible groups. An advanced value remains inactive until its Override switch is on. Reset module changes the controls to defaults and switches affected modules off. Save changes applies your edits; reset does not secretly write a file. **Launch game** beside Save changes starts the selected installation; save pending settings or source edits first.
 
 Character names lets you pick a built-in racer as the matching name, then type any replacement text. Older saved custom match names remain available in the selector. When the installed plugin differs from the bundled version, the app header shows an Update plugin action; it uses the same backed-up install flow as the Installation page.
 
@@ -23,7 +23,7 @@ Camera setup contains FOV, Keep kart size, distance, height, side offset, aim, t
 
 Disable vignette is an optional visual module, off by default. Enable it to suppress the post-processing vignette while preserving the game's profile values; turning it off lets the game's current vignette settings apply again. The hook compiles against the installed game interop, but its live rendering behavior still needs an in-game check.
 
-Online protection is mandatory and locked on. It permits leaderboard submissions and online rooms when only the built-in allowlisted modules are active: HUD size and HUD transparency. Other enabled Toolkit modules, enabled recipes, and any other loaded BepInEx plugin block those actions. See [Online protection](ONLINE-PROTECTION.md) for the module-by-module review and hook coverage.
+Online protection is mandatory and locked on. The reviewed built-in allowlist determines which presentation modules can be used online. Unapproved enabled modules, arbitrary recipes, and other loaded BepInEx plugins block leaderboard submissions and online-room actions. See [Online protection](ONLINE-PROTECTION.md) for the module-by-module review and hook coverage.
 
 ## Workshop
 

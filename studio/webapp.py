@@ -17,9 +17,6 @@ import webbrowser
 from urllib.parse import urlsplit, parse_qs
 from . import core, pack, settings, setup, symbols, releases, pseudocode
 from .version import APP_VERSION
-from .frontend import render_html
-
-WEB = core.ROOT / "studio/web"
 WEB_DIST = core.ROOT / "studio/web-dist"
 CLIENT_ID = re.compile(r"^[A-Za-z0-9_-]{12,80}$")
 CLIENT_IDLE_SECONDS = 600
@@ -323,13 +320,13 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200, symbols.detail(parse_qs(parsed.query).get("id", [""])[0]))
                 return self.reply(404, {"error": "Unknown API"})
             if parsed.path == "/":
-                index = WEB_DIST / "index.html" if (WEB_DIST / "index.html").is_file() else WEB / "index.html"
-                source = (index.read_text(encoding="utf-8") if index.parent == WEB_DIST
-                          else render_html(index, WEB))
+                index = WEB_DIST / "index.html"
+                if not index.is_file():
+                    return self.reply(503, '<h1>Frontend build missing</h1><p>Source checkout: run npm ci and npm run build at the repository root, then reload. Release copy: extract the complete archive again. Releases do not require npm.</p>', 'text/html')
+                source = index.read_text(encoding="utf-8")
                 source = source.replace("__SESSION_TOKEN__", self.server.app.token).replace("__APP_VERSION__", APP_VERSION)
                 return self.reply(200, source, "text/html")
-            files = {"/app.js": WEB / "app.js",
-                     "/assets/logo.png": core.ROOT / "assets/Logo.png",
+            files = {"/assets/logo.png": core.ROOT / "assets/Logo.png",
                      "/assets/art.jpg": core.ROOT / "assets/library_600x900_2x.jpg",
                      "/assets/app.ico": core.ROOT / "assets/TheKartersLogoModified.ico"}
             if (WEB_DIST / "index.html").is_file():
@@ -342,10 +339,6 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path in files:
                 path = files[parsed.path]
                 return self.reply(200, path.read_bytes(), mimetypes.guess_type(path.name)[0] or "application/octet-stream")
-            if parsed.path.startswith(("/features/", "/shared/", "/styles/")):
-                source_file = (WEB / parsed.path.lstrip("/")).resolve()
-                if source_file.is_relative_to(WEB.resolve()) and source_file.suffix in (".js", ".css") and source_file.is_file():
-                    return self.reply(200, source_file.read_bytes(), mimetypes.guess_type(source_file.name)[0] or "application/octet-stream")
             self.reply(404, {"error": "Not found"})
         except Exception as exc: self.reply(400, {"error": str(exc)})
 

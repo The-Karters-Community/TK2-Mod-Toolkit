@@ -12,6 +12,16 @@ from studio import core, pack, setup, symbols
 from studio.version import APP_VERSION
 
 VERSION = APP_VERSION
+PLAYER_DIRECTORIES = ('assets', 'studio/web-dist', 'src/Reconstructed', 'templates', 'docs')
+
+
+def stage_player_assets(staging):
+    """Only compiled UI is shipped; npm, frontend source and caches are not player requirements."""
+    if not (core.ROOT / 'studio/web-dist/index.html').is_file():
+        raise ValueError('Build the frontend from the repository root with npm ci and npm run build before packaging.')
+    for directory in PLAYER_DIRECTORIES:
+        shutil.copytree(core.ROOT / directory, staging / directory, dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns('node_modules', '__pycache__', '*.map'))
 
 
 def publish_directory(source, target):
@@ -67,9 +77,7 @@ def main():
     staging.mkdir(parents=True, exist_ok=True)
     # Include editable source, assets and the prebuilt plugin. Never include game
     # binaries, generated interop assemblies, credentials, session tokens or logs.
-    for directory in ('assets', 'studio/web', 'studio/web-dist', 'src/Reconstructed', 'templates', 'docs'):
-        ignore = shutil.ignore_patterns('node_modules') if directory == 'studio/web' else None
-        shutil.copytree(core.ROOT / directory, staging / directory, dirs_exist_ok=True, ignore=ignore)
+    stage_player_assets(staging)
     (staging / 'tools').mkdir(parents=True, exist_ok=True)
     shutil.copy2(core.ROOT / 'tools/update_portable.ps1', staging / 'tools/update_portable.ps1')
     for file in pack.source_files() + ['plugins/TK2.Customization/TK2.Customization.csproj', 'README.md', 'LICENSE']:

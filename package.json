@@ -1,0 +1,12 @@
+{
+  "name": "tk2-mod-toolkit",
+  "private": true,
+  "workspaces": ["studio/ui"],
+  "scripts": {
+    "dev": "npm run dev --workspace studio/ui",
+    "build": "npm run build --workspace studio/ui",
+    "test": "npm run test --workspace studio/ui",
+    "format": "npm run format --workspace studio/ui",
+    "format:check": "npm run format:check --workspace studio/ui"
+  }
+}

@@ -4,14 +4,16 @@ Start with the part you want to change. The desktop host, web interface and game
 
 | Change | Start here | Verify with |
 | --- | --- | --- |
-| Mod controls, filters and settings | `studio/web/features/mods/` | Frontend assertions and browser smoke check |
-| Workshop editor, API reference, sharing | `studio/web/features/workshop/` | Frontend assertions and affected Workshop tab |
-| Installation and update interface | `studio/web/features/installation/` | Python tests and Installation smoke check |
-| Page markup and visual styling | `studio/web/views/`, `studio/web/styles/` | Vite build and narrow/wide window checks |
+| Mod controls, filters and settings | `studio/ui/src/pages/Mods.jsx` | Frontend assertions and browser smoke check |
+| Workshop editor, API reference, sharing | `studio/ui/src/pages/Workshop.jsx`, `Reference.jsx`, `Sharing.jsx` | Frontend assertions and affected Workshop tab |
+| Installation and update interface | `studio/ui/src/pages/Installation.jsx` | Python tests and Installation smoke check |
+| Page markup and visual styling | `studio/ui/src/components/`, `studio/ui/src/styles.css` | Vite build and narrow/wide window checks |
 | Backend and desktop lifecycle | `studio/webapp.py`, `studio/core.py` | Python tests |
 | Existing game module | Its C# file in `plugins/TK2.Customization/` | Relevant harness, plugin build, then in-game validation |
 | New editable recipe | Workshop → Create recipe; `templates/` | Build & install with the game closed |
 | Evidence or readable game behavior | `docs/`, `src/Reconstructed/` | Native evidence, interop signatures and documented limits |
+
+Players using release ZIPs or the updater need no npm installation. Contributors install dependencies **once at the repository root**, not inside `studio/ui/`.
 
 ## Local setup
 
@@ -19,10 +21,8 @@ Install Python 3.10+ x64, a Vite-compatible Node version (20.19+ or 22.12+; use 
 
 ```powershell
 python -m pip install -r tools/requirements-app.txt
-cd studio/web
 npm ci
 npm run build
-cd ../..
 python launch.py
 ```
 
@@ -37,17 +37,16 @@ python launch.py --no-browser
 In the second:
 
 ```powershell
-cd studio/web
 npm run dev
 ```
 
-Open the local URL printed by Vite. CSS edits update live; JavaScript and view-template edits reload the page. Save your pending settings or source edits before a reload. The Vite proxy reads the ignored backend session file and retains the backend's loopback authentication. Restart Vite if you restart the backend, because its session token changes.
+Open the local URL printed by Vite. React Fast Refresh updates components while you edit; Tailwind and CSS changes update live. Save pending settings or C# source before restarting the dev server. The Vite proxy reads the ignored backend session file and retains the backend's loopback authentication. Restart Vite if you restart the backend, because its session token changes.
 
 For in-game settings, **Apply as you adjust** saves eligible settings for already-enabled modules after a short debounce. Enable/disable changes still need **Save changes**. C# code requires **Build & install** with the game closed, followed by a manual game restart; this is not hot code replacement.
 
 ## Frontend ownership
 
-See [the frontend map](studio/web/README.md). Add behavior to the owning feature, not `app.js`. Keep markup in readable view fragments and shared state explicit. Formatting is checked with Prettier; avoid compressed source HTML or embedding whole pages in JavaScript strings.
+See [Architecture](docs/ARCHITECTURE.md). Keep page behavior with its page; reuse the existing controls and settings model. JSX stays readable and is formatted with Prettier. Avoid creating one file per event or splitting CSS by every control.
 
 ## Plugin changes
 
@@ -71,11 +70,11 @@ Native-hook contributions should include the supported game build, hashes of `Ga
 
 ```powershell
 python -m unittest discover -s tests
-node tests/garage-state.test.cjs
+npm test
 dotnet run --project tests/MirrorRace/MirrorRace.csproj -c Release
-cd studio/web
 npm run format:check
 npm run build
+python tools/smoke_garage.py
 ```
 
-Run the relevant checks for your change and include the result in your commit. Plugin changes also need a plugin build and a visible game test. Commit focused milestones. Normal edits/builds keep the current toolkit version and use the stable local plugin artifact folder; they do not create a new release. Only set the next version when preparing an explicitly requested release with `tools/set_version.ps1`. See [Releasing](docs/RELEASING.md) for full and compact release assets.
+Run the relevant checks for your change and include the result in your commit. Plugin changes also need a plugin build and a visible game test. Commit focused milestones. Normal edits/builds keep the current toolkit version and use the stable local plugin artifact folder; they do not create a new release. Only set the next version when preparing an explicitly requested release with `tools/set_version.ps1`. See [Releasing](docs/RELEASING.md) for portable release assets and updater requirements.

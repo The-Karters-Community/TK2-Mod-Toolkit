@@ -1,45 +1,43 @@
-"""Static UI wiring smoke check. Browser visual inspection is a separate required check."""
+"""Validate compiled UI references and size; browser inspection remains separate."""
 from html.parser import HTMLParser
 import json
 from pathlib import Path
-import re
-import subprocess
-import sys
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from studio import core
-from studio.frontend import render_html
+
+ROOT = Path(__file__).resolve().parents[1]
+WEB = ROOT / "studio/web-dist"
+
 
 class Page(HTMLParser):
-    def __init__(self): super().__init__(); self.ids = []; self.targets = []
+    def __init__(self):
+        super().__init__()
+        self.assets = []
+
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        if "id" in attrs: self.ids.append(attrs["id"])
-        if "data-view" in attrs: self.targets.append(attrs["data-view"])
+        url = attrs.get("src", attrs.get("href", ""))
+        if url.startswith("/assets/") and url not in ("/assets/logo.png", "/assets/app.ico"):
+            self.assets.append(url)
 
-page = Page()
-web = core.ROOT / "studio/web"
-html = render_html(web / 'index.html', web)
-page.feed(html)
-assert len(page.ids) == len(set(page.ids)), "Duplicate UI ids"
-assert all(target in page.ids for target in page.targets)
-scripts = [web / 'app.js', *sorted((web / 'features').rglob('*.js')), *sorted((web / 'shared').rglob('*.js'))]
-for script in scripts:
-    source = script.read_text(encoding='utf-8')
-    assert all(name in page.ids for name in re.findall(r'''\$\(["']([^"']+)["']\)''', source)), f'Unknown control id in {script.name}'
-css = '\n'.join(path.read_text(encoding='utf-8') for path in sorted((web / 'styles').glob('*.css')))
-assert 'data-theme' in css and 'prefers-reduced-motion' in css
-assert '.module-expand' in css and '.topbar-update' in css
-assert '/styles/index.css' in html
-assert 'max-width: 1450px' not in css and 'min-height: 100vh' in css
-assert '__APP_VERSION__' in html
-assert 'id="expand-all-accordions"' in html and 'id="collapse-all-accordions"' in html
-assert 'aria-expanded="true"' in css and 'oklch(84% 0.16 72)' in css
-assert all((core.ROOT / "assets" / name).exists() for name in ("Logo.png", "library_600x900_2x.jpg"))
-for script in scripts:
-    subprocess.run(['node', '--check', str(script)], check=True, creationflags=core.CREATE_NO_WINDOW)
-result = {"uniqueControls": len(page.ids), "views": page.targets, "themeTokens": True, "assetsPresent": True,
-          "componentStyles": "passed",
-          "javascriptSyntax": "passed", "visualBrowserCheck": "separate browser check required",
-          "gameRuntimeTest": "not run"}
-core.write_json(core.ROOT / "local/garage-smoke.json", result)
-print(json.dumps(result, indent=2))
+
+def main():
+    html = (WEB / "index.html").read_text(encoding="utf-8")
+    assert "__SESSION_TOKEN__" in html and "__APP_VERSION__" in html
+    page = Page()
+    page.feed(html)
+    assert page.assets, "Missing compiled assets; run npm run build"
+    for url in page.assets:
+        assert (WEB / url.lstrip("/")).is_file(), f"Missing {url}"
+    files = [path for path in WEB.rglob("*") if path.is_file()]
+    assert not any(path.suffix == ".map" for path in files)
+    size = sum(path.stat().st_size for path in files)
+    assert size < 500_000, f"UI exceeds 500 KB raw budget: {size}"
+    result = {"compiledFiles": len(files), "bytes": size, "assetReferences": "passed",
+              "visualBrowserCheck": "separate browser check required"}
+    output = ROOT / "local/garage-smoke.json"
+    output.parent.mkdir(exist_ok=True)
+    output.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    print(json.dumps(result, indent=2))
+
+
+if __name__ == "__main__":
+    main()

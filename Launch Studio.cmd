@@ -6,19 +6,16 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-pushd "%~dp0studio\web"
 if not exist "node_modules\vite\bin\vite.js" (
   call npm ci
   if errorlevel 1 goto frontend_failed
 )
 call npm run build
 if errorlevel 1 goto frontend_failed
-popd
 start "" pythonw "%~dp0launch.py"
 exit /b 0
 
 :frontend_failed
-popd
 echo Frontend setup or build failed. Studio was not opened with stale assets.
 pause
 exit /b 1

@@ -1,0 +1,210 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-panel: var(--panel);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-warning: var(--warning);
+}
+
+:root {
+  color-scheme: light;
+  --surface: oklch(97% 0.006 75);
+  --panel: oklch(99% 0.003 75);
+  --rail: oklch(94% 0.007 75);
+  --text: oklch(25% 0.01 75);
+  --muted: oklch(47% 0.012 75);
+  --line: oklch(85% 0.008 75);
+  --accent: oklch(67% 0.16 60);
+  --warning: oklch(46% 0.18 30);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: oklch(20% 0.008 75);
+  --panel: oklch(24% 0.008 75);
+  --rail: oklch(17% 0.007 75);
+  --text: oklch(94% 0.006 75);
+  --muted: oklch(73% 0.01 75);
+  --line: oklch(35% 0.008 75);
+  --accent: oklch(76% 0.145 68);
+  --warning: oklch(78% 0.13 32);
+}
+[hidden] {
+  display: none !important;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button:not(:disabled),
+summary {
+  cursor: pointer;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+button:disabled,
+input:disabled,
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+h1 {
+  @apply text-2xl font-semibold tracking-tight;
+}
+h2 {
+  @apply text-lg font-semibold;
+}
+h3 {
+  @apply font-semibold;
+}
+pre {
+  @apply overflow-auto rounded-lg border border-line bg-panel p-4 text-xs leading-6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.app-shell {
+  @apply min-h-dvh md:grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+}
+.app-rail {
+  @apply flex gap-4 border-b border-line p-4 md:sticky md:top-0 md:h-dvh md:flex-col md:border-r md:border-b-0 md:p-5;
+  background: var(--rail);
+}
+.app-main {
+  @apply min-w-0 px-4 py-5 sm:px-6 lg:px-9;
+  padding-bottom: 100px;
+}
+.button,
+.button-primary {
+  @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium;
+  transition:
+    background-color 150ms ease-out,
+    transform 150ms ease-out;
+}
+.button {
+  @apply border-line bg-panel;
+}
+.button-primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: oklch(20% 0.02 60);
+}
+.button:active:not(:disabled),
+.button-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.button.selected {
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
+}
+.button.filter {
+  @apply border-transparent bg-transparent;
+}
+.button.filter.selected {
+  @apply border-line bg-panel;
+  color: var(--text);
+}
+.button.nav-button {
+  @apply justify-start border-transparent bg-transparent;
+}
+.button.nav-button.selected {
+  @apply bg-panel border-line;
+  color: var(--text);
+}
+.field {
+  @apply min-h-9 min-w-0 rounded-md border border-line bg-panel px-3 py-2;
+}
+.checkbox {
+  @apply h-4 w-4 shrink-0;
+  accent-color: var(--accent);
+}
+.range {
+  accent-color: var(--accent);
+}
+.badge {
+  @apply inline-flex items-center rounded border border-line px-2 py-0.5 text-xs font-normal text-muted;
+}
+.switch {
+  @apply relative h-6 w-10 shrink-0 rounded-full border border-line;
+  background: var(--line);
+  transition: background-color 150ms ease-out;
+}
+.switch > span {
+  @apply absolute left-0.5 top-0.5 h-4 w-4 rounded-full;
+  background: var(--text);
+  transition: transform 150ms ease-out;
+}
+.switch[aria-checked="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.switch[aria-checked="true"] > span {
+  transform: translateX(16px);
+  background: oklch(20% 0.02 60);
+}
+.disclosure {
+  @apply rounded-lg border border-line bg-panel;
+}
+.library-toolbar {
+  @apply border-b border-line pb-4;
+}
+.save-bar {
+  @apply fixed bottom-0 left-0 right-0 z-10 flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 sm:px-6 md:left-[196px] lg:px-9;
+  background: var(--surface);
+}
+.notification {
+  @apply fixed bottom-20 left-4 right-4 z-20 flex items-center justify-between gap-4 rounded-lg border border-line bg-panel p-4 text-sm shadow-lg md:left-auto md:max-w-lg;
+}
+.error-box {
+  @apply rounded-lg border p-4 text-sm;
+  border-color: var(--warning);
+  color: var(--warning);
+  background: var(--panel);
+}
+.skeleton {
+  @apply rounded-lg bg-panel;
+}
+.result-row {
+  @apply block w-full border-b border-line p-3 text-left;
+}
+.result-row[aria-pressed="true"] {
+  background: var(--rail);
+}
+@media (hover: hover) and (pointer: fine) {
+  .button:hover:not(:disabled),
+  .result-row:hover {
+    background: var(--rail);
+  }
+  .button-primary:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+}
+@media (max-width: 767px) {
+  .app-rail {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .app-rail nav {
+    flex: 1 1 100%;
+    order: 2;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation: none !important;
+  }
+}

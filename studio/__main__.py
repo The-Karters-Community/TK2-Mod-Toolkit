@@ -1,3 +1,3 @@
-from .gui import Studio
+from .webapp import main
 
-Studio().mainloop()
+main()
