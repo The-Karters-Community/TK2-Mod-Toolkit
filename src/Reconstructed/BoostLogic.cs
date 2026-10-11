@@ -25,6 +25,14 @@ public enum BoostZone
     Insane = 6
 }
 
+public readonly record struct BoostPadTriggerPlan(
+    bool ShouldFire,
+    bool ResetInstantVelocity,
+    float LastTriggerTime,
+    float BoostPadTime,
+    float FireLength,
+    float FireInstantVelocity);
+
 /// <summary>
 /// Readable normal-state translations of small Ant_BoostManager methods.
 /// ObscuredFloat inputs here are already decoded values; IL2CPP initialization,
@@ -126,6 +134,26 @@ public static class BoostLogic
         if (elapsedFillTime <= 0.55f) return BoostZone.Early;
         if (0.94f < elapsedFillTime && elapsedFillTime <= 1.05f) return BoostZone.Perfect;
         return BoostZone.Great;
+    }
+
+    // Ant_BoostManager.BoostPadTriggerEnter. Diagnostic Debug.Log calls are omitted.
+    public static BoostPadTriggerPlan PlanBoostPadTrigger(bool resetInstantVelocityBeforeFiring,
+        float currentTime, float lastTriggerTime, float minimumSamePadInterval,
+        float currentBoostPadTime, float strength, float length,
+        float defaultBoostPadLengthTime, float defaultInstantVelocity)
+    {
+        if (!resetInstantVelocityBeforeFiring)
+        {
+            float newLastTriggerTime = currentTime;
+            if (currentTime - lastTriggerTime < minimumSamePadInterval)
+                return new(false, false, newLastTriggerTime, currentBoostPadTime, 0f, 0f);
+
+            lastTriggerTime = newLastTriggerTime;
+        }
+
+        float fireLength = length * defaultBoostPadLengthTime;
+        return new(true, resetInstantVelocityBeforeFiring, lastTriggerTime,
+            currentBoostPadTime + fireLength, fireLength, strength * defaultInstantVelocity);
     }
 
     // IsManualBoostWithingFireRange uses slot zero and includes both boundaries.

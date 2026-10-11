@@ -115,6 +115,28 @@
       "confidence": "reviewed normal-state semantics; assumes initialized controller, motor and kart physics; no runtime equivalence proof"
     },
     {
+      "method": "Ant_BoostManager.BoostPadTriggerEnter",
+      "address": "180665fa0",
+      "source": "src/Reconstructed/NativeAdapters.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180665fa0_Ant_BoostManager__BoostPadTriggerEnter.c",
+      "evidenceSha256": "7a4c95343815ba3d2a0fb411dd3630aa32e96ae7f9e5df70ef5a3ea58520956b",
+      "dependencies": [
+        {
+          "method": "Ant_BoostManager.FireBoost",
+          "address": "1806663a0",
+          "evidence": "local/ghidra/assembly-csharp-full/pseudocode/1806663a0_Ant_BoostManager__FireBoost.c",
+          "evidenceSha256": "1b6da09f1be57926dfc6d646aed5cbf0524cd1112cdbafbb267223333d4340d9"
+        },
+        {
+          "method": "PixelKartPhysics.ResetInstantBoostVelocity",
+          "address": "1805e1c20",
+          "evidence": "local/ghidra/assembly-csharp-full/pseudocode/1805e1c20_PixelKartPhysics__ResetInstantBoostVelocity.c",
+          "evidenceSha256": "c3949cd87f892a2ef702d089c63916a7674eb34937b9c537c25978c90451a371"
+        }
+      ],
+      "confidence": "reviewed normal-state cooldown and fire semantics; diagnostic logging and native null/error paths omitted; delegates boost state and event handling to game-owned methods"
+    },
+    {
       "method": "Ant_BoostManager.WhatZoneIsThePlayerIn",
       "address": "1806697c0",
       "source": "src/Reconstructed/BoostLogic.cs",

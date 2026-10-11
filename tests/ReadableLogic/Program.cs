@@ -110,6 +110,20 @@ Check(BoostLogic.GetBoostZone(0, new[] { .2f, .3f, .4f }, new[] { 1.05f, .6f, .6
     "the perfect window includes its 1.05 upper boundary");
 Check(BoostLogic.GetBoostZone(0, new[] { .2f, .3f, .4f }, new[] { 1.0501f, .6f, .6f }, 1) == BoostZone.Great,
     "fill time above 1.05 falls back to great");
+var resetPad = BoostLogic.PlanBoostPadTrigger(true, 5f, 4f, 2f, .25f, 2f, 3f, 4f, 5f);
+Check(resetPad.ShouldFire && resetPad.ResetInstantVelocity, "reset-mode boost pads bypass same-pad cooldown");
+Check(resetPad.LastTriggerTime == 4f && resetPad.BoostPadTime == 12.25f,
+    "reset-mode pad adds duration without updating the last-trigger timestamp");
+Check(resetPad.FireLength == 12f && resetPad.FireInstantVelocity == 10f,
+    "boost-pad strength and length use their configured multipliers");
+var suppressedPad = BoostLogic.PlanBoostPadTrigger(false, 1.4f, 1f, .5f, .25f, 2f, 3f, 4f, 5f);
+Check(!suppressedPad.ShouldFire && !suppressedPad.ResetInstantVelocity,
+    "same-pad trigger is suppressed strictly inside the cooldown");
+Check(suppressedPad.LastTriggerTime == 1.4f && suppressedPad.BoostPadTime == .25f,
+    "suppressed pad still updates last-trigger time without adding pad duration");
+var boundaryPad = BoostLogic.PlanBoostPadTrigger(false, 1.5f, 1f, .5f, .25f, 2f, 3f, 4f, 5f);
+Check(boundaryPad.ShouldFire && boundaryPad.LastTriggerTime == 1.5f,
+    "same-pad trigger is accepted at the exact cooldown boundary");
 float[] boostFills = { .35f, .8f, 1.2f };
 Check(BoostLogic.GetManualBoostFillNormalized(boostFills, 1) == .8f, "manual boost getter returns the selected fill slot");
 foreach (var item in new[] { (.2f, true), (.5f, true), (.5001f, false), (.1999f, false), (float.NaN, false) })

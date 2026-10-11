@@ -78,6 +78,36 @@ public static partial class ReadableGame
             boost.fCurrentBoostFillTime_NotClampedTimeSinceLoading,
             boost.iCurrentBoosterNumberCount);
 
+    // Ant_BoostManager.BoostPadTriggerEnter @ 0x180665fa0.
+    // The game-owned FireBoost method remains responsible for its normal state/event behavior.
+    public static bool BoostPadTriggerEnter(Ant_BoostManager boost, float strength, float length,
+        bool resetInstantVelocityBeforeFiring)
+    {
+        float currentTime = resetInstantVelocityBeforeFiring ? 0f : UnityEngine.Time.time;
+        float lastTriggerTime = resetInstantVelocityBeforeFiring ? 0f : boost._fLastBoostPadTriggerTime;
+        var plan = BoostLogic.PlanBoostPadTrigger(
+            resetInstantVelocityBeforeFiring,
+            currentTime,
+            lastTriggerTime,
+            boost.fMinTimeBetweenSameBoostPadTrigger,
+            boost.fCurrentConstBoostingTimeFromBoostpad,
+            strength,
+            length,
+            boost.fDefaultBoostPadLengthTime,
+            boost.fDefaultBoostPadInstantVelAfterEntering);
+
+        if (!resetInstantVelocityBeforeFiring)
+            boost._fLastBoostPadTriggerTime = plan.LastTriggerTime;
+        if (!plan.ShouldFire) return false;
+
+        boost.fCurrentConstBoostingTimeFromBoostpad = plan.BoostPadTime;
+        if (plan.ResetInstantVelocity)
+            boost.kartController.kartPhysics.ResetInstantBoostVelocity();
+        boost.FireBoost(Ant_BoostManager.EBoostType.EBOOST_BOOSTPAD, 0f,
+            plan.FireInstantVelocity, plan.FireLength);
+        return true;
+    }
+
     // HpBarController.GetCurrentHP shares 0x18056d2b0 with PlayerGlobalStats.GetCurrentHP.
     // The native getter reads synchronized visible HP, rather than private currentHp.
     public static int GetCurrentHP(HpBarController hp) => hp.player.visualInstanceSyncedParams.iPlayerHP;
