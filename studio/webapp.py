@@ -16,7 +16,7 @@ import time
 import webbrowser
 from urllib.parse import urlsplit, parse_qs
 from . import core, pack, settings, setup, symbols, releases, pseudocode
-from .version import APP_VERSION
+from .version import APP_VERSION, display_version
 WEB_DIST = core.ROOT / "studio/web-dist"
 CLIENT_ID = re.compile(r"^[A-Za-z0-9_-]{12,80}$")
 CLIENT_IDLE_SECONDS = 600
@@ -324,7 +324,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not index.is_file():
                     return self.reply(503, '<h1>Frontend build missing</h1><p>Source checkout: run npm ci and npm run build at the repository root, then reload. Release copy: extract the complete archive again. Releases do not require npm.</p>', 'text/html')
                 source = index.read_text(encoding="utf-8")
-                source = source.replace("__SESSION_TOKEN__", self.server.app.token).replace("__APP_VERSION__", APP_VERSION)
+                source = source.replace("__SESSION_TOKEN__", self.server.app.token).replace("__APP_VERSION__", display_version(bool(getattr(sys, "frozen", False))))
                 return self.reply(200, source, "text/html")
             files = {"/assets/logo.png": core.ROOT / "assets/Logo.png",
                      "/assets/art.jpg": core.ROOT / "assets/library_600x900_2x.jpg",

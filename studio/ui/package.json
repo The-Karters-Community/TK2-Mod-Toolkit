@@ -3,11 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "test": "vitest run",
-    "format": "prettier --write src index.html vite.config.js package.json",
-    "format:check": "prettier --check src index.html vite.config.js package.json"
+    "dev": "vite --configLoader native",
+    "build": "vite build --configLoader native",
+    "test": "vitest run --configLoader native"
   },
   "dependencies": {
     "react": "19.2.0",

@@ -29,6 +29,7 @@ export default defineConfig(({ command, mode }) => {
   ).match(/APP_VERSION\s*=\s*"([^"]+)"/)[1];
   return {
     root,
+    cacheDir: resolve(repo, "local/ui-cache"),
     plugins: [
       react(),
       tailwindcss(),
@@ -38,7 +39,7 @@ export default defineConfig(({ command, mode }) => {
           return session
             ? html
                 .replaceAll("__SESSION_TOKEN__", session.token)
-                .replaceAll("__APP_VERSION__", version)
+                .replaceAll("__APP_VERSION__", version + "-dev")
             : html;
         },
       },

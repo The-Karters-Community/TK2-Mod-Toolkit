@@ -48,10 +48,10 @@ Tests sit beside the settings model and Mods page. Pages load on demand. Adding 
 
 ## Development and packaging
 
-Run `npm ci` once **from the repository root**. `npm run build` writes ignored `studio/web-dist/`; `Launch Studio.cmd` rebuilds it before opening. For Fast Refresh, start `python launch.py --no-browser`, then `npm run dev` in another root terminal. Vite proxies the authenticated loopback API using the ignored session file. Restart Vite when the backend session changes.
+Run `npm ci` once **from the repository root**. `npm run build` writes ignored `studio/web-dist/`; `Launch Studio.cmd` rebuilds it before opening. For Fast Refresh, start `python launch.py --no-browser`, then `npm run dev` in another root terminal. Vite proxies the authenticated loopback API using the ignored session file. Restart Vite when the backend session changes. Dependencies live in root `node_modules/`; Vite/test caches live in ignored `local/ui-cache/`. Native config loading prevents a second `studio/ui/node_modules/.vite-temp/` folder.
 
 Run `npm test`, `npm run format:check`, `npm run build`, and `python -m unittest discover -s tests`. Inspect wide and narrow windows in both themes. `python tools/smoke_garage.py` checks compiled references and a 500 KB raw UI budget; it does not prove visual layout or game behavior.
 
 Packaging stages compiled UI, not React source or `node_modules`. Players need no npm, including after an update. Python, desktop hosting and Workshop material dominate the portable package size. Validate a relocated portable copy before release; a source build does not prove packaged startup.
 
-Versions change only during an explicitly prepared release. Normal UI builds overwrite the stable generated directory. See [Contributing](../CONTRIBUTING.md) and [Releasing](RELEASING.md).
+The checkout holds the next unreleased version and displays `-dev`. Successful release creation advances the checkout to the next patch and commits the version files; normal edits/builds never increment it. Normal UI builds overwrite the stable generated directory. See [Contributing](../CONTRIBUTING.md) and [Releasing](RELEASING.md).

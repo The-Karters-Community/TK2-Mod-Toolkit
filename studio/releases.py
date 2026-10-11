@@ -10,7 +10,6 @@ import subprocess
 import sys
 import tempfile
 import threading
-import time
 import urllib.error
 import urllib.request
 import zipfile
@@ -159,8 +158,7 @@ class ReleaseChecker:
                 if old_local.is_dir(): shutil.copytree(old_local, package / "local", dirs_exist_ok=True)
                 script = package / "tools/update_portable.ps1"
                 command = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script),
-                           "-OldRoot", str(self.root), "-NewRoot", str(package), "-WaitPid", str(os.getpid()),
-                           "-BackupRoot", str(self.root.parent / (self.root.name + ".backup-" + time.strftime("%Y%m%d-%H%M%S")))]
+                           "-OldRoot", str(self.root), "-NewRoot", str(package), "-WaitPid", str(os.getpid())]
                 subprocess.Popen(command, cwd=str(self.root.parent), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
                 return {"message": f"Verified Toolkit {info['version']} downloaded. The app will close and reopen to finish updating."}
             except Exception:

@@ -33,4 +33,13 @@ See README.md for prerequisites, installation, and update behavior.
     if ($LASTEXITCODE -ne 0) { throw 'GitHub CLI did not create the release.' }
     Write-Output "Release $tag created. Archive SHA-256: $hash"
     if (-not $Publish) { Write-Output 'This is a draft. Publish it on GitHub after review to enable in-app update checks.' }
+    # The tag and ZIP retain the released version; subsequent source work uses the next patch.
+    $parts = $version.Split('.')
+    $next = "$($parts[0]).$($parts[1]).$([int]$parts[2] + 1)"
+    & (Join-Path $PSScriptRoot 'set_version.ps1') -Version $next
+    git add -- studio/version.py plugins/TK2.Customization/ToolkitVersion.cs
+    if ($LASTEXITCODE -ne 0) { throw "Release created, but staging development version $next failed." }
+    git commit -m "chore: start $next development"
+    if ($LASTEXITCODE -ne 0) { throw "Release created, but committing development version $next failed." }
+    Write-Output "Source checkout advanced to ${next}-dev. Release $tag and its archive are unchanged. Push the new development commit when ready."
 } finally { Pop-Location }

@@ -11,7 +11,7 @@ The in-app updater is configured for `The-Karters-Community/TK2-Mod-Toolkit`. It
 
 ## Prepare and test
 
-1. Set the next release version with `.\tools\set_version.ps1 -Version 0.6.24`. This updates the desktop and plugin version from one release value. Do this only while preparing a release; builds and ordinary development do not increment versions.
+1. Check `APP_VERSION` in `studio/version.py`: it is the next unreleased version (currently 0.6.24). Source UI adds `-dev`; packaged builds show the numeric release version. Use `.\tools\set_version.ps1 -Version X.Y.Z` only to choose a different release number. Builds never increment versions.
 2. Run relevant tests and inspect the final diff. Compile the plugin with the supported game references when plugin code changed.
 3. Close the Toolkit executable, then build the desired package:
 
@@ -41,8 +41,10 @@ Run from the repository root:
 
 The script validates the versioned archive, Git status and remote branch head, then creates tag `v<version>` on the exact commit and uploads the ZIP. By default, it creates a draft; review notes and asset before publishing the draft on GitHub. Publishing a stable release is what makes it eligible for startup update checks. The GitHub release asset API must report its SHA-256 digest for automatic installation to be offered.
 
+After a successful release creation (draft or published), the script increments the patch version in the checkout and commits the desktop/plugin version files. The release tag and ZIP keep the released version. Push that development commit before further contributions; creation failure does not advance the version. The next source build shows the new version with `-dev`.
+
 ## Updater compatibility and current limits
 
-The updater currently accepts one asset with the exact name `TK2-Mod-Toolkit-<version>-win-x64.zip`. It installs the whole application folder. **Compact/delta packages and dual full-plus-compact update releases are not implemented.** If both the slim app ZIP and the loader-included ZIP are uploaded, the current updater cannot distinguish them; do not publish both with the same required name.
+The updater currently accepts one asset with the exact name `TK2-Mod-Toolkit-<version>-win-x64.zip`. It replaces the contents at the same application path; a folder named `TK2-Mod-Toolkit-0.6.23-win-x64` keeps that name after updating to 0.6.24, so existing shortcuts still work. The displayed version and manifest identify the installed version. The downloaded updater accepts calls from older releases. Old files remain only in temporary staging until the new process passes its authenticated health check; successful startup removes staging and leaves no permanent `.backup-*` folder. Failed startup restores the old app and keeps diagnostics in staging. Existing backups made by older updates are not removed automatically. **Compact/delta packages and dual full-plus-compact update releases are not implemented.** If both the slim app ZIP and the loader-included ZIP are uploaded, the current updater cannot distinguish them; do not publish both with the same required name.
 
 Before publishing each update, test it against an older packaged copy. Verify the update prompt, digest, embedded manifest, preserved `local/` folder, relaunch and rollback path.

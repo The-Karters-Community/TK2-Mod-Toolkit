@@ -85,7 +85,7 @@ Double-click **Build Toolkit.cmd**, or run from PowerShell:
   -LoaderPath 'D:\Modding\BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.788+5b766a3'
 ```
 
-The build requires Python 3.10+ x64, Node.js 20.19+ with npm, a .NET SDK and an initialized supported game installation when the plugin must be compiled. Packaging dependencies are installed in the ignored `local/portable-build-env/` environment. The build does not deploy into the game or launch it. Build artifacts reuse the configured release version; they never increment it. `tools/set_version.ps1` changes the desktop and plugin release versions together during release preparation.
+The build requires Python 3.10+ x64, Node.js 20.19+ with npm, a .NET SDK and an initialized supported game installation when the plugin must be compiled. Packaging dependencies are installed in the ignored `local/portable-build-env/` environment. The build does not deploy into the game or launch it. Build artifacts reuse the configured release version; they never increment it. The checkout displays the next unreleased version with `-dev`; successful release creation automatically advances and commits the next patch version. `tools/set_version.ps1` selects a different release number when needed.
 
 The default artifact is a compressed, self-contained **application** ZIP at `artifacts/portable/TK2-Mod-Toolkit-<version>-win-x64.zip`; it bundles the app's Python runtime and prebuilt Toolkit plugin, but not the game or BepInEx. Users install the validated loader separately. `-IncludeLoader` creates the same package with BepInEx included. The portable build step also produces an unpacked app folder beside the ZIP.
 
@@ -107,7 +107,7 @@ The plugin's focused C# checks are separate projects under `tests/` (for example
 
 ## Releases and in-app updates
 
-The updater is already configured for **`The-Karters-Community/TK2-Mod-Toolkit`**. At startup, a packaged copy checks that repository's latest stable GitHub Release. Source checkouts only point to the release page. The current installer accepts a newer release only when it has the exact asset name `TK2-Mod-Toolkit-<version>-win-x64.zip`, the matching portable manifest and updater script, and a valid SHA-256 digest from GitHub. It preserves the user's `local/` data and has rollback handling. A draft or prerelease is not offered as a stable update.
+The updater is already configured for **`The-Karters-Community/TK2-Mod-Toolkit`**. At startup, a packaged copy checks that repository's latest stable GitHub Release. Source checkouts only point to the release page. The current installer accepts a newer release only when it has the exact asset name `TK2-Mod-Toolkit-<version>-win-x64.zip`, the matching portable manifest and updater script, and a valid SHA-256 digest from GitHub. It preserves the user's `local/` data and the folder path you launched. It checks the restarted app before removing temporary rollback files; successful updates leave no permanent app backup. A draft or prerelease is not offered as a stable update.
 
 **The updater currently supports one full portable ZIP; it does not apply compact/delta updates.** Every release intended for in-app updates needs that exact ZIP and its `v<version>` tag. `tools/publish_release.ps1` checks that the versioned archive exists, the worktree is clean and the exact commit is pushed to `origin/main`; by default it creates a draft. Review the draft and publish it on GitHub to make it visible to the stable updater:
 

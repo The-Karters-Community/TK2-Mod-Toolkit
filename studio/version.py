@@ -1,2 +1,6 @@
-"""Single source of truth for the desktop toolkit release version."""
-APP_VERSION = "0.6.23"
+"""Next release version. Source checkouts display a development suffix."""
+APP_VERSION = "0.6.24"
+
+
+def display_version(frozen=False):
+    return APP_VERSION if frozen else APP_VERSION + "-dev"

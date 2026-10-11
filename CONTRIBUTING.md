@@ -77,4 +77,4 @@ npm run build
 python tools/smoke_garage.py
 ```
 
-Run the relevant checks for your change and include the result in your commit. Plugin changes also need a plugin build and a visible game test. Commit focused milestones. Normal edits/builds keep the current toolkit version and use the stable local plugin artifact folder; they do not create a new release. Only set the next version when preparing an explicitly requested release with `tools/set_version.ps1`. See [Releasing](docs/RELEASING.md) for portable release assets and updater requirements.
+Run the relevant checks for your change and include the result in your commit. Plugin changes also need a plugin build and a visible game test. Commit focused milestones. Normal edits/builds keep the current development version and use the stable local plugin artifact folder; they do not create a new release. Successful release creation advances and commits the next patch automatically. Source builds display `-dev`; `tools/set_version.ps1` selects an explicit release number when needed. See [Releasing](docs/RELEASING.md) for portable release assets and updater requirements.
