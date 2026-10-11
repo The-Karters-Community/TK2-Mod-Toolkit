@@ -1,0 +1,74 @@
+.editor-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: center;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+}
+.editor-search input {
+  flex: 0 1 180px;
+  font-size: 11px;
+  padding: 5px 8px;
+}
+.editor-search > span {
+  margin-left: auto;
+  color: var(--muted);
+}
+.code-surface {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  height: clamp(340px, 60vh, 720px);
+  background: var(--editor);
+  min-width: 0;
+}
+#line-numbers {
+  padding: 18px 9px 18px 0;
+  margin: 0;
+  overflow: hidden;
+  text-align: right;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--editor);
+  user-select: none;
+  font:
+    13px/1.7 Consolas,
+    "Cascadia Code",
+    monospace;
+}
+#code {
+  display: block;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  padding: 18px 16px;
+  resize: none;
+  background: var(--editor);
+  font:
+    13px/1.7 Consolas,
+    "Cascadia Code",
+    monospace;
+  overflow: auto;
+  flex: none;
+}
+.editor-caption {
+  font-size: 11px;
+  line-height: 1.6;
+}
+.build-details {
+  margin-top: 18px;
+  font-size: 12px;
+}
+.build-details pre {
+  background: var(--editor);
+  padding: 16px;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    12px/1.7 Consolas,
+    monospace;
+}

@@ -1,5 +1,16 @@
 # Mod log
 
+## Mirror presentation correction and frontend ownership (2026-10-11, unreleased)
+
+- Restored the camera/steering mirror during track countdown; no race-start delay. Countdown numbers use per-instance atlas UV compensation rather than delaying the entire mirror effect.
+- Native `PTK_MarkersSingleAndCoopManager.CreateMarkerForOtherPlayer` at `0x18052bd50` passes the local camera as `transformForDistCalculate`; `Waypoint_Indicator.ChooseTargetTransforms` at `0x180a75f00` assigns this to `distCalTarget`. It is not the opponent tracking target. The previous projection therefore followed local camera motion. Installed interop also exposes waypoint members as CLR properties, so the earlier field-reflection path silently skipped correction.
+- The revised hook restores the prior native marker placement before Update, then reflects the game's finished UI position within its own camera viewport. It retains native tracking, height offsets and off-screen clamping instead of re-projecting an assumed racer transform. Full native Waypoint Update decompilation timed out; that body has not been reconstructed.
+- CounterBoardController Awake at `0x1808b7190` creates the number material instance; ChangeTileMatOffsets at `0x1808b73e0` selects the atlas tile; ScreenIdleUpdate at `0x1808b79d0` updates the same offsets. The compensation reflects X UVs inside that tile and restores native values before updates and on disable.
+- Mirror regression harness: 66 assertions. Plugin compiled against installed references without warnings/errors. Actual number rendering and CPU nameplate attachment still require in-game visual confirmation; mocked placement tests do not establish that.
+- Split the frontend into feature-owned ES modules, readable HTML fragments and responsibility-based stylesheets. Bootstrap is now small; backend source serving and Vite use matching template composition. Added explicit shared state, formatting checks, authenticated development proxy and contributor ownership/setup guides. Normal startup rebuilds the frontend and stops on build failure.
+- Preserved the confirmed gamepad scaling fix. Toolkit stays at 0.6.23; no release or portable distribution is produced for these edits.
+- Installed the rebuilt plugin after the game exited; backup transaction `local/backups/1791728883877367900`. Installed DLL matches the build SHA-256 `40bd4d587f93a75ba7846a76efe6fdb98d71468f89e0fb09534dd710b5718bab`. Browser checks passed for production Mod packs/Workshop and the authenticated Vite development interface/Installation. No game was launched by the agent.
+
 ## Scalable module library, fair-play allowlist and release updates 0.6.21 (2026-10-09)
 
 - Generated module filters from catalog metadata and grouped cards by their existing category inside each pack. Added per-category counts and moved expand/collapse controls into a separate responsive toolbar row so controls remain usable in narrow windows.

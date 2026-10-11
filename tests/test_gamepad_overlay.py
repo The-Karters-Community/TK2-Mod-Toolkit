@@ -45,6 +45,7 @@ class GamepadOverlayCatalogTests(unittest.TestCase):
             "plugins/TK2.Customization/InputOverlayModel.cs",
             "plugins/TK2.Customization/StudioBehaviour.cs",
             "plugins/TK2.Customization/Plugin.cs",
+            "plugins/TK2.Customization/ToolkitVersion.cs",
         })
 
 

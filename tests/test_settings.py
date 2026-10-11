@@ -127,7 +127,8 @@ class SettingsMergeTests(unittest.TestCase):
         garage = next(p for p in pack.catalog_packs() if p["id"] == "garage")
         self.assertEqual(garage["features"].count("DisableVignette"), 1)
         self.assertEqual(set(pack.module_sources()["DisableVignette"]), {
-            "plugins/TK2.Customization/PackModules.cs", "plugins/TK2.Customization/Plugin.cs"})
+            "plugins/TK2.Customization/PackModules.cs", "plugins/TK2.Customization/Plugin.cs",
+            "plugins/TK2.Customization/ToolkitVersion.cs"})
 
     def test_online_protection_is_default_on_and_in_the_essentials_pack(self):
         self.assertTrue(pack.defaults()["OnlineProtection/Enabled"])
@@ -138,7 +139,8 @@ class SettingsMergeTests(unittest.TestCase):
         self.assertEqual(set(pack.module_sources()["OnlineProtection"]), {
             "plugins/TK2.Customization/OnlineProtectionFeature.cs",
             "plugins/TK2.Customization/OnlineProtectionPolicy.cs",
-            "plugins/TK2.Customization/Plugin.cs"})
+            "plugins/TK2.Customization/Plugin.cs",
+            "plugins/TK2.Customization/ToolkitVersion.cs"})
 
     def test_online_protection_cannot_be_disabled_and_repairs_existing_config(self):
         disabled = "[OnlineProtection]\nEnabled = false\nBlockLeaderboardUploads = false\nBlockOnlineLobbyJoins = false\n"

@@ -1,0 +1,59 @@
+.setup-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.setup-step {
+  position: relative;
+  padding: 24px 24px 24px 68px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.setup-step h2 {
+  margin: 0 0 12px;
+}
+.setup-step > p {
+  margin: 10px 0;
+}
+.setup-step > label {
+  display: block;
+  font-size: 12px;
+  margin: 10px 0 5px;
+}
+.setup-step > input {
+  width: 100%;
+}
+.step-number {
+  position: absolute;
+  left: 22px;
+  top: 22px;
+  color: var(--accent-text);
+  background: var(--accent);
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-weight: 700;
+}
+.step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.setup-checks {
+  list-style: none;
+  padding: 0;
+  margin: 15px 0;
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+.check-pending {
+  color: var(--muted);
+}
+.check-ok {
+  color: var(--text);
+}

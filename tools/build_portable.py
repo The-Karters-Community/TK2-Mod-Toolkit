@@ -67,8 +67,9 @@ def main():
     staging.mkdir(parents=True, exist_ok=True)
     # Include editable source, assets and the prebuilt plugin. Never include game
     # binaries, generated interop assemblies, credentials, session tokens or logs.
-    for directory in ('assets', 'studio/web', 'src/Reconstructed', 'templates', 'docs'):
-        shutil.copytree(core.ROOT / directory, staging / directory, dirs_exist_ok=True)
+    for directory in ('assets', 'studio/web', 'studio/web-dist', 'src/Reconstructed', 'templates', 'docs'):
+        ignore = shutil.ignore_patterns('node_modules') if directory == 'studio/web' else None
+        shutil.copytree(core.ROOT / directory, staging / directory, dirs_exist_ok=True, ignore=ignore)
     (staging / 'tools').mkdir(parents=True, exist_ok=True)
     shutil.copy2(core.ROOT / 'tools/update_portable.ps1', staging / 'tools/update_portable.ps1')
     for file in pack.source_files() + ['plugins/TK2.Customization/TK2.Customization.csproj', 'README.md', 'LICENSE']:
@@ -85,7 +86,7 @@ def main():
     fresh_dist = core.contained(core.ROOT, core.ROOT / 'local/portable-dist' / str(time.time_ns()))
     command = [str(args.python.resolve()), '-m', 'PyInstaller', '--noconfirm', '--onedir', '--windowed', '--contents-directory', '.',
                '--icon', str(core.ROOT / 'assets/TheKartersLogoModified.ico'), '--name', 'TK2 Mod Toolkit', '--distpath', str(fresh_dist), '--workpath', str(core.ROOT / 'local/portable-pyinstaller'),
-               '--specpath', str(core.ROOT / 'local/portable-pyinstaller'), '--add-data', str(staging) + ':.', str(core.ROOT / 'launch.py')]
+               '--specpath', str(core.ROOT / 'local/portable-pyinstaller'), '--collect-all', 'webview', '--add-data', str(staging) + ':.', str(core.ROOT / 'launch.py')]
     print('Packaging TK2 Mod Toolkit (no game files are installed)...', flush=True)
     process = subprocess.run(command, cwd=core.ROOT, capture_output=True, text=True, errors='replace', creationflags=core.CREATE_NO_WINDOW)
     core.atomic_write(core.ROOT / 'local/portable-build.log', (process.stdout + process.stderr).encode('utf-8'))
@@ -93,7 +94,7 @@ def main():
         print(process.stdout + process.stderr)
         raise ValueError('Packaging failed. See local/portable-build.log. Existing output was not replaced.')
     fresh_output = core.contained(fresh_dist, fresh_dist / 'TK2 Mod Toolkit')
-    core.write_json(fresh_output / 'portable-manifest.json', {'version':VERSION, 'playerRequirements':['Windows x64', 'The Karters 2 0.1.4.18', 'BepInEx Unity IL2CPP x64 6.0.0-be.788 (5b766a3)', 'Edge or another browser'],
+    core.write_json(fresh_output / 'portable-manifest.json', {'version':VERSION, 'playerRequirements':['Windows x64', 'The Karters 2 0.1.4.18', 'BepInEx Unity IL2CPP x64 6.0.0-be.788 (5b766a3)', 'WebView2 Runtime recommended; Edge fallback'],
         'pythonIncluded':True, 'loaderIncluded':source is not None, 'loaderVersion':setup.SUPPORTED_BEPINEX_VERSION, 'compilerRequiredForPlayerInstall':False, 'authorBuildRequires':'.NET SDK',
         'gameBinaryIncluded':False, 'supportedGameHash':json.loads((pack.ARTIFACT / 'build.json').read_text())['fingerprint']['files']['GameAssembly.dll']})
     previous = None

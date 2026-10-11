@@ -2,4 +2,8 @@
 
 Run `dotnet run --project tests/MirrorRace/MirrorRace.csproj -c Release` from the SDK root.
 
-The harness links production MirrorRace and MirrorImageEffect code with stub Unity/Harmony/config APIs. It checks zero scene scans and no retained render callback in menus/loading/offline-denied/disabled states, transition guards before the next update, countdown attachment, steering/image reversal, quarter-second discovery, and cleanup without destroying native cameras. It does not test native image-effect scheduling, shader output, actual menu FPS or IL2CPP injection.
+The harness links production MirrorRace, its presentation companion and MirrorImageEffect with stub Unity/Harmony/config APIs. It checks menu/loading/online guards, mirroring and reversed steering during the countdown, discovery throttling, native nameplate placement reflected within each camera viewport, repeated updates without oscillation, atlas-tile UV compensation and restoration, and cleanup without destroying native cameras.
+
+The waypoint and counter members are CLR properties, matching the installed interop signatures. The harness deliberately keeps the distance-reference camera separate from the native marker placement: that camera is not the opponent tracking target.
+
+It does not test native image-effect scheduling, shader output, actual in-game nameplate placement, menu FPS or IL2CPP injection. Those still require visual validation in the game.

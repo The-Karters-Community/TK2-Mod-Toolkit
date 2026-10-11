@@ -1,0 +1,80 @@
+<section
+  id="panel-editor"
+  class="workshop-panel"
+  role="tabpanel"
+  aria-labelledby="tab-editor"
+>
+  <div class="workshop-toolbar">
+    <label for="recipe-name"
+      >Create a new module<input
+        id="recipe-name"
+        placeholder="MyKartHop"
+        maxlength="40" /></label
+    ><button id="create-recipe" class="secondary">Create recipe</button>
+    <div class="build-actions">
+      <button id="build" class="secondary">Build pack</button
+      ><button id="workshop-install" class="primary">
+        Build &amp; install
+      </button>
+    </div>
+  </div>
+  <p id="editor-flow" class="workflow-note">
+    Save C# → Build &amp; install with the game closed → Restart game. Settings
+    and toggles reload live.
+  </p>
+  <div class="source-layout">
+    <aside class="source-sidebar">
+      <label for="module-focus">Module source</label
+      ><select id="module-focus">
+        <option value="all">All project files</option></select
+      ><label class="sr-only" for="file-query">Filter source files</label
+      ><input id="file-query" type="search" placeholder="Find a file…" />
+      <p id="module-source-note" class="muted">
+        Select a module to show its behavior and settings files.
+      </p>
+      <h3>Module &amp; shared code</h3>
+      <div id="pack-files"></div>
+      <h3>Reconstructed game logic</h3>
+      <div id="reconstructed-files"></div>
+    </aside>
+    <div class="editor-panel">
+      <div class="editor-toolbar">
+        <span id="source-name">Choose a C# file</span
+        ><button id="open-source-folder" class="quiet" disabled>
+          Open folder</button
+        ><button id="reload-source" class="quiet" disabled>Reload file</button
+        ><button id="save-source" class="secondary" disabled>Save C#</button>
+      </div>
+      <div class="editor-search">
+        <label for="code-find">Find in file</label
+        ><input
+          id="code-find"
+          type="search"
+          placeholder="Text or method name"
+        /><button id="find-next" class="quiet">Next match</button
+        ><span id="editor-state" role="status">Choose a file</span>
+      </div>
+      <div class="code-surface">
+        <pre id="line-numbers" aria-hidden="true">1</pre>
+        <label class="sr-only" for="code">Editable C# source</label
+        ><textarea
+          id="code"
+          readonly
+          spellcheck="false"
+          aria-describedby="source-help"
+          placeholder="Select a file from the navigation to edit its C# code."
+        ></textarea>
+      </div>
+      <div id="source-help" class="editor-caption">
+        Ctrl+S saves this file. Tab inserts four spaces. Reload file reads
+        external edits. Saving code does not replace the running plugin.
+      </div>
+    </div>
+  </div>
+  <details class="build-details">
+    <summary>Compiler output</summary>
+    <pre id="workshop-build-log">
+Build the pack to see compiler output here.</pre
+    >
+  </details>
+</section>

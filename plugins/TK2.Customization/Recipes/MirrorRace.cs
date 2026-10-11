@@ -9,13 +9,12 @@ using UnityEngine;
 namespace TK2.Customization;
 
 /// <summary>Mirrors the local race image while preserving the game's native camera and lighting.</summary>
-public sealed class MirrorRace : IModRecipe
+public sealed partial class MirrorRace : IModRecipe
 {
     public string Name => "MirrorRace";
     public bool ChangesGameplay => true;
 
     private static MirrorRace? _instance;
-    private static readonly FieldInfo? MarkerCanvasRoot = AccessTools.Field(typeof(Waypoint_Indicator), "wpParentRectTransform");
     private readonly HashSet<int> _localCameras = new();
     private readonly HashSet<MirrorImageEffect> _effects = new();
     private readonly HashSet<MirrorImageEffect> _activeEffects = new();
@@ -38,7 +37,12 @@ public sealed class MirrorRace : IModRecipe
 
         MethodInfo markerUpdate = AccessTools.DeclaredMethod(typeof(Waypoint_Indicator), "Update", Type.EmptyTypes)
             ?? throw new MissingMethodException(typeof(Waypoint_Indicator).FullName, "Update()");
-        harmony.Patch(markerUpdate, postfix: new HarmonyMethod(typeof(MirrorRace), nameof(AfterWaypointUpdate)));
+        harmony.Patch(markerUpdate,
+            prefix: new HarmonyMethod(typeof(MirrorRace), nameof(BeforeWaypointUpdate)),
+            postfix: new HarmonyMethod(typeof(MirrorRace), nameof(AfterWaypointUpdate)));
+
+        PatchCountdown(harmony, "Update", Type.EmptyTypes);
+        PatchCountdown(harmony, "ChangeTileMatOffsets", new[] { typeof(int) });
     }
 
     public void Tick()
@@ -91,43 +95,22 @@ public sealed class MirrorRace : IModRecipe
     internal static bool ShouldMirror(Camera? camera)
     {
         var module = _instance;
-        return camera != null && camera.isActiveAndEnabled && module != null && module._active && module.RaceContextAllowed &&
+        return camera != null && camera.isActiveAndEnabled && module != null && module.MirrorActive &&
             module._localCameras.Contains(camera.GetInstanceID());
     }
+
+    private bool MirrorActive => _active && RaceContextAllowed;
 
     private static void BeforeSteerInput(PixelEasyCharMoveKartController __instance, ref float __0)
     {
         var module = _instance;
-        if (module == null || !module._active || !module.RaceContextAllowed || __instance.parentPlayer == null || !__instance.gameObject.activeInHierarchy) return;
+        if (module == null || !module.MirrorActive || __instance.parentPlayer == null || !__instance.gameObject.activeInHierarchy) return;
         if (__instance.parentPlayer.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL) __0 = -__0;
     }
 
-    private static void AfterWaypointUpdate(Waypoint_Indicator __instance)
-    {
-        var module = _instance;
-        if (module == null || !module._active || !module.RaceContextAllowed || __instance == null) return;
-        try
-        {
-            // These waypoint indicators belong to opponent nameplates. Their UI is
-            // projected into a separate screen-space canvas after the camera image
-            // has been mirrored, so move the shared icon/text container as a unit.
-            if (__instance.GetComponentInParent<PTK_MarkerIndicator>() == null) return;
-            if (MarkerCanvasRoot?.GetValue(__instance) is not RectTransform root || root.parent is not RectTransform parent) return;
-            Vector3 position = root.localPosition;
-            position.x = MirrorMarkerLocalX(position.x, parent.rect.width, parent.pivot.x);
-            root.localPosition = position;
-        }
-        catch
-        {
-            // Some world-space marker prefabs do not have a screen-space root.
-        }
-    }
-
-    internal static float MirrorMarkerLocalX(float localX, float parentWidth, float parentPivotX) =>
-        parentWidth * (1f - 2f * parentPivotX) - localX;
-
     public void Restore()
     {
+        RestorePresentation();
         _active = false;
         _localCameras.Clear();
         foreach (var effect in _effects)

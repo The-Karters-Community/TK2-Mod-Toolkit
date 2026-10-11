@@ -191,8 +191,8 @@ internal static class GamepadOverlay
         EnsureStyles();
         if (!Visible) return;
         float scale = Mathf.Clamp(_scale.Value, .25f, 2f);
-        const float baseWidth = 440, baseHeight = 180;
-        float availableScale = Mathf.Max(.1f, Mathf.Min((Screen.width - 24f) / baseWidth, (Screen.height - 24f) / baseHeight));
+        const float baseWidth = 440, baseHeight = 196;
+        float availableScale = Mathf.Max(.1f, Mathf.Min((Screen.width - 24f) / (baseWidth + 36f), (Screen.height - 24f) / (baseHeight + 36f)));
         scale = Mathf.Min(scale, availableScale);
         float width = baseWidth * scale, height = baseHeight * scale, margin = 18 * scale;
         string corner = _corner.Value;
@@ -205,20 +205,20 @@ internal static class GamepadOverlay
         try
         {
             DrawCard(new Rect(0, 0, baseWidth, baseHeight), _opacity.Value);
-            GUI.Label(new Rect(12, 7, 260, 20), "INPUT VIEWER", _title);
-            DrawStatus(new Rect(336, 7, 92, 18), !_hasSample ? "WAIT" : _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
-            GUI.Label(new Rect(12, 27, 320, 14), !_hasSample ? "WAITING FOR INPUT" : _sample.IsReplay ? "RECORDED INPUTS" : _sample.Device, _small);
-            DrawPanel(new Rect(10, 46, 132, 138), _opacity.Value);
-            DrawPanel(new Rect(150, 46, 278, 114), _opacity.Value);
-            DrawSteering(new Rect(20, 52, 112, 48), _sample.Steering);
-            DrawButton(new Rect(20, 107, 112, 27), "ACCELERATE", _sample.Accelerate, new Color(1f,.57f,.12f));
-            DrawButton(new Rect(20, 141, 112, 27), "REVERSE", _sample.Reverse, new Color(.24f,.67f,1f));
-            GUI.Label(new Rect(162, 52, 250, 14), _sample.IsReplay ? "GHOST INPUTS" : "LIVE INPUTS", _section);
-            DrawButton(new Rect(162, 73, 120, 29), "JUMP / DRIFT", _sample.JumpDrift, new Color(.18f,.72f,.95f));
-            DrawButton(new Rect(290, 73, 120, 29), "BOOST", _sample.Boost, new Color(1f,.57f,.12f));
-            DrawButton(new Rect(162, 108, 120, 29), "BRAKE", _sample.Brake, new Color(.84f,.88f,.94f));
+            GUI.Label(new Rect(12, 5, 260, 24), "INPUT VIEWER", _title);
+            DrawStatus(new Rect(336, 7, 92, 20), !_hasSample ? "WAIT" : _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
+            GUI.Label(new Rect(12, 28, 320, 18), !_hasSample ? "WAITING FOR INPUT" : _sample.IsReplay ? "RECORDED INPUTS" : _sample.Device, _small);
+            DrawPanel(new Rect(10, 50, 132, 138), _opacity.Value);
+            DrawPanel(new Rect(150, 50, 278, 114), _opacity.Value);
+            DrawSteering(new Rect(20, 54, 112, 50), _sample.Steering);
+            DrawButton(new Rect(20, 109, 112, 29), "ACCELERATE", _sample.Accelerate, new Color(1f,.57f,.12f));
+            DrawButton(new Rect(20, 145, 112, 29), "REVERSE", _sample.Reverse, new Color(.24f,.67f,1f));
+            GUI.Label(new Rect(162, 52, 250, 19), _sample.IsReplay ? "GHOST INPUTS" : "LIVE INPUTS", _section);
+            DrawButton(new Rect(162, 75, 120, 31), "JUMP / DRIFT", _sample.JumpDrift, new Color(.18f,.72f,.95f));
+            DrawButton(new Rect(290, 75, 120, 31), "BOOST", _sample.Boost, new Color(1f,.57f,.12f));
+            DrawButton(new Rect(162, 112, 120, 31), "BRAKE", _sample.Brake, new Color(.84f,.88f,.94f));
             if (!_sample.IsReplay)
-                DrawButton(new Rect(290, 108, 120, 29), "USE WEAPON", _sample.Weapon, new Color(.98f,.3f,.34f));
+                DrawButton(new Rect(290, 112, 120, 31), "USE WEAPON", _sample.Weapon, new Color(.98f,.3f,.34f));
         }
         finally
         {
@@ -326,17 +326,17 @@ internal static class GamepadOverlay
     private static void EnsureStyles()
     {
         if (_title != null) return;
-        _title = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+        _title = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Overflow, wordWrap = false };
         _title.normal.textColor = Color.white;
-        _small = new GUIStyle(GUI.skin.label) { fontSize = 10, alignment = TextAnchor.MiddleLeft };
+        _small = new GUIStyle(GUI.skin.label) { fontSize = 10, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Overflow, wordWrap = false };
         _small.normal.textColor = new Color(.68f,.8f,.91f,1);
-        _pill = new GUIStyle(GUI.skin.label) { fontSize = 9, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+        _pill = new GUIStyle(GUI.skin.label) { fontSize = 9, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Clip, wordWrap = false };
         _pill.normal.textColor = Color.white;
-        _section = new GUIStyle(GUI.skin.label) { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+        _section = new GUIStyle(GUI.skin.label) { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Overflow, wordWrap = false };
         _section.normal.textColor = new Color(.52f,.68f,.83f,1);
-        _secondary = new GUIStyle(GUI.skin.label) { fontSize = 9, alignment = TextAnchor.MiddleLeft };
+        _secondary = new GUIStyle(GUI.skin.label) { fontSize = 9, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Overflow, wordWrap = false };
         _secondary.normal.textColor = new Color(.74f,.81f,.89f,1);
-        _status = new GUIStyle(GUI.skin.label) { fontSize = 9, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+        _status = new GUIStyle(GUI.skin.label) { fontSize = 9, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Clip, wordWrap = false };
     }
 
     internal static void Restore() { ResetState(); _faulted = false; }

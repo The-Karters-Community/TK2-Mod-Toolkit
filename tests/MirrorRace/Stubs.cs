@@ -38,6 +38,7 @@ namespace UnityEngine
     public class Component : Object
     {
         public GameObject gameObject = null!;
+        public T? TryCast<T>() where T : class => this as T;
         public T? GetComponent<T>() where T : Component => gameObject.GetComponent<T>();
         public T? GetComponentInParent<T>() where T : Component => gameObject.GetComponent<T>();
     }
@@ -45,8 +46,10 @@ namespace UnityEngine
     { public MonoBehaviour() { } public MonoBehaviour(IntPtr pointer) { } public bool enabled = true; }
     public class GameObject : Object
     {
+        public Transform transform;
         public bool activeInHierarchy = true;
         readonly List<Component> components = new();
+        public GameObject() { transform = new Transform { gameObject = this }; components.Add(transform); }
         public T AddComponent<T>() where T : Component
         {
             var value = typeof(T).GetConstructor(new[] { typeof(IntPtr) }) != null ?
@@ -57,12 +60,22 @@ namespace UnityEngine
         }
         public T? GetComponent<T>() where T : Component => components.OfType<T>().FirstOrDefault(v => !v.Destroyed);
     }
-    public class Camera : MonoBehaviour { public bool isActiveAndEnabled => enabled && !Destroyed && gameObject.activeInHierarchy; }
+    public class Camera : MonoBehaviour { public Rect pixelRect = new(0, 0, 1200, 800); public bool isActiveAndEnabled => enabled && !Destroyed && gameObject.activeInHierarchy; }
+    public enum RenderMode { ScreenSpaceOverlay, ScreenSpaceCamera, WorldSpace }
+    public class Canvas : Component { public RenderMode renderMode; public Camera? worldCamera; }
+    public static class Screen { public static int width = 1200; }
+    public static class RectTransformUtility
+    {
+        public static Vector2 WorldToScreenPoint(Camera? camera, Vector3 position) => new(position.x, position.y);
+        public static bool ScreenPointToWorldPointInRectangle(RectTransform rect, Vector2 point, Camera? camera, out Vector3 position)
+        { position = new Vector3(point.x, point.y, 0); return true; }
+    }
+    public class Material : Object { public Vector2 mainTextureScale = new(.5f, .5f); public Vector2 mainTextureOffset; }
     public class RenderTexture : Object { }
     public struct Vector2 { public float x, y; public Vector2(float a, float b) { x = a; y = b; } }
     public struct Vector3 { public float x, y, z; public Vector3(float a, float b, float c) { x = a; y = b; z = c; } }
-    public struct Rect { public float width, height; public Rect(float x, float y, float w, float h) { width = w; height = h; } }
-    public class Transform : Component { public Transform? parent; public Vector3 localPosition; }
+    public struct Rect { public float width, height, xMin, xMax; public Rect(float x, float y, float w, float h) { width = w; height = h; xMin = x; xMax = x + w; } }
+    public class Transform : Component { public Transform? parent; public Vector3 localPosition; public Vector3 position { get => localPosition; set => localPosition = value; } }
     public class RectTransform : Transform { public Rect rect; public Vector2 pivot; }
     public static class Graphics
     {
@@ -85,6 +98,11 @@ namespace TK2.Customization
 }
 public class MenuManager : UnityEngine.Object { public static MenuManager? Instance; }
 public class Ant_MapData : UnityEngine.Object { public static Ant_MapData? instance; }
+public static class Ant_CurrentGameConfiguration
+{
+    public enum ERaceState { E_321_COUNTING_BEFORE_RACE, E_RACE_RUNNING, E_WHOLE_RACE_FINISHED_SHOWING_SUMMARY }
+    public static ERaceState eCurrentRaceState;
+}
 public class Ant_Player : UnityEngine.Component
 {
     public enum EPlayerType { E_HUMAN_LOCAL, E_AI_LOCAL, E_HUMAN_ONLINE }
@@ -93,10 +111,22 @@ public class Ant_Player : UnityEngine.Component
 public class CameraBrain { public bool bIsSpectatorCamera; public CameraData? Data; public CameraData? GetCamera() => Data; }
 public class CameraData { public UnityEngine.Camera? unityCamera; }
 public class PixelEasyCharMoveKartController : UnityEngine.Component { public Ant_Player? parentPlayer; public void SteerInput(float amount) { } }
-public class PTK_MarkerIndicator : UnityEngine.Component { }
+public class PTK_MarkerIndicator : UnityEngine.Component { public Waypoint_Indicator? markerIndicatorImpl { get; set; } }
 public class Waypoint_Indicator : UnityEngine.Component
 {
-    private UnityEngine.RectTransform? wpParentRectTransform;
+    // Match the installed IL2CPP wrappers: native fields are CLR properties.
+    public UnityEngine.RectTransform? wpParentRectTransform { get; set; }
+    public UnityEngine.Camera? mainCamera { get; set; }
+    public UnityEngine.Canvas? mainCanvas { get; set; }
+    public UnityEngine.GameObject? distCalTarget { get; set; }
     public void SetMarkerRoot(UnityEngine.RectTransform root) => wpParentRectTransform = root;
+    public void SetTracking(UnityEngine.Camera camera, UnityEngine.Canvas canvas, UnityEngine.GameObject target)
+    { mainCamera = camera; mainCanvas = canvas; distCalTarget = target; }
     private void Update() { }
+}
+public class PTK_CounterBoardController : UnityEngine.Component
+{
+    public UnityEngine.Material? numbersTileMatInstance { get; set; }
+    private void Update() { }
+    private void ChangeTileMatOffsets(int number) { }
 }

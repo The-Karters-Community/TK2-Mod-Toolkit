@@ -1,0 +1,54 @@
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.filters {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.chip {
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.chip.selected {
+  background: var(--text);
+  color: var(--bg);
+}
+input,
+select {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+input::placeholder {
+  color: var(--muted);
+}
+.search-label input {
+  width: 200px;
+}
+.settings-error {
+  border: 1px solid var(--line);
+  background: var(--error-bg);
+  color: var(--error-text);
+  padding: 14px 18px;
+  border-radius: 8px;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.settings-error p {
+  flex: 1;
+}

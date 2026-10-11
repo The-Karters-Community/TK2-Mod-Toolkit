@@ -17,8 +17,10 @@ import webbrowser
 from urllib.parse import urlsplit, parse_qs
 from . import core, pack, settings, setup, symbols, releases, pseudocode
 from .version import APP_VERSION
+from .frontend import render_html
 
 WEB = core.ROOT / "studio/web"
+WEB_DIST = core.ROOT / "studio/web-dist"
 CLIENT_ID = re.compile(r"^[A-Za-z0-9_-]{12,80}$")
 CLIENT_IDLE_SECONDS = 600
 
@@ -321,15 +323,29 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(200, symbols.detail(parse_qs(parsed.query).get("id", [""])[0]))
                 return self.reply(404, {"error": "Unknown API"})
             if parsed.path == "/":
-                source = (WEB / "index.html").read_text(encoding="utf-8").replace("__SESSION_TOKEN__", self.server.app.token).replace("__APP_VERSION__", APP_VERSION)
+                index = WEB_DIST / "index.html" if (WEB_DIST / "index.html").is_file() else WEB / "index.html"
+                source = (index.read_text(encoding="utf-8") if index.parent == WEB_DIST
+                          else render_html(index, WEB))
+                source = source.replace("__SESSION_TOKEN__", self.server.app.token).replace("__APP_VERSION__", APP_VERSION)
                 return self.reply(200, source, "text/html")
-            files = {"/app.js": WEB / "app.js", "/style.css": WEB / "style.css", "/components.css": WEB / "components.css",
+            files = {"/app.js": WEB / "app.js",
                      "/assets/logo.png": core.ROOT / "assets/Logo.png",
                      "/assets/art.jpg": core.ROOT / "assets/library_600x900_2x.jpg",
                      "/assets/app.ico": core.ROOT / "assets/TheKartersLogoModified.ico"}
+            if (WEB_DIST / "index.html").is_file():
+                try:
+                    built_file = (WEB_DIST / parsed.path.lstrip("/")).resolve()
+                    if built_file.is_relative_to(WEB_DIST.resolve()) and built_file.is_file():
+                        return self.reply(200, built_file.read_bytes(), mimetypes.guess_type(built_file.name)[0] or "application/octet-stream")
+                except (OSError, ValueError):
+                    pass
             if parsed.path in files:
                 path = files[parsed.path]
                 return self.reply(200, path.read_bytes(), mimetypes.guess_type(path.name)[0] or "application/octet-stream")
+            if parsed.path.startswith(("/features/", "/shared/", "/styles/")):
+                source_file = (WEB / parsed.path.lstrip("/")).resolve()
+                if source_file.is_relative_to(WEB.resolve()) and source_file.suffix in (".js", ".css") and source_file.is_file():
+                    return self.reply(200, source_file.read_bytes(), mimetypes.guess_type(source_file.name)[0] or "application/octet-stream")
             self.reply(404, {"error": "Not found"})
         except Exception as exc: self.reply(400, {"error": str(exc)})
 
@@ -363,14 +379,30 @@ class Handler(BaseHTTPRequestHandler):
                        {"error": str(exc), **({"conflicts": exc.keys} if isinstance(exc, settings.SettingsConflict) else {})})
 
 
-def open_window(url):
-    # Edge app mode provides a desktop window; the default browser is a portable fallback.
+def open_window(url, server=None):
+    # Use the Windows WebView2 runtime as a native desktop host in packaged builds.
+    # Keep Edge app mode available for source checkouts that lack the optional GUI package.
+    server_thread = None
+    try:
+        import webview
+        webview.create_window("TK2 Mod Toolkit", url, width=1320, height=900, min_size=(900, 600))
+        if server is not None:
+            server_thread = threading.Thread(target=server.serve_forever, daemon=True, name="ToolkitHttpServer")
+            server_thread.start()
+        webview.start()
+        return True
+    except Exception:
+        if server is not None and server_thread is not None:
+            try: server.shutdown()
+            except Exception: pass
+    # Edge app mode provides a desktop window; the default browser is a fallback.
     candidates = [Path(os.environ.get("PROGRAMFILES(X86)", "C:/Program Files (x86)")) / "Microsoft/Edge/Application/msedge.exe",
                   Path(os.environ.get("PROGRAMFILES", "C:/Program Files")) / "Microsoft/Edge/Application/msedge.exe"]
     edge = next((p for p in candidates if p.exists()), None)
     if edge:
         subprocess.Popen([str(edge), "--app=" + url, "--window-size=1320,900"], creationflags=core.CREATE_NO_WINDOW)
     else: webbrowser.open(url)
+    return False
 
 
 def stop_server_when_windows_close(server):
@@ -450,10 +482,14 @@ def main():
                 if attempt == 39: raise RuntimeError("The old Toolkit is still closing. Try launching again.")
                 time.sleep(.1)
     core.write_json(session, {"origin": server.origin, "token": server.app.token})
-    if not args.no_browser: open_window(server.origin)
     if not args.no_browser:
         threading.Thread(target=stop_server_when_windows_close, args=(server,), daemon=True,
                          name="ToolkitWindowMonitor").start()
+        if open_window(server.origin, server):
+            server.shutdown()
+            server.server_close()
+            if session.exists() and json.loads(session.read_text()).get("token") == server.app.token: session.unlink()
+            return
     try: server.serve_forever()
     finally:
         server.server_close()

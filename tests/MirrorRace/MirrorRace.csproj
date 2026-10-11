@@ -3,5 +3,6 @@
   <ItemGroup>
     <Compile Include="../../plugins/TK2.Customization/Recipes/MirrorRace.cs" Link="MirrorRace.cs" />
     <Compile Include="../../plugins/TK2.Customization/Recipes/MirrorRace.ImageEffect.cs" Link="MirrorRace.ImageEffect.cs" />
+    <Compile Include="../../plugins/TK2.Customization/Recipes/MirrorRace.Presentation.cs" Link="MirrorRace.Presentation.cs" />
   </ItemGroup>
 </Project>

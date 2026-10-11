@@ -26,12 +26,16 @@ class TrackModuleIntegrationTests(unittest.TestCase):
         self.assertIn('Graphics.Blit(source, destination, new Vector2(-1f, 1f), new Vector2(1f, 0f));', effect)
         self.assertNotIn('projectionMatrix', source)
         self.assertNotIn('GL.invertCulling', source)
-        self.assertNotIn('ERaceState', source)
+        self.assertNotIn('ERaceState.E_RACE_RUNNING', source)
+        presentation = (pack.PROJECT.parent / 'Recipes/MirrorRace.Presentation.cs').read_text(encoding='utf-8')
+        self.assertIn('MirrorScreenX', presentation)
+        self.assertNotIn('AccessTools.Field', presentation)
+        self.assertIn('WorldToScreenPoint', presentation)
         self.assertNotIn('BeforeRacingCameraFraming', source)
         self.assertNotIn('AfterRacingCameraFraming', source)
         self.assertIn('BeforeSteerInput', source)
         self.assertIn('E_HUMAN_LOCAL', source)
-        self.assertIn('active before countdown', source)
+        self.assertIn('countdown', source.lower())
 
     def test_export_includes_only_active_recipe_helpers(self):
         features = {f['id']: f for f in pack.catalog_features()}

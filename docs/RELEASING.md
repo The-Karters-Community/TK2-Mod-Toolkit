@@ -4,14 +4,14 @@ The in-app updater is configured for `The-Karters-Community/TK2-Mod-Toolkit`. It
 
 ## Prerequisites
 
-- Windows x64 build host with Python 3.10+ x64 and a .NET SDK.
+- Windows x64 build host with Python 3.10+ x64, Node.js 20.19+ with npm, and a .NET SDK.
 - A supported, initialized game/BepInEx installation for plugin compilation.
 - GitHub CLI (`gh`) authenticated as a repository maintainer.
 - A clean Git worktree with the intended release commit already pushed to `origin/main`.
 
 ## Prepare and test
 
-1. Update `APP_VERSION` in `studio/version.py`. The release script uses it for the tag and archive name.
+1. Set the next release version with `.\tools\set_version.ps1 -Version 0.6.24`. This updates the desktop and plugin version from one release value. Do this only while preparing a release; builds and ordinary development do not increment versions.
 2. Run relevant tests and inspect the final diff. Compile the plugin with the supported game references when plugin code changed.
 3. Close the Toolkit executable, then build the desired package:
 
@@ -23,7 +23,7 @@ The in-app updater is configured for `The-Karters-Community/TK2-Mod-Toolkit`. It
 4. Test the unpacked package in a relocated folder. Verify startup, installation discovery, module/source catalogs and update metadata. Do not test against the production game folder if the test would modify its files; use a disposable copy where possible.
 5. Commit and push the exact tested source commit. The release script refuses a dirty worktree or a local HEAD different from `origin/main`.
 
-The normal archive is `artifacts/portable/TK2-Mod-Toolkit-<version>-win-x64.zip`. The default package bundles the application runtime but not BepInEx. `-IncludeLoader` adds the validated loader distribution while preserving the same archive name, so choose one package variant for a release asset.
+The build runs `npm ci` when Vite dependencies are missing, compiles `studio/web/` into `studio/web-dist/`, and packages the built files. The Windows app uses pywebview with the system WebView2 runtime when available; it falls back to Edge app mode. The normal archive is `artifacts/portable/TK2-Mod-Toolkit-<version>-win-x64.zip`. The default package bundles the application runtime but not BepInEx. `-IncludeLoader` adds the validated loader distribution while preserving the same archive name, so choose one package variant for a release asset.
 
 ## Create the GitHub release
 

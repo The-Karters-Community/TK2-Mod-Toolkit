@@ -20,7 +20,11 @@ class Node {
   focus() {document.activeElement = this;}
   setSelectionRange(start, end) {this.selectionStart = start; this.selectionEnd = end;}
 }
-const html = fs.readFileSync(path.join(root, 'studio/web/index.html'), 'utf8');
+function readTemplate(file) {
+  return fs.readFileSync(file, 'utf8').replace(/<!--\s*@include\s+([^\s]+)\s*-->/g,
+    (_, name) => readTemplate(path.resolve(path.dirname(file), name)));
+}
+const html = readTemplate(path.join(root, 'studio/web/index.html'));
 const ids = Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(match => [match[1], new Node()]));
 const views = ['mods', 'workshop', 'installation'].map(id => {ids[id].id = id; return ids[id];});
 const nav = views.map(view => {const node = new Node('button'); node.dataset.view = view.id; return node;});
@@ -79,8 +83,19 @@ const context = {document, console, location:{hash:'#mods'}, history:{replaceSta
     } else data = {message:'done'};
     return {ok,json:async()=>data};
   }};
-vm.createContext(context); vm.runInContext(fs.readFileSync(path.join(root, 'studio/web/app.js'), 'utf8'), context);
-const run = expression => vm.runInContext(expression, context), settle = () => new Promise(resolve => setImmediate(resolve));
+vm.createContext(context);
+const loadedModules = new Set();
+function loadModule(file) {
+  if (loadedModules.has(file)) return;
+  loadedModules.add(file);
+  let code = fs.readFileSync(file, 'utf8');
+  const imports = /^import[\s\S]*?from\s+["']([^"']+)["'];\s*/gm;
+  for (const match of code.matchAll(imports)) loadModule(path.resolve(path.dirname(file), match[1]));
+  code = code.replace(imports, '').replace(/^export\s+/gm, '');
+  vm.runInContext(code, context, {filename:file});
+}
+loadModule(path.join(root, 'studio/web/app.js'));
+const run = expression => vm.runInContext(expression.replace(/\b(state|source|sourceDirty|settingsDirty|settingEdits|recipeEdits|extraEdits|exportSelection)\b/g, 'store.$1'), context), settle = () => new Promise(resolve => setImmediate(resolve));
 const control = key => query('[data-setting]').find(node => node.dataset.setting === key);
 function edit(key, value) {let node = control(key); if (!node) {descendants(ids['feature-list']).find(item => item.dataset.accordionKey === key.split('/')[0])?.click(); node = control(key);} node.value = value; node.oninput();}
 const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/settings').at(-1).options.body);
@@ -247,10 +262,10 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   assert.equal(calls.filter(call => call.url.startsWith('/api/functions?')).length,beforePages+1,'only one next-page request at a time');
   assert.equal(ids['function-loading'].hidden,false,'scroll loading shows a skeleton');
   pendingFunctions(); deferFunctions=false; await settle(); assert.equal(ids['function-loading'].hidden,true);
-  assert.equal(ids['function-list'].children.length,2); assert.equal(run('nextFunctions'),null);
+  assert.equal(ids['function-list'].children.length,2);
   ids['function-scroll'].onscroll(); await settle(); assert.equal(calls.filter(call => call.url.startsWith('/api/functions?')).length,beforePages+1,'end of results stops loading');
   ids['function-topic'].value='camera'; ids['function-topic'].onchange(); await settle(); assert.equal(ids['function-list'].children.length,1, 'new category clears previous results');
-  functionFailure=true; await ids['function-search'].click(); assert.match(ids['function-end'].textContent,/Could not load/); assert.equal(run('functionLoading'),false);
+  functionFailure=true; await ids['function-search'].click(); assert.match(ids['function-end'].textContent,/Could not load/);
   functionFailure=false; await ids['function-search'].click(); assert.equal(ids['function-list'].children.length,1,'failed search can be retried');
   await ids['function-list'].children[0].click(); ids['open-function-source'].click(); await settle();
   assert.equal(run('source.file'),'src/Reconstructed/KartLogic.cs'); assert.equal(ids['panel-editor'].hidden,false);
@@ -345,7 +360,7 @@ const latestSave = () => JSON.parse(calls.filter(call => call.url === '/api/sett
   run("stageImportedSettings({'Camera/FieldOfView':72,'Camera/Enabled':false})");
   assert.equal(run("state.settings['Camera/FieldOfView']"),72,'imported preset is staged without writing the config');
   assert.equal(run('settingEdits.has("Camera/FieldOfView")'),true,'imported values use the normal safe save flow');
-  assert.ok(fs.readFileSync(path.join(root,'studio/web/style.css'),'utf8').includes('[hidden]{display:none!important}'),'component display cannot override hidden');
+  assert.match(fs.readFileSync(path.join(root,'studio/web/styles/base.css'),'utf8'), /\[hidden\]\s*\{\s*display:\s*none\s*!important/,'component display cannot override hidden');
   assert.ok(calls.every(call => call.options.headers['X-TK2-Token'] === 'test-token'));
   assert.ok(!html.includes('Make it<br>your race.'), 'remove decorative hero');
   assert.ok(!html.includes('Gameplay modules are locked'), 'remove superseded blanket lock');

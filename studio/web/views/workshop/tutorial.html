@@ -1,0 +1,114 @@
+<section
+  id="panel-tutorial"
+  class="workshop-panel tutorial"
+  role="tabpanel"
+  aria-labelledby="tab-tutorial"
+  hidden
+>
+  <div class="tutorial-heading">
+    <span class="eyebrow">START WITH A SMALL CHANGE</span>
+    <h2>Your first mod: a kart hop</h2>
+    <p>
+      Press F9 in a local race to give your kart an extra upward impulse. The
+      template already includes a shortcut, a configurable strength and race
+      checks.
+    </p>
+    <button id="tutorial-create" class="primary">
+      Create MyKartHop recipe
+    </button>
+  </div>
+  <ol class="tutorial-steps">
+    <li>
+      <h3>Create the recipe</h3>
+      <p>
+        The button creates plugins/TK2.Customization/Recipes/MyKartHop.cs and
+        opens it in Module editor. Choose another name in the editor if it
+        already exists.
+      </p>
+    </li>
+    <li>
+      <h3>Change a readable value</h3>
+      <p>
+        In Configure, change the default strength from 6f to 8f. The allowed
+        range is 0–30. Configure declares settings; Tick runs while enabled;
+        Restore undoes persistent changes when disabled.
+      </p>
+      <pre class="reference-code">
+_hop = config.Bind("Recipe." + Name, "UpwardVelocity", 8f,
+    new ConfigDescription("Extra upward velocity.",
+        new AcceptableValueRange&lt;float&gt;(0, 30)));</pre
+      >
+    </li>
+    <li>
+      <h3>Use a game function</h3>
+      <p>
+        The template finds local karts and calls the readable adapter below. In
+        Game API reference, choose Kart &amp; driving and search AddVelocity to
+        inspect the declaration and reconstructed implementation.
+      </p>
+      <pre class="reference-code">
+ReadableGame.AddVelocity(kart, Vector3.up * _hop.Value);</pre
+      >
+      <p>
+        Game API entries can be public, internal or private. The adapter is our
+        public C# helper; a private declaration alone is not a ready-to-call
+        recipe function. Harmony hooks must specify the complete target
+        signature.
+      </p>
+    </li>
+    <li>
+      <h3>Save, build and test</h3>
+      <p>
+        Save C#, close the game, then choose Build &amp; install. Start the game
+        yourself. In Mod packs → Your recipes, enable My Kart Hop and save.
+        Press F9 during a local race. After this first build, changing its
+        strength or toggle needs only Save changes.
+      </p>
+      <p>
+        Author builds require the .NET SDK and initialized BepInEx interop.
+        Failed builds leave the installed DLL in place; read Compiler output for
+        the file and line to fix.
+      </p>
+    </li>
+  </ol>
+  <h2 class="ideas-heading">Try a different idea next</h2>
+  <div class="tutorial-ideas">
+    <article>
+      <h3>Precision practice hop</h3>
+      <p>
+        Add a cooldown using Time.unscaledTime, or separate forward and upward
+        impulse settings. Keep the race and local-player checks.
+      </p>
+    </article>
+    <article>
+      <h3>Comfort camera preset</h3>
+      <p>
+        Start with Camera setup → Edit code. Explore distance, target height and
+        smoothing; use F8 to tune existing settings live before adding behavior.
+      </p>
+    </article>
+    <article>
+      <h3>Quiet practice audio</h3>
+      <p>
+        Start with Audio mixer → Edit code. Add an optional preset that lowers
+        music while preserving captured volume values when disabled.
+      </p>
+    </article>
+    <article>
+      <h3>Frame limit preset</h3>
+      <p>
+        Open Recipes/FrameLimiter.cs. It is a small non-gameplay example with
+        configurable FPS and restoration of the previous target.
+      </p>
+      <button id="tutorial-frame" class="quiet">
+        Open frame limiter example
+      </button>
+    </article>
+  </div>
+  <p class="workflow-note">
+    Recipes live beside the application in plugins/TK2.Customization/Recipes.
+    Built-in modules share source files in the parent folder. Edit here or
+    choose Open folder and use your own editor. Save, build and install code
+    once; tune its config live afterwards.
+  </p>
+</section>

@@ -24,9 +24,14 @@ class GarageTests(unittest.TestCase):
         (self.root / "src/Reconstructed").mkdir(parents=True)
         (self.root / "templates").mkdir()
         (self.root / "templates/PackRecipe.cs.txt").write_text("public class RecipeName {}")
+        self.web_dist = self.root / "studio/web-dist"
+        (self.web_dist / "assets").mkdir(parents=True)
+        (self.web_dist / "index.html").write_text('<meta name="tk2-session" content="__SESSION_TOKEN__"> Toolkit __APP_VERSION__ <script src="/assets/app-test.js"></script>')
+        (self.web_dist / "assets/app-test.js").write_text("console.log('vite build')")
         for target, value in (("ROOT", self.root),):
             p = patch.object(core, target, value); p.start(); self.addCleanup(p.stop)
         p = patch.object(pack, "SOURCE_ROOT", self.sources); p.start(); self.addCleanup(p.stop)
+        p = patch.object(webapp, "WEB_DIST", self.web_dist); p.start(); self.addCleanup(p.stop)
         self.app = webapp.Application(self.game)
 
     def test_pack_defaults_allow_requested_offline_test_toggles(self):
@@ -163,7 +168,9 @@ class GarageTests(unittest.TestCase):
         status, html = request("GET", "/")
         self.assertEqual(status, 200); self.assertIn(self.app.token.encode(), html); self.assertNotIn(b"__SESSION_TOKEN__", html)
         self.assertIn(f"Toolkit {webapp.APP_VERSION}".encode(), html); self.assertNotIn(b"__APP_VERSION__", html)
-        status, component_css = request("GET", "/components.css")
+        status, built_js = request("GET", "/assets/app-test.js")
+        self.assertEqual(status, 200); self.assertIn(b"vite build", built_js)
+        status, component_css = request("GET", "/styles/module-cards.css")
         self.assertEqual(status, 200); self.assertIn(b".module-expand", component_css)
         bad = json.dumps({"values": {"Audio/Enabled": True}, "hash": "stale"})
         self.assertEqual(request("POST", "/api/settings", {**auth, "Content-Type": "application/json"}, bad)[0], 409)

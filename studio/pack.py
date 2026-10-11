@@ -210,6 +210,10 @@ def module_sources():
     result = {feature["id"]: ["plugins/TK2.Customization/" + file for file in
               ownership.get(feature["id"], ["LegacyMK.cs"]) if "plugins/TK2.Customization/" + file in available]
               for feature in FEATURES}
+    version_source = "plugins/TK2.Customization/ToolkitVersion.cs"
+    for files in result.values():
+        if "plugins/TK2.Customization/Plugin.cs" in files and version_source in available:
+            files.append(version_source)
     import re
     for file in available:
         if "/Recipes/" not in file: continue

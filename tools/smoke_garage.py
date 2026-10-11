@@ -7,6 +7,7 @@ import subprocess
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from studio import core
+from studio.frontend import render_html
 
 class Page(HTMLParser):
     def __init__(self): super().__init__(); self.ids = []; self.targets = []
@@ -17,26 +18,28 @@ class Page(HTMLParser):
 
 page = Page()
 web = core.ROOT / "studio/web"
-page.feed((web / "index.html").read_text(encoding="utf-8"))
+html = render_html(web / 'index.html', web)
+page.feed(html)
 assert len(page.ids) == len(set(page.ids)), "Duplicate UI ids"
 assert all(target in page.ids for target in page.targets)
-script = (web / "app.js").read_text(encoding="utf-8")
-assert all(name in page.ids for name in re.findall(r"\$\('([^']+)'\)", script)), "Unknown control id"
-css = (web / "style.css").read_text(encoding="utf-8")
-assert "data-theme=dark" in css and "prefers-reduced-motion" in css
-components = (web / "components.css").read_text(encoding="utf-8")
-assert ".module-expand" in components and ".topbar-update" in components
-assert '/components.css' in (web / "index.html").read_text(encoding="utf-8")
-assert "max-width:1450px" not in css and "min-height:100vh" in css
-assert "__APP_VERSION__" in (web / "index.html").read_text(encoding="utf-8")
-html = (web / "index.html").read_text(encoding="utf-8")
+scripts = [web / 'app.js', *sorted((web / 'features').rglob('*.js')), *sorted((web / 'shared').rglob('*.js'))]
+for script in scripts:
+    source = script.read_text(encoding='utf-8')
+    assert all(name in page.ids for name in re.findall(r'''\$\(["']([^"']+)["']\)''', source)), f'Unknown control id in {script.name}'
+css = '\n'.join(path.read_text(encoding='utf-8') for path in sorted((web / 'styles').glob('*.css')))
+assert 'data-theme' in css and 'prefers-reduced-motion' in css
+assert '.module-expand' in css and '.topbar-update' in css
+assert '/styles/index.css' in html
+assert 'max-width: 1450px' not in css and 'min-height: 100vh' in css
+assert '__APP_VERSION__' in html
 assert 'id="expand-all-accordions"' in html and 'id="collapse-all-accordions"' in html
-assert ":root[data-theme=dark] .module-expand[aria-expanded=true] .expand-arrow{color:oklch(84% .16 72)}" in components
+assert 'aria-expanded="true"' in css and 'oklch(84% 0.16 72)' in css
 assert all((core.ROOT / "assets" / name).exists() for name in ("Logo.png", "library_600x900_2x.jpg"))
-subprocess.run(["node", "--check", str(web / "app.js")], check=True, creationflags=core.CREATE_NO_WINDOW)
+for script in scripts:
+    subprocess.run(['node', '--check', str(script)], check=True, creationflags=core.CREATE_NO_WINDOW)
 result = {"uniqueControls": len(page.ids), "views": page.targets, "themeTokens": True, "assetsPresent": True,
           "componentStyles": "passed",
-          "javascriptSyntax": "passed", "visualBrowserCheck": "blocked by declined browser permission; pending",
+          "javascriptSyntax": "passed", "visualBrowserCheck": "separate browser check required",
           "gameRuntimeTest": "not run"}
 core.write_json(core.ROOT / "local/garage-smoke.json", result)
 print(json.dumps(result, indent=2))

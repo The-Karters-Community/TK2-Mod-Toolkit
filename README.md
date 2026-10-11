@@ -31,16 +31,21 @@ To remove the Toolkit plugin, close the game and use **Installation → Backups 
 
 ## Run from a source checkout
 
-On Windows, install **Python 3.10 or newer, 64-bit** and clone the repository. The application backend uses Python's standard library; a browser is opened as an app-style window when Edge is available, with a normal-browser fallback.
+On Windows, install **Python 3.10 or newer, 64-bit**, **Node.js 20.19 or newer with npm**, and clone the repository. Vite builds the frontend into static assets served by the authenticated local backend. Packaged builds use a pywebview desktop host with WebView2; source checkouts use it when `pywebview` is installed and otherwise open in Edge app mode.
 
 ```powershell
 git clone https://github.com/The-Karters-Community/TK2-Mod-Toolkit.git
 cd TK2-Mod-Toolkit
 python --version
+python -m pip install -r tools/requirements-app.txt  # optional native WebView2 desktop window
+cd studio/web
+npm ci
+npm run build
+cd ../..
 python launch.py
 ```
 
-You can also double-click **Launch Studio.cmd**. The source app uses this checkout's files directly, so changes to Python, HTML, CSS and JavaScript are visible on the next launch or page refresh. The app does not install or launch the game by itself.
+You can also double-click **Launch Studio.cmd**; it installs missing frontend dependencies and rebuilds the Vite frontend before opening. A failed build stops startup instead of serving stale assets. Install `tools/requirements-app.txt` to use the native WebView2 window; without it, the launcher opens Edge app mode. For frontend changes that appear immediately while editing, use the two-terminal Vite workflow in [Contributing](CONTRIBUTING.md). The [frontend ownership map](studio/web/README.md) explains where each view, control and stylesheet belongs. The app does not install or launch the game by itself.
 
 To compile or install the plugin from source, also install a **.NET SDK that can target `net6.0`**, install the supported BepInEx build in the game, run the game once to generate interop assemblies, then close the game. Select the game in Installation and use **Build & install** in Workshop, or run `python -m studio.cli --game 'D:\Games\The Karters 2 Turbo Charged' build`. The plugin project requires game-specific interop references; build it through the Toolkit or this CLI rather than invoking `dotnet build` directly. A normal player using the prebuilt plugin does not need the .NET SDK.
 
@@ -80,7 +85,7 @@ Double-click **Build Toolkit.cmd**, or run from PowerShell:
   -LoaderPath 'D:\Modding\BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.788+5b766a3'
 ```
 
-The build requires Python 3.10+ x64, .NET SDK and an initialized supported game installation when the plugin must be compiled. Packaging dependencies are installed in the ignored `local/portable-build-env/` environment. The build does not deploy into the game or launch it.
+The build requires Python 3.10+ x64, Node.js 20.19+ with npm, a .NET SDK and an initialized supported game installation when the plugin must be compiled. Packaging dependencies are installed in the ignored `local/portable-build-env/` environment. The build does not deploy into the game or launch it. Build artifacts reuse the configured release version; they never increment it. `tools/set_version.ps1` changes the desktop and plugin release versions together during release preparation.
 
 The default artifact is a compressed, self-contained **application** ZIP at `artifacts/portable/TK2-Mod-Toolkit-<version>-win-x64.zip`; it bundles the app's Python runtime and prebuilt Toolkit plugin, but not the game or BepInEx. Users install the validated loader separately. `-IncludeLoader` creates the same package with BepInEx included. The portable build step also produces an unpacked app folder beside the ZIP.
 
@@ -111,9 +116,9 @@ The updater is already configured for **`The-Karters-Community/TK2-Mod-Toolkit`*
 .\tools\publish_release.ps1 -Publish
 ```
 
-The release version is set in `studio/version.py`. Build the archive after finalizing and committing the source. The script tags the current commit and uploads the ZIP. A release may use the default slim package or the larger loader-included package under the same required filename; the updater does not currently distinguish or offer two variants. See [release and update details](docs/RELEASING.md) and [portable packaging](docs/PORTABLE.md).
+The release version is shared by `studio/version.py` and `plugins/TK2.Customization/ToolkitVersion.cs`; set both through `tools/set_version.ps1` while preparing a release. Build the archive after finalizing and committing the source. The script tags the current commit and uploads the ZIP. A release may use the default slim package or the larger loader-included package under the same required filename; the updater does not currently distinguish or offer two variants. See [release and update details](docs/RELEASING.md) and [portable packaging](docs/PORTABLE.md).
 
-The repository has **no published GitHub releases as of October 10, 2026**, so the updater has not yet been validated against a real published asset. Once the first release is published with the expected tag and ZIP, test update discovery and installation from an older packaged build.
+The latest tagged toolkit release in this checkout is `v0.6.23`. Builds retain that version until a maintainer prepares the next release with `tools/set_version.ps1`; they do not create artificial version bumps.
 
 ## Decompiled code and reverse-engineering evidence
 
