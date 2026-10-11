@@ -1,5 +1,5 @@
 """Next release version. Source checkouts display a development suffix."""
-APP_VERSION = "0.6.24"
+APP_VERSION = "0.6.25"
 
 
 def display_version(frozen=False):
