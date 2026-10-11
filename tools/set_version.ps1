@@ -8,8 +8,9 @@ $python = [IO.File]::ReadAllText($pythonPath)
 $plugin = [IO.File]::ReadAllText($pluginPath)
 if ($python -notmatch '(?m)^APP_VERSION\s*=\s*"\d+\.\d+\.\d+"(?=\r?$)') { throw 'Could not find APP_VERSION in studio/version.py.' }
 if ($plugin -notmatch '(?m)^\s*internal const string Value = "\d+\.\d+\.\d+";(?=\r?$)') { throw 'Could not find ToolkitVersion.Value in ToolkitVersion.cs.' }
-$python = [Regex]::Replace($python, '(?m)(^APP_VERSION\s*=\s*")\d+\.\d+\.\d+("(?=\r?$))', "`$1$Version`$2", 1)
-$plugin = [Regex]::Replace($plugin, '(?m)(^\s*internal const string Value = ")\d+\.\d+\.\d+(";(?=\r?$))', "`$1$Version`$2", 1)
+$replacement = '${1}' + $Version + '${2}'
+$python = [Regex]::Replace($python, '(?m)(^APP_VERSION\s*=\s*")\d+\.\d+\.\d+("(?=\r?$))', $replacement)
+$plugin = [Regex]::Replace($plugin, '(?m)(^\s*internal const string Value = ")\d+\.\d+\.\d+(";(?=\r?$))', $replacement)
 [IO.File]::WriteAllText($pythonPath, $python, [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($pluginPath, $plugin, [Text.UTF8Encoding]::new($false))
 Write-Output "Toolkit version set to $Version. Use this only while preparing a release; builds do not alter the version."

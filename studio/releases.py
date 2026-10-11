@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
@@ -136,6 +137,14 @@ class ReleaseChecker:
         info = self.check()
         if info.get("state") != "available": raise ValueError("No newer stable toolkit release is available.")
         if not info.get("canInstall"): raise ValueError("This copy cannot install updates automatically. Use the GitHub release page to update it.")
+        name = self.root.name
+        if re.fullmatch(r"TK2-Mod-Toolkit-\d+\.\d+\.\d+-win-x64", name):
+            name = f"TK2-Mod-Toolkit-{info['version']}-win-x64"
+        elif re.fullmatch(r"TK2 Mod Toolkit \d+\.\d+\.\d+", name):
+            name = f"TK2 Mod Toolkit {info['version']}"
+        target = self.root.with_name(name)
+        if target != self.root and target.exists():
+            raise ValueError(f"Update destination already exists: {target}. Move that folder before retrying; this app will stay open.")
         response = _request(info["downloadUrl"])
         with response:
             declared = int(response.headers.get("Content-Length", "0") or 0)

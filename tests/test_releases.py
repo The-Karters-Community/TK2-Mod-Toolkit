@@ -41,6 +41,18 @@ class ReleaseTests(unittest.TestCase):
             package = releases.extract_verified_archive(archive, destination, "0.7.0")
             self.assertTrue((package / "TK2 Mod Toolkit.exe").is_file())
 
+    def test_existing_update_destination_is_reported_before_download_or_shutdown(self):
+        with tempfile.TemporaryDirectory() as folder:
+            parent = Path(folder)
+            root = parent / 'TK2-Mod-Toolkit-0.6.23-win-x64'
+            root.mkdir()
+            (parent / 'TK2-Mod-Toolkit-0.6.24-win-x64').mkdir()
+            checker = releases.ReleaseChecker('0.6.23', root, True)
+            with patch.object(checker, 'check', return_value={'state': 'available', 'canInstall': True, 'version': '0.6.24'}), patch.object(releases, '_request') as request:
+                with self.assertRaisesRegex(ValueError, 'destination already exists'):
+                    checker.prepare_update()
+                request.assert_not_called()
+
     def test_extraction_rejects_traversal_and_mismatched_version(self):
         with tempfile.TemporaryDirectory() as temp:
             base = Path(temp); archive = base / "unsafe.zip"; destination = base / "extract"

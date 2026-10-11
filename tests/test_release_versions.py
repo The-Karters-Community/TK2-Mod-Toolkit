@@ -50,8 +50,8 @@ function gh {
 '''.replace('__RESULT__', '0' if succeeds else '1'), encoding='utf-8')
                 result = subprocess.run([POWERSHELL, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(harness)], capture_output=True, text=True, timeout=15)
                 expected = '0.6.25' if succeeds else '0.6.24'
-                self.assertIn(expected, version.read_text(), result.stderr)
-                self.assertIn(expected, plugin.read_text(), result.stderr)
+                self.assertEqual(version.read_text(), f'APP_VERSION = "{expected}"\n', result.stderr)
+                self.assertEqual(plugin.read_text(), f'internal const string Value = "{expected}";\n', result.stderr)
                 self.assertEqual((root / 'commit.txt').exists(), succeeds, result.stderr)
                 self.assertIn('v0.6.24', (root / 'release.txt').read_text())
                 self.assertEqual(result.returncode == 0, succeeds, result.stderr)
