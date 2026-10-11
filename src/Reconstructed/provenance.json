@@ -297,6 +297,36 @@
       "confidence": "reviewed normal-state semantics; multiplier independently read from matching GameAssembly.dll"
     }
   ],
+  "slices": [
+    {
+      "behavior": "Ant_BoostManager.FireSliderBoost strength curve slice",
+      "address": "180666590",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "adapter": "src/Reconstructed/NativeAdapters.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180666590_Ant_BoostManager__FireSliderBoost.c",
+      "evidenceSha256": "DB43677BD3BE088E5C257ADE58E2C475B74A8C8A9E6C906694B28C816B57A809",
+      "dependencies": [
+        {
+          "symbol": "FUN_18039d450 power curve implementation",
+          "address": "18039d450",
+          "evidence": "local/ghidra/reconstruction-detail/pseudocode/18039d450_FUN_18039d450.c",
+          "evidenceSha256": "5EBB122E780BC2A946AAE05552C416B0D41D982DF126BC65F9ED0A7A3B1CEA98"
+        },
+        {
+          "symbol": "Cross-caller names the second argument fNonLinearPow",
+          "address": "18094fd30",
+          "evidence": "local/ghidra/assembly-csharp-full/pseudocode/18094fd30_PTK_CamDistanceScaling__UpdateScaleBasedOnCamera.c",
+          "evidenceSha256": "68721CA4C8A82D550D01ADA89E535294D5656190A80150A53C7316F0F316FDBF"
+        },
+        {
+          "symbol": "Ant_BoostManager.fPowForBoostClickSliderNormalized at field offset 0x1F4",
+          "evidence": "local/cpp2il-2022.1.0-pre-release.21/TheKarters2-0.1.4.18-diffable/DiffableCs/Assembly-CSharp/Ant_BoostManager.cs",
+          "evidenceSha256": "52AD53A1ED6A6AE2D7B6264E593671E215A6642B57ED9E9F0FF05F928E7C30B3"
+        }
+      ],
+      "confidence": "reviewed normalized-fill power curve only; the enclosing method state changes and events are not reconstructed"
+    }
+  ],
   "constant": {
     "address": "183707e34",
     "fileOffset": "3706634",

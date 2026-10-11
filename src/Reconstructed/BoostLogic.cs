@@ -196,6 +196,16 @@ public static class BoostLogic
         return normalized;
     }
 
+    // FireSliderBoost's strength slice: clamp the fill ratio, then apply the configured power curve.
+    public static float GetSliderBoostStrength(float fillTime, float minimumTime,
+        float maximumBestBoostTime, float exponent)
+    {
+        float normalized = (fillTime - minimumTime) / (maximumBestBoostTime - minimumTime);
+        if (normalized < 0f) normalized = 0f;
+        else if (1f < normalized) normalized = 1f;
+        return MathF.Pow(normalized, exponent);
+    }
+
     // IsPlayerAchivedMaximumBoostLevel uses equality, not a greater-than-or-equal check.
     public static bool HasMaximumManualBoostLevel(int boosterCount) => boosterCount == 3;
 

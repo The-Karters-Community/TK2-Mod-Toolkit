@@ -143,6 +143,13 @@ foreach (var item in new[] { (.2f, true), (.5f, true), (.5001f, false), (.1999f,
     Check(BoostLogic.IsManualBoostWithinFireRange(new[] { item.Item1 }, .2f, .5f) == item.Item2, "manual boost fire range uses inclusive bounds and rejects NaN");
 foreach (var item in new[] { (.2f, 0f), (.5f, .5f), (.8f, 1f), (1.1f, 1f), (.1f, 0f) })
     Check(BoostLogic.GetTriggeredBoostStrengthNormalized(new[] { item.Item1 }, 0, .2f, .8f) == item.Item2, "triggered boost strength normalizes and clamps to zero through one");
+Check(BoostLogic.GetSliderBoostStrength(.5f, 0f, 1f, 2f) == .25f,
+    "slider boost strength applies the configured power curve to normalized fill");
+Check(BoostLogic.GetSliderBoostStrength(-1f, 0f, 1f, 2f) == 0f
+    && BoostLogic.GetSliderBoostStrength(2f, 0f, 1f, 2f) == 1f,
+    "slider boost strength clamps its fill ratio before the power curve");
+Check(BoostLogic.GetSliderBoostStrength(.5f, 0f, 1f, 0f) == 1f,
+    "zero slider exponent returns full strength for a finite normalized fill");
 Check(BoostLogic.HasMaximumManualBoostLevel(3) && !BoostLogic.HasMaximumManualBoostLevel(4), "maximum boost level is exactly three");
 Check(BoostLogic.AddReserves(2, 3) == 5 && BoostLogic.AddReserves(2, -3) == -1,
     "reserve addition adds the amount directly without clamping");

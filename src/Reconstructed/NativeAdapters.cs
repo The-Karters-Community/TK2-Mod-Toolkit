@@ -79,6 +79,14 @@ public static partial class ReadableGame
             boost.fCurrentBoostFillTime_NotClampedTimeSinceLoading,
             boost.iCurrentBoosterNumberCount);
 
+    // FireSliderBoost strength curve slice @ 0x180666590; this does not reproduce the enclosing state changes.
+    public static float GetSliderBoostStrength(Ant_BoostManager boost, int boostIndex) =>
+        BoostLogic.GetSliderBoostStrength(
+            boost.fCurrentBoostFillTime[boostIndex],
+            boost.fMinimumTimeForBoost,
+            boost.fMaximumTimeForBestBoost,
+            boost.fPowForBoostClickSliderNormalized);
+
     // Ant_BoostManager.BoostPadTriggerEnter @ 0x180665fa0.
     // The game-owned FireBoost method remains responsible for its normal state/event behavior.
     public static bool BoostPadTriggerEnter(Ant_BoostManager boost, float strength, float length,
