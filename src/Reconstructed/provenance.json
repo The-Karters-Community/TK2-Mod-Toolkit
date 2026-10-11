@@ -145,6 +145,14 @@
       "confidence": "reviewed initialized three-slot state reset; ObscuredFloat encoding is delegated to interop; native null and short-array error paths omitted"
     },
     {
+      "method": "Ant_BoostManager.SetWheelBurningBoostFillTime",
+      "address": "180668aa0",
+      "source": "src/Reconstructed/NativeAdapters.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180668aa0_Ant_BoostManager__SetWheelBurningBoostFillTime.c",
+      "evidenceSha256": "3a4c7c05528f8ff2334e5e694c1aa021b428fbf5ac5b71534c568983f95f3af7",
+      "confidence": "reviewed normal-array state; matches direct indexed assignment and native unsigned bounds check"
+    },
+    {
       "method": "Ant_BoostManager.WhatZoneIsThePlayerIn",
       "address": "1806697c0",
       "source": "src/Reconstructed/BoostLogic.cs",

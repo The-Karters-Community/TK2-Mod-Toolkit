@@ -134,6 +134,11 @@ Check(stoppedBoost.CurrentAirTime == 0f && stoppedBoost.BoosterCount == 0,
     "StopBoost resets airborne time and the booster count");
 float[] boostFills = { .35f, .8f, 1.2f };
 Check(BoostLogic.GetManualBoostFillNormalized(boostFills, 1) == .8f, "manual boost getter returns the selected fill slot");
+BoostLogic.SetWheelBurningBoostFillTime(boostFills, 1, .45f);
+Check(boostFills[0] == .35f && boostFills[1] == .45f && boostFills[2] == 1.2f,
+    "boost fill setter replaces only the selected slot");
+try { BoostLogic.SetWheelBurningBoostFillTime(boostFills, -1, .2f); throw new Exception("negative boost slot accepted"); }
+catch (IndexOutOfRangeException) { Check(true, "negative boost slot follows the native unsigned bounds check"); }
 foreach (var item in new[] { (.2f, true), (.5f, true), (.5001f, false), (.1999f, false), (float.NaN, false) })
     Check(BoostLogic.IsManualBoostWithinFireRange(new[] { item.Item1 }, .2f, .5f) == item.Item2, "manual boost fire range uses inclusive bounds and rejects NaN");
 foreach (var item in new[] { (.2f, 0f), (.5f, .5f), (.8f, 1f), (1.1f, 1f), (.1f, 0f) })

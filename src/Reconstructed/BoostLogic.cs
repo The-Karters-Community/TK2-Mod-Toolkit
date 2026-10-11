@@ -173,6 +173,10 @@ public static class BoostLogic
         return new(0f, 0f, stoppedFillTimes, 0f, 0);
     }
 
+    // Ant_BoostManager.SetWheelBurningBoostFillTime writes the requested slot directly.
+    public static void SetWheelBurningBoostFillTime(float[] fillTimes, int boxIndex, float loadedTime) =>
+        fillTimes[boxIndex] = loadedTime;
+
     // IsManualBoostWithingFireRange uses slot zero and includes both boundaries.
     public static bool IsManualBoostWithinFireRange(float[] fillTimes, float minimumTime, float maximumTime)
     {

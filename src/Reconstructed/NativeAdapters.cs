@@ -120,6 +120,10 @@ public static partial class ReadableGame
         boost.iCurrentBoosterNumberCount = plan.BoosterCount;
     }
 
+    // Ant_BoostManager.SetWheelBurningBoostFillTime @ 0x180668aa0.
+    public static void SetWheelBurningBoostFillTime(Ant_BoostManager boost, int boxIndex, float loadedTime) =>
+        BoostLogic.SetWheelBurningBoostFillTime(boost.fCurrentBoostFillTime, boxIndex, loadedTime);
+
     // HpBarController.GetCurrentHP shares 0x18056d2b0 with PlayerGlobalStats.GetCurrentHP.
     // The native getter reads synchronized visible HP, rather than private currentHp.
     public static int GetCurrentHP(HpBarController hp) => hp.player.visualInstanceSyncedParams.iPlayerHP;
