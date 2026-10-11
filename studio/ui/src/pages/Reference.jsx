@@ -15,7 +15,7 @@ const topics = {
 };
 
 // Both explorers use the same request/selection component. Only their API contract differs.
-function Explorer({ native = false, onSource }) {
+function Explorer({ native = false, onSource, onNativeAddress, nativeAddress = "" }) {
   const { notify } = useToolkit();
   const [query, setQuery] = useState(""),
     [topic, setTopic] = useState("important"),
@@ -28,9 +28,10 @@ function Explorer({ native = false, onSource }) {
   const sequence = useRef(0),
     selection = useRef(0),
     active = useRef(false),
-    controller = useRef(null);
+    controller = useRef(null),
+    section = useRef(null);
   const rows = native ? result?.results || [] : result?.methods || [];
-  async function search(more = false) {
+  async function search(more = false, queryOverride = query) {
     if (more && (active.current || result?.next == null)) return;
     controller.current?.abort();
     const request = new AbortController();
@@ -46,7 +47,7 @@ function Explorer({ native = false, onSource }) {
       ++selection.current;
     }
     const params = new URLSearchParams({
-      q: query,
+      q: queryOverride,
       offset: more ? result.next : 0,
       topic,
       recovered,
@@ -94,6 +95,12 @@ function Explorer({ native = false, onSource }) {
     const timer = setTimeout(() => search(), 300);
     return () => clearTimeout(timer);
   }, [query, topic, recovered]);
+  useEffect(() => {
+    if (!native || !nativeAddress) return;
+    setQuery(nativeAddress);
+    search(false, nativeAddress);
+    section.current?.scrollIntoView?.({behavior: "smooth", block: "start"});
+  }, [nativeAddress]);
   useEffect(
     () => () => {
       controller.current?.abort();
@@ -103,12 +110,12 @@ function Explorer({ native = false, onSource }) {
     [],
   );
   return (
-    <section className="space-y-4">
+    <section ref={section} className="space-y-4">
       <h2>{native ? "Native pseudocode" : "Game API reference"}</h2>
       <p className="max-w-3xl text-sm text-muted">
         {native
           ? "Search your local Ghidra exports. This is approximate native output, not original C#. First use may build a local index."
-          : "Browse signatures and reviewed reconstructions. A declaration lists types and parameters; it does not contain executable game logic."}
+          : "Browse signatures and reviewed reconstructions, then search matching native pseudocode by address. A declaration lists types and parameters; it does not contain executable game logic."}
       </p>
       <form
         className="flex flex-wrap items-end gap-3"
@@ -266,6 +273,11 @@ function Explorer({ native = false, onSource }) {
                   </Button>
                 </div>
               )}
+              {!native && detail.address && onNativeAddress && (
+                <Button onClick={() => onNativeAddress(detail.address)}>
+                  Search native pseudocode at 0x{detail.address}
+                </Button>
+              )}
               {native && detail.reconstruction && (
                 <div className="space-y-2 rounded-lg border border-line p-3">
                   <p className="text-sm">
@@ -295,11 +307,12 @@ function Explorer({ native = false, onSource }) {
 }
 
 export default function Reference({ onSource }) {
+  const [nativeAddress, setNativeAddress] = useState("");
   return (
     <div className="space-y-8">
-      <Explorer onSource={onSource} />
+      <Explorer onSource={onSource} onNativeAddress={setNativeAddress} />
       <div className="border-t border-line pt-6">
-        <Explorer native onSource={onSource} />
+        <Explorer native nativeAddress={nativeAddress} onSource={onSource} />
       </div>
     </div>
   );
