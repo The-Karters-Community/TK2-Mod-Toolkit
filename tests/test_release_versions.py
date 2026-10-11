@@ -32,6 +32,7 @@ class ReleaseVersionTests(unittest.TestCase):
                 for file in ('publish_release.ps1', 'set_version.ps1'):
                     shutil.copyfile(ROOT / 'tools' / file, root / 'tools' / file)
                 harness = root / 'harness.ps1'
+                (root / 'notes.md').write_text('Complete release highlights\n', encoding='utf-8')
                 harness.write_text('''
 $ErrorActionPreference = 'Stop'
 function Get-FileHash { param($LiteralPath, $Algorithm) [pscustomobject]@{Hash=('a' * 64)} }
@@ -44,9 +45,10 @@ function git {
 function gh {
     if ($args[1] -eq 'view') { $global:LASTEXITCODE=1; return }
     $args -join ' ' | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'release.txt')
+    Get-Content -LiteralPath $args[([array]::IndexOf($args, '--notes-file') + 1)] -Raw | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'notes-used.txt')
     $global:LASTEXITCODE=__RESULT__
 }
-& (Join-Path $PSScriptRoot 'tools/publish_release.ps1') -Publish
+& (Join-Path $PSScriptRoot 'tools/publish_release.ps1') -Publish -NotesFile (Join-Path $PSScriptRoot 'notes.md')
 '''.replace('__RESULT__', '0' if succeeds else '1'), encoding='utf-8')
                 result = subprocess.run([POWERSHELL, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(harness)], capture_output=True, text=True, timeout=15)
                 expected = '0.6.25' if succeeds else '0.6.24'
@@ -54,4 +56,5 @@ function gh {
                 self.assertEqual(plugin.read_text(), f'internal const string Value = "{expected}";\n', result.stderr)
                 self.assertEqual((root / 'commit.txt').exists(), succeeds, result.stderr)
                 self.assertIn('v0.6.24', (root / 'release.txt').read_text())
+                self.assertEqual((root / 'notes-used.txt').read_text().strip(), 'Complete release highlights')
                 self.assertEqual(result.returncode == 0, succeeds, result.stderr)

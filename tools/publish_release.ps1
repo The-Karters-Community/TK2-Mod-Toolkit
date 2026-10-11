@@ -1,4 +1,4 @@
-param([switch]$Publish)
+param([switch]$Publish, [string]$NotesFile)
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $versionSource = Get-Content -LiteralPath (Join-Path $repoRoot 'studio/version.py') -Raw
@@ -25,6 +25,10 @@ TK2 Mod Toolkit $version for The Karters 2 Turbo Charged.
 Portable Windows x64 package. The archive SHA-256 is $hash.
 See README.md for prerequisites, installation, and update behavior.
 "@
+    if ($NotesFile) {
+        $notes = Get-Content -LiteralPath $NotesFile -Raw
+        if (-not $notes.Trim()) { throw 'Release notes must not be empty.' }
+    }
     $notesPath = Join-Path $env:TEMP "tk2-release-$version-notes.md"
     [IO.File]::WriteAllText($notesPath, $notes, [Text.UTF8Encoding]::new($false))
     $arguments = @('release','create',$tag,$archive,'--title',"TK2 Mod Toolkit $version",'--notes-file',$notesPath,'--target',$head)

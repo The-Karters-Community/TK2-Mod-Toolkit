@@ -11,7 +11,7 @@ The in-app updater is configured for `The-Karters-Community/TK2-Mod-Toolkit`. It
 
 ## Prepare and test
 
-1. Check `APP_VERSION` in `studio/version.py`: it is the next unreleased version (currently 0.6.24). Source UI adds `-dev`; packaged builds show the numeric release version. Use `.\tools\set_version.ps1 -Version X.Y.Z` only to choose a different release number. Builds never increment versions.
+1. Check `APP_VERSION` in `studio/version.py`: it is the next unreleased version (for example, 0.6.24). Source UI adds `-dev`; packaged builds show the numeric release version. Use `.\tools\set_version.ps1 -Version X.Y.Z` only to choose a different release number. Builds never increment versions.
 2. Run relevant tests and inspect the final diff. Compile the plugin with the supported game references when plugin code changed.
 3. Close the Toolkit executable, then build the desired package:
 
@@ -36,7 +36,7 @@ Run from the repository root:
 .\tools\publish_release.ps1
 
 # Publish directly (skip draft review)
-.\tools\publish_release.ps1 -Publish
+.\tools\publish_release.ps1 -Publish -NotesFile local/release-notes.md
 ```
 
 The script validates the versioned archive, Git status and remote branch head, then creates tag `v<version>` on the exact commit and uploads the ZIP. By default, it creates a draft; review notes and asset before publishing the draft on GitHub. Publishing a stable release is what makes it eligible for startup update checks. The GitHub release asset API must report its SHA-256 digest for automatic installation to be offered.

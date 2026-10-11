@@ -8,12 +8,12 @@ The supported game build is **0.1.4.18 (Windows x64)**. The validated loader is 
 
 ## Toolkit screenshots
 
-The screenshots below show the current Mod packs page and Workshop editor. The web UI adapts to the app window; controls and module catalog may change between toolkit builds.
+The screenshots below show the current Mod library page and Workshop editor. The web UI adapts to the app window; controls and module catalog may change between toolkit builds.
 
-![Mod packs overview](docs/images/mod-packs.png)
-![Workshop 1](docs/images/workshop.png)
-![Workshop 3](docs/images/workshop3.png)
-![Tool Installation](docs/images/installation.png)
+![Mod library overview](docs/images/mod-packs.png)
+![Workshop editor](docs/images/workshop.png)
+![Workshop sharing](docs/images/workshop3.png)
+![Installation checks](docs/images/installation.png)
 
 ## Install and use the application
 
@@ -21,7 +21,7 @@ For a ready-to-run copy, download the Windows x64 ZIP from [GitHub Releases](htt
 
 In **Installation**, select the folder containing `TheKarters2.exe` and `GameAssembly.dll`. Install or repair the supported BepInEx build if needed, start the game yourself once so BepInEx can generate IL2CPP interop, then close the game and run **Check**. Install/update the Toolkit plugin only after the app reports the installation is ready. Existing plugin and config files are preserved; the app identifies possible conflicts and offers reversible disable/restore actions.
 
-Open **Mod packs**, expand a module, enable it, adjust settings and select **Save changes**. Ordinary settings reload from `BepInEx/config/local.tk2.customization.cfg` while the game is running. Changing C# source is different: close the game, use **Build pack** or **Build & install**, then restart the game to load the rebuilt DLL. The module catalog, search, filters, resets, advanced settings and Workshop are described in [Application usage](docs/USAGE.md).
+Open **Mod library**, expand a module, enable it, adjust settings and select **Save changes**. Ordinary settings reload from `BepInEx/config/local.tk2.customization.cfg` while the game is running. Changing C# source is different: close the game, use **Build pack** or **Build & install**, then restart the game to load the rebuilt DLL. The module catalog, search, filters, resets, advanced settings and Workshop are described in [Application usage](docs/USAGE.md).
 
 ### Troubleshooting and uninstalling
 
