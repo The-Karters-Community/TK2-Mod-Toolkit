@@ -12,11 +12,15 @@ POWERSHELL = shutil.which('powershell.exe')
 
 @unittest.skipUnless(POWERSHELL, 'Windows updater integration')
 class PortableUpdaterTests(unittest.TestCase):
-    def run_update(self, healthy=True, safe=True):
+    def run_update(self, healthy=True, safe=True, name='TK2-Mod-Toolkit-0.6.23-win-x64', collision=False):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         root = Path(temp.name)
-        old = root / 'TK2-Mod-Toolkit-0.6.23-win-x64'
+        old = root / name
+        target_name = name.replace('0.6.23', '0.6.24')
+        if collision:
+            (root / target_name).mkdir()
+            (root / target_name / 'keep.txt').write_text('existing installation')
         staging = root / ('tk2-toolkit-update-fixture' if safe else 'unrelated-folder')
         new = staging / 'extracted/new-release'
         old.mkdir()
@@ -34,7 +38,10 @@ class PortableUpdaterTests(unittest.TestCase):
         def quote(path):
             return "'" + str(path).replace("'", "''") + "'"
         wrapper.write_text("""
-function Start-Process { param($FilePath, $WorkingDirectory, [switch]$PassThru) if ($PassThru) { [pscustomobject]@{Id=4444} } }
+function Start-Process { param($FilePath, $WorkingDirectory, [switch]$PassThru)
+    $FilePath | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'launched.txt')
+    if ($PassThru) { [pscustomobject]@{Id=4444} }
+}
 function Get-Process { param($Id, $ErrorAction) if ($Id -eq 4444) { [pscustomobject]@{Id=4444} } }
 function Stop-Process { param($Id, [switch]$Force, $ErrorAction) }
 function Invoke-RestMethod { param($Uri, $Headers, $TimeoutSec)
@@ -45,22 +52,44 @@ function Invoke-RestMethod { param($Uri, $Headers, $TimeoutSec)
         result = subprocess.run([POWERSHELL, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(wrapper)], capture_output=True, text=True, timeout=15)
         return result, root, old, staging
 
-    def test_healthy_update_preserves_path_data_and_leaves_no_backup(self):
+    def test_healthy_update_renames_folder_preserves_data_and_leaves_no_backup(self):
         result, root, old, staging = self.run_update()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((old / 'TK2 Mod Toolkit.exe').read_bytes(), b'new fixture')
-        self.assertEqual((old / 'local/user.txt').read_text(), 'preserved preferences')
-        self.assertFalse((old / 'old-only.txt').exists())
+        target = root / 'TK2-Mod-Toolkit-0.6.24-win-x64'
+        self.assertFalse(old.exists())
+        self.assertEqual((target / 'TK2 Mod Toolkit.exe').read_bytes(), b'new fixture')
+        self.assertEqual((target / 'local/user.txt').read_text(), 'preserved preferences')
+        self.assertIn(str(target), (root / 'launched.txt').read_text())
+        self.assertFalse((target / 'old-only.txt').exists())
         self.assertFalse(staging.exists())
         self.assertFalse((root / 'old.backup').exists())
 
     def test_unhealthy_startup_restores_old_folder(self):
-        result, _, old, staging = self.run_update(healthy=False)
+        result, root, old, staging = self.run_update(healthy=False)
         self.assertEqual(result.returncode, 3, result.stderr)
         self.assertEqual((old / 'TK2 Mod Toolkit.exe').read_bytes(), b'old fixture')
         self.assertTrue((old / 'old-only.txt').exists())
         self.assertTrue((staging / 'update-error.txt').exists())
         self.assertFalse((staging / 'previous').exists())
+        self.assertFalse((root / 'TK2-Mod-Toolkit-0.6.24-win-x64').exists())
+        self.assertIn(str(old), (root / 'launched.txt').read_text())
+
+    def test_older_space_separated_package_folder_is_renamed(self):
+        result, root, old, _ = self.run_update(name='TK2 Mod Toolkit 0.6.23')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(old.exists())
+        self.assertTrue((root / 'TK2 Mod Toolkit 0.6.24/TK2 Mod Toolkit.exe').is_file())
+
+    def test_custom_unversioned_folder_name_is_preserved(self):
+        result, _, old, _ = self.run_update(name='My Toolkit')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((old / 'TK2 Mod Toolkit.exe').read_bytes(), b'new fixture')
+
+    def test_existing_destination_is_never_overwritten(self):
+        result, root, old, _ = self.run_update(collision=True)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertTrue((old / 'old-only.txt').exists())
+        self.assertEqual((root / 'TK2-Mod-Toolkit-0.6.24-win-x64/keep.txt').read_text(), 'existing installation')
 
     def test_rejects_unexpected_staging_before_moving_files(self):
         result, _, old, staging = self.run_update(safe=False)

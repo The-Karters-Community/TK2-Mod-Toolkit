@@ -27,18 +27,28 @@ foreach ($path in @($old, $temporary, (Split-Path -Parent $new), $new)) {
 }
 $manifest = Get-Content -LiteralPath (Join-Path $new 'portable-manifest.json') -Raw | ConvertFrom-Json
 if ($manifest.version -notmatch '^\d+\.\d+\.\d+$') { exit 2 }
+$name = Split-Path -Leaf $old
+$targetName = $name
+if ($name -match '^TK2-Mod-Toolkit-\d+\.\d+\.\d+-win-x64$') {
+    $targetName = "TK2-Mod-Toolkit-$($manifest.version)-win-x64"
+} elseif ($name -match '^TK2 Mod Toolkit \d+\.\d+\.\d+$') {
+    $targetName = "TK2 Mod Toolkit $($manifest.version)"
+}
+$target = [IO.Path]::GetFullPath((Join-Path $parent $targetName)).TrimEnd('\')
+if ((Split-Path -Parent $target) -ne $parent -or $target -eq $temporary -or
+    ($target -ne $old -and (Test-Path -LiteralPath $target))) { exit 2 }
 while (Get-Process -Id $WaitPid -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 250 }
 $launched = $null
 try {
     Move-Item -LiteralPath $old -Destination $previous
-    Move-Item -LiteralPath $new -Destination $old
-    $launched = Start-Process -FilePath (Join-Path $old 'TK2 Mod Toolkit.exe') -WorkingDirectory $old -PassThru
+    Move-Item -LiteralPath $new -Destination $target
+    $launched = Start-Process -FilePath (Join-Path $target 'TK2 Mod Toolkit.exe') -WorkingDirectory $target -PassThru
     $deadline = [DateTime]::UtcNow.AddSeconds($StartupTimeoutSeconds)
     $ready = $false
     while ([DateTime]::UtcNow -lt $deadline) {
         if (-not (Get-Process -Id $launched.Id -ErrorAction SilentlyContinue)) { break }
         try {
-            $session = Get-Content -LiteralPath (Join-Path $old 'local/garage-session.json') -Raw | ConvertFrom-Json
+            $session = Get-Content -LiteralPath (Join-Path $target 'local/garage-session.json') -Raw | ConvertFrom-Json
             if ($session.origin -match '^http://127\.0\.0\.1:\d+$') {
                 $health = Invoke-RestMethod -Uri ($session.origin + '/api/health') -Headers @{'X-TK2-Token'=$session.token} -TimeoutSec 2
                 if ($health.app -eq 'TK2 Mod Toolkit' -and $health.version -eq $manifest.version -and $health.pid -eq $launched.Id) {
@@ -54,7 +64,7 @@ try {
     $failure = $_.Exception.Message
     if ($launched) { Stop-Process -Id $launched.Id -Force -ErrorAction SilentlyContinue }
     if (Test-Path -LiteralPath $previous) {
-        if (Test-Path -LiteralPath $old) { Move-Item -LiteralPath $old -Destination $failed }
+        if (Test-Path -LiteralPath $target) { Move-Item -LiteralPath $target -Destination $failed }
         Move-Item -LiteralPath $previous -Destination $old
         Start-Process -FilePath (Join-Path $old 'TK2 Mod Toolkit.exe') -WorkingDirectory $old
     }
