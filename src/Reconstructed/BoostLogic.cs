@@ -33,6 +33,13 @@ public readonly record struct BoostPadTriggerPlan(
     float FireLength,
     float FireInstantVelocity);
 
+public readonly record struct BoostStopPlan(
+    float BoostReserves,
+    float TripleBoostSpeedIncreaseReservesNormalized,
+    float[] FillTimes,
+    float CurrentAirTime,
+    int BoosterCount);
+
 /// <summary>
 /// Readable normal-state translations of small Ant_BoostManager methods.
 /// ObscuredFloat inputs here are already decoded values; IL2CPP initialization,
@@ -154,6 +161,16 @@ public static class BoostLogic
         float fireLength = length * defaultBoostPadLengthTime;
         return new(true, resetInstantVelocityBeforeFiring, lastTriggerTime,
             currentBoostPadTime + fireLength, fireLength, strength * defaultInstantVelocity);
+    }
+
+    // Ant_BoostManager.StopBoost clears the active reserve, boost slots, air time and booster count.
+    public static BoostStopPlan PlanStopBoost(float[] fillTimes)
+    {
+        float[] stoppedFillTimes = (float[])fillTimes.Clone();
+        stoppedFillTimes[0] = 0f;
+        stoppedFillTimes[1] = 0f;
+        stoppedFillTimes[2] = 0f;
+        return new(0f, 0f, stoppedFillTimes, 0f, 0);
     }
 
     // IsManualBoostWithingFireRange uses slot zero and includes both boundaries.

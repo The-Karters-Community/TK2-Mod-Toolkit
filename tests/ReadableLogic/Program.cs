@@ -124,6 +124,14 @@ Check(suppressedPad.LastTriggerTime == 1.4f && suppressedPad.BoostPadTime == .25
 var boundaryPad = BoostLogic.PlanBoostPadTrigger(false, 1.5f, 1f, .5f, .25f, 2f, 3f, 4f, 5f);
 Check(boundaryPad.ShouldFire && boundaryPad.LastTriggerTime == 1.5f,
     "same-pad trigger is accepted at the exact cooldown boundary");
+var stoppedBoost = BoostLogic.PlanStopBoost(new[] { .4f, .8f, 1.2f, 7f });
+Check(stoppedBoost.BoostReserves == 0f && stoppedBoost.TripleBoostSpeedIncreaseReservesNormalized == 0f,
+    "StopBoost clears reserves and the accumulated triple-boost reserve bonus");
+Check(stoppedBoost.FillTimes.Length == 4 && stoppedBoost.FillTimes[0] == 0f
+    && stoppedBoost.FillTimes[1] == 0f && stoppedBoost.FillTimes[2] == 0f && stoppedBoost.FillTimes[3] == 7f,
+    "StopBoost clears the three boost slots and preserves any later array elements");
+Check(stoppedBoost.CurrentAirTime == 0f && stoppedBoost.BoosterCount == 0,
+    "StopBoost resets airborne time and the booster count");
 float[] boostFills = { .35f, .8f, 1.2f };
 Check(BoostLogic.GetManualBoostFillNormalized(boostFills, 1) == .8f, "manual boost getter returns the selected fill slot");
 foreach (var item in new[] { (.2f, true), (.5f, true), (.5001f, false), (.1999f, false), (float.NaN, false) })

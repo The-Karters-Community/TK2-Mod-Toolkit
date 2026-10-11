@@ -1,3 +1,4 @@
+using System;
 using TK2.Reconstructed;
 
 namespace TK2.Customization;
@@ -106,6 +107,17 @@ public static partial class ReadableGame
         boost.FireBoost(Ant_BoostManager.EBoostType.EBOOST_BOOSTPAD, 0f,
             plan.FireInstantVelocity, plan.FireLength);
         return true;
+    }
+
+    // Ant_BoostManager.StopBoost @ 0x180669140.
+    public static void StopBoost(Ant_BoostManager boost)
+    {
+        var plan = BoostLogic.PlanStopBoost(boost.fCurrentBoostFillTime);
+        boost.fBoostingReserves = plan.BoostReserves;
+        boost.fTripleBoostSpeedIncreaseReservesNormalized = plan.TripleBoostSpeedIncreaseReservesNormalized;
+        Array.Copy(plan.FillTimes, boost.fCurrentBoostFillTime, plan.FillTimes.Length);
+        boost.fCurrentAirTime = plan.CurrentAirTime;
+        boost.iCurrentBoosterNumberCount = plan.BoosterCount;
     }
 
     // HpBarController.GetCurrentHP shares 0x18056d2b0 with PlayerGlobalStats.GetCurrentHP.

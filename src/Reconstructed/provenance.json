@@ -137,6 +137,14 @@
       "confidence": "reviewed normal-state cooldown and fire semantics; diagnostic logging and native null/error paths omitted; delegates boost state and event handling to game-owned methods"
     },
     {
+      "method": "Ant_BoostManager.StopBoost",
+      "address": "180669140",
+      "source": "src/Reconstructed/NativeAdapters.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180669140_Ant_BoostManager__StopBoost.c",
+      "evidenceSha256": "9cfd94a8b36efd1da2b8370f9393de0a09ab3a66ef52849f0eeab26b37836555",
+      "confidence": "reviewed initialized three-slot state reset; ObscuredFloat encoding is delegated to interop; native null and short-array error paths omitted"
+    },
+    {
       "method": "Ant_BoostManager.WhatZoneIsThePlayerIn",
       "address": "1806697c0",
       "source": "src/Reconstructed/BoostLogic.cs",
