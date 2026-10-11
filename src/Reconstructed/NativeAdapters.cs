@@ -70,6 +70,14 @@ public static partial class ReadableGame
             boost.fAccelerationMultiplierAfterEnteringBoostpad);
     }
 
+    // Ant_BoostManager.WhatZoneIsThePlayerIn @ 0x1806697c0.
+    public static Ant_BoostManager.EBoostZone WhatZoneIsThePlayerIn(Ant_BoostManager boost, int boostIndex) =>
+        (Ant_BoostManager.EBoostZone)BoostLogic.GetBoostZone(
+            boostIndex,
+            boost.fCurrentBoostFillTime,
+            boost.fCurrentBoostFillTime_NotClampedTimeSinceLoading,
+            boost.iCurrentBoosterNumberCount);
+
     // HpBarController.GetCurrentHP shares 0x18056d2b0 with PlayerGlobalStats.GetCurrentHP.
     // The native getter reads synchronized visible HP, rather than private currentHp.
     public static int GetCurrentHP(HpBarController hp) => hp.player.visualInstanceSyncedParams.iPlayerHP;

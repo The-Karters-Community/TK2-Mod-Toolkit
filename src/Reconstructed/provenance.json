@@ -115,6 +115,14 @@
       "confidence": "reviewed normal-state semantics; assumes initialized controller, motor and kart physics; no runtime equivalence proof"
     },
     {
+      "method": "Ant_BoostManager.WhatZoneIsThePlayerIn",
+      "address": "1806697c0",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/1806697c0_Ant_BoostManager__WhatZoneIsThePlayerIn.c",
+      "evidenceSha256": "ea7e36775ff8305d3e5e72177eab306d4e86db6f3275193b5c2a88fbc561b5a3",
+      "confidence": "reviewed valid-index normal-state classification; null and invalid-index logging paths omitted; thresholds independently read from the matching GameAssembly.dll"
+    },
+    {
       "method": "HpBarController.GetCurrentHP",
       "address": "18056d2b0",
       "source": "src/Reconstructed/NativeAdapters.cs",
@@ -271,6 +279,30 @@
       "bytes": "3333333f",
       "value": 0.7,
       "usedBy": "Ant_BoostManager.WallCollisionOccuredInTimeFromLastOne"
+    },
+    {
+      "address": "183707a48",
+      "bytes": "cdcccc3d",
+      "value": 0.1,
+      "usedBy": "Ant_BoostManager.WhatZoneIsThePlayerIn"
+    },
+    {
+      "address": "183707e04",
+      "bytes": "cdcc0c3f",
+      "value": 0.55,
+      "usedBy": "Ant_BoostManager.WhatZoneIsThePlayerIn"
+    },
+    {
+      "address": "183708078",
+      "bytes": "d7a3703f",
+      "value": 0.94,
+      "usedBy": "Ant_BoostManager.WhatZoneIsThePlayerIn"
+    },
+    {
+      "address": "183707e08",
+      "bytes": "6666863f",
+      "value": 1.05,
+      "usedBy": "Ant_BoostManager.WhatZoneIsThePlayerIn"
     }
   ]
 }

@@ -90,6 +90,26 @@ Check(BoostLogic.GetCurrentBoostAccelMultiplier(0, 0, 1, 0, 0, 4, 0, 5, 1.8f) ==
     "boost pad timer must be positive to apply the configured multiplier");
 Check(BoostLogic.GetCurrentBoostAccelMultiplier(0, 0, 1, 4, 0, 0, 1, 5, 1.8f) == 1.8f,
     "native forward-speed magnitude ignores lateral velocity");
+Check(BoostLogic.GetBoostZone(1, new[] { 1f, .1f, .05f }, new[] { .6f, .6f, .6f }, 0) == BoostZone.Perfect,
+    "one full boost with two low slots can mark the active boost perfect");
+Check(BoostLogic.GetBoostZone(1, new[] { 1f, float.NaN, float.NaN }, new[] { .6f, .6f, .6f }, 0) == BoostZone.Perfect,
+    "native comparisons count NaN fill slots as low in the full-slot combo");
+Check(BoostLogic.GetBoostZone(0, new[] { 1f, .05f, .05f }, new[] { .6f, .6f, .6f }, 3) == BoostZone.Great,
+    "the full-slot combo is suppressed after all three boosters have been counted");
+Check(BoostLogic.GetBoostZone(1, new[] { 1f, .4f, .5f }, new[] { .6f, .6f, .6f }, 1) == BoostZone.Great,
+    "another completed boost slot raises the current result to great");
+Check(BoostLogic.GetBoostZone(0, new[] { .2f, .3f, .4f }, new[] { .55f, .6f, .6f }, 1) == BoostZone.Early,
+    "the early zone includes the exact 0.55 threshold");
+Check(BoostLogic.GetBoostZone(0, new[] { .2f, .3f, .4f }, new[] { .5501f, .6f, .6f }, 1) == BoostZone.Great,
+    "fill time above the early threshold falls back to great");
+Check(BoostLogic.GetBoostZone(0, new[] { .2f, .3f, .4f }, new[] { .94f, .6f, .6f }, 1) == BoostZone.Great,
+    "the perfect window excludes its 0.94 lower boundary");
+Check(BoostLogic.GetBoostZone(0, new[] { .2f, .3f, .4f }, new[] { .9401f, .6f, .6f }, 1) == BoostZone.Perfect,
+    "fill time just above 0.94 is perfect");
+Check(BoostLogic.GetBoostZone(0, new[] { .2f, .3f, .4f }, new[] { 1.05f, .6f, .6f }, 1) == BoostZone.Perfect,
+    "the perfect window includes its 1.05 upper boundary");
+Check(BoostLogic.GetBoostZone(0, new[] { .2f, .3f, .4f }, new[] { 1.0501f, .6f, .6f }, 1) == BoostZone.Great,
+    "fill time above 1.05 falls back to great");
 float[] boostFills = { .35f, .8f, 1.2f };
 Check(BoostLogic.GetManualBoostFillNormalized(boostFills, 1) == .8f, "manual boost getter returns the selected fill slot");
 foreach (var item in new[] { (.2f, true), (.5f, true), (.5001f, false), (.1999f, false), (float.NaN, false) })

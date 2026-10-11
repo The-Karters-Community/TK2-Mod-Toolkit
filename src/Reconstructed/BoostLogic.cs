@@ -14,6 +14,17 @@ public enum BoostKind
     StarAura = 6
 }
 
+public enum BoostZone
+{
+    None = 0,
+    Early = 1,
+    Nice = 2,
+    Great = 3,
+    VeryGood = 4,
+    Perfect = 5,
+    Insane = 6
+}
+
 /// <summary>
 /// Readable normal-state translations of small Ant_BoostManager methods.
 /// ObscuredFloat inputs here are already decoded values; IL2CPP initialization,
@@ -88,6 +99,33 @@ public static class BoostLogic
         if (boostPadTimeRemaining > 0f && (float)projectedSpeed < minimumForcedSpeed)
             return accelerationMultiplier;
         return 1f;
+    }
+
+    // WhatZoneIsThePlayerIn. Callers supply the manager's three aligned boost slots
+    // and a valid index; IL2CPP null/invalid-array logging paths are outside this model.
+    public static BoostZone GetBoostZone(int boostIndex, float[] currentFillTimes,
+        float[] timeSinceLoading, int currentBoosterCount)
+    {
+        int fullSlots = 0;
+        int lowSlots = 0;
+        foreach (float fillTime in currentFillTimes)
+        {
+            if (1f <= fillTime) fullSlots++;
+            else if (!(0.1f < fillTime)) lowSlots++;
+        }
+
+        if (fullSlots == 1 && lowSlots == 2
+            && (currentFillTimes[boostIndex] < 1f || currentBoosterCount < 3))
+            return BoostZone.Perfect;
+
+        for (int i = 0; i < currentFillTimes.Length; i++)
+            if (i != boostIndex && 1f <= currentFillTimes[i])
+                return BoostZone.Great;
+
+        float elapsedFillTime = timeSinceLoading[boostIndex];
+        if (elapsedFillTime <= 0.55f) return BoostZone.Early;
+        if (0.94f < elapsedFillTime && elapsedFillTime <= 1.05f) return BoostZone.Perfect;
+        return BoostZone.Great;
     }
 
     // IsManualBoostWithingFireRange uses slot zero and includes both boundaries.
