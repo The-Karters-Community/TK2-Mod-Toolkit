@@ -99,6 +99,22 @@
       "confidence": "reviewed normal-state field and timer semantics; runtime equivalence not yet tested"
     },
     {
+      "method": "Ant_BoostManager.GetCurrentBoostAccelMultiplier",
+      "address": "1806679e0",
+      "source": "src/Reconstructed/BoostLogic.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/1806679e0_Ant_BoostManager__GetCurrentBoostAccelMultiplier.c",
+      "evidenceSha256": "10cf5f67a47f6463c4d0a32fd901192c4994c242a2e28d21145dc32645918587",
+      "dependencies": [
+        {
+          "method": "PixelEasyCharMoveKartController.GetKartVelocity",
+          "address": "1805d8280",
+          "evidence": "local/ghidra/assembly-csharp-full/pseudocode/1805d8280_PixelEasyCharMoveKartController__GetKartVelocity.c",
+          "evidenceSha256": "2645e4e04b238ebfd1a77f015776e8b188db06bd35191bae5fc4104aa38e79ac"
+        }
+      ],
+      "confidence": "reviewed normal-state semantics; assumes initialized controller, motor and kart physics; no runtime equivalence proof"
+    },
+    {
       "method": "HpBarController.GetCurrentHP",
       "address": "18056d2b0",
       "source": "src/Reconstructed/NativeAdapters.cs",
@@ -247,7 +263,7 @@
       "fileOffset": "37061b4",
       "bytes": "0000803f",
       "value": 1.0,
-      "usedBy": "Ant_BoostManager.GetTriggeredBoostClickedOnBoostingRangeStrengthNormalized"
+      "usedBy": "Ant_BoostManager.GetTriggeredBoostClickedOnBoostingRangeStrengthNormalized and Ant_BoostManager.GetCurrentBoostAccelMultiplier"
     },
     {
       "address": "183707ed4",

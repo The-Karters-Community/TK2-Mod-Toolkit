@@ -55,6 +55,21 @@ public static partial class ReadableGame
             boost.fCurrentConstBoostingTimeFromBoostpad,
             boost.fMaxSpeedIncreaseForBoostPad);
 
+    // Ant_BoostManager.GetCurrentBoostAccelMultiplier @ 0x1806679e0.
+    // GetKartVelocity reads the controller Motor.BaseVelocity; native null paths throw.
+    public static float GetCurrentBoostAccelMultiplier(Ant_BoostManager boost)
+    {
+        var controller = boost.kartController;
+        var velocity = controller.GetKartVelocity();
+        var forward = controller.kartPhysics.vForward_SteeringChar_AlignedToSurfacce_Normalized;
+        return BoostLogic.GetCurrentBoostAccelMultiplier(
+            forward.x, forward.y, forward.z,
+            velocity.x, velocity.y, velocity.z,
+            boost.fCurrentConstBoostingTimeFromBoostpad,
+            boost.fMinimumSpeedForcedAfterEnteringBoostpad,
+            boost.fAccelerationMultiplierAfterEnteringBoostpad);
+    }
+
     // HpBarController.GetCurrentHP shares 0x18056d2b0 with PlayerGlobalStats.GetCurrentHP.
     // The native getter reads synchronized visible HP, rather than private currentHp.
     public static int GetCurrentHP(HpBarController hp) => hp.player.visualInstanceSyncedParams.iPlayerHP;

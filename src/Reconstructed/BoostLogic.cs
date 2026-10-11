@@ -71,6 +71,25 @@ public static class BoostLogic
         + (starTimeRemaining > 0f ? starBonus : 0f)
         + (boostPadTimeRemaining > 0f ? boostPadBonus : 0f);
 
+    // GetCurrentBoostAccelMultiplier compares the magnitude of the velocity projected
+    // onto the forward vector against the boost-pad minimum. Keep the native float
+    // operation order before Math.Sqrt; the vector is expected to be normalized.
+    public static float GetCurrentBoostAccelMultiplier(
+        float forwardX, float forwardY, float forwardZ,
+        float velocityX, float velocityY, float velocityZ,
+        float boostPadTimeRemaining, float minimumForcedSpeed, float accelerationMultiplier)
+    {
+        float forwardDotVelocity = forwardY * velocityY + forwardX * velocityX + forwardZ * velocityZ;
+        float forwardZComponent = forwardDotVelocity * forwardZ;
+        double projectedSpeed = Math.Sqrt((double)(
+            forwardDotVelocity * forwardX * forwardDotVelocity * forwardX
+            + forwardDotVelocity * forwardY * forwardDotVelocity * forwardY
+            + forwardZComponent * forwardZComponent));
+        if (boostPadTimeRemaining > 0f && (float)projectedSpeed < minimumForcedSpeed)
+            return accelerationMultiplier;
+        return 1f;
+    }
+
     // IsManualBoostWithingFireRange uses slot zero and includes both boundaries.
     public static bool IsManualBoostWithinFireRange(float[] fillTimes, float minimumTime, float maximumTime)
     {

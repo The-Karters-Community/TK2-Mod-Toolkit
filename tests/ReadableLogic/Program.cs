@@ -82,6 +82,14 @@ Check(BoostLogic.GetCurrentBoostMaxSpeedIncrease(1, 2, 3, 4, 0, 5, 0, 6, 0, 7) =
     "max-speed getter always includes accumulated bonuses but omits zero-timer sources");
 Check(BoostLogic.GetCurrentBoostMaxSpeedIncrease(1, 2, 3, 4, -.1f, 5, -.1f, 6, -.1f, 7) == 10,
     "max-speed getter omits negative-timer sources");
+Check(BoostLogic.GetCurrentBoostAccelMultiplier(0, 0, 1, 0, 0, 4, 1, 5, 1.8f) == 1.8f,
+    "boost pad applies configured acceleration below the forward-speed threshold");
+Check(BoostLogic.GetCurrentBoostAccelMultiplier(0, 0, 1, 0, 0, 5, 1, 5, 1.8f) == 1f,
+    "boost pad does not apply the configured multiplier at the exact speed threshold");
+Check(BoostLogic.GetCurrentBoostAccelMultiplier(0, 0, 1, 0, 0, 4, 0, 5, 1.8f) == 1f,
+    "boost pad timer must be positive to apply the configured multiplier");
+Check(BoostLogic.GetCurrentBoostAccelMultiplier(0, 0, 1, 4, 0, 0, 1, 5, 1.8f) == 1.8f,
+    "native forward-speed magnitude ignores lateral velocity");
 float[] boostFills = { .35f, .8f, 1.2f };
 Check(BoostLogic.GetManualBoostFillNormalized(boostFills, 1) == .8f, "manual boost getter returns the selected fill slot");
 foreach (var item in new[] { (.2f, true), (.5f, true), (.5001f, false), (.1999f, false), (float.NaN, false) })
