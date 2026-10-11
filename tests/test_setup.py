@@ -104,11 +104,18 @@ class SetupTests(unittest.TestCase):
         dump.write_text('// Image 0: Assembly-CSharp.dll - 0\n// Namespace: \npublic class Kart // TypeDefIndex: 0\n{\n\t// RVA: 0x10 Offset: 0x10 VA: 0x180000010\n\tpublic void Jump(bool pressed) { }\n}\n')
         core.index_dump(dump, self.root / "local/catalog.json")
         (self.root / "src/Reconstructed").mkdir(parents=True)
-        core.write_json(self.root / "src/Reconstructed/provenance.json", {"methods":[{"method":"Kart.Jump","address":"180000010","source":"src/Reconstructed/Kart.cs","confidence":"reviewed"}]})
+        core.write_json(self.root / "src/Reconstructed/provenance.json", {"methods":[{"method":"Kart.Jump","address":"180000010","source":"src/Reconstructed/Kart.cs","confidence":"reviewed"}], "slices":[{"behavior":"Kart jump buffer timing slice","address":"180000020","source":"src/Reconstructed/Kart.cs","confidence":"partial"}]})
         result = symbols.search('Jump')
         self.assertEqual(result["methods"][0]["address"], '180000010')
         self.assertEqual(result["reconstructed"], 1)
         self.assertIn('public void Jump(bool pressed);', symbols.detail('0:0')["declaration"])
+        slice_dump = self.root / "slice-dump.cs"
+        slice_dump.write_text('// Image 0: Assembly-CSharp.dll - 0\n// Namespace: \npublic class Kart // TypeDefIndex: 0\n{\n\t// RVA: 0x20 Offset: 0x20 VA: 0x180000020\n\tpublic void JumpBuffered() { }\n}\n')
+        core.index_dump(slice_dump, self.root / "local/catalog.json")
+        slice_entry = symbols.search('JumpBuffered', recovered=True)["methods"][0]
+        self.assertEqual(slice_entry["behaviorSlice"]["behavior"], "Kart jump buffer timing slice")
+        self.assertEqual(symbols.search(recovered=True)["behaviorSlices"], 1)
+        self.assertIn("Partial C# behavior slice", symbols.detail(slice_entry["id"])["status"])
 
     def test_runtime_check_tracks_plugin_version_instead_of_legacy_constant(self):
         source = self.root / 'plugins/TK2.Customization/Plugin.cs'

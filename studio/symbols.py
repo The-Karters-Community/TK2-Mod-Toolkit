@@ -20,13 +20,16 @@ def methods():
         if _cache is None or _stamp != stamp:
             with _lock: _cache, _stamp = json.loads(exported.read_text(encoding="utf-8")), stamp
         return _cache
-    stamp = (str(catalog_path), catalog_path.stat().st_mtime_ns)
+    provenance = core.ROOT / "src/Reconstructed/provenance.json"
+    stamp = (str(catalog_path), catalog_path.stat().st_mtime_ns,
+             provenance.stat().st_mtime_ns if provenance.is_file() else None)
     if _cache is not None and stamp == _stamp: return _cache
     with _lock:
         catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
         if not Path(catalog["source"]).is_file(): return []
-        provenance = core.ROOT / "src/Reconstructed/provenance.json"
-        recovered = {m["address"].lower(): m for m in json.loads(provenance.read_text())["methods"]} if provenance.is_file() else {}
+        data = json.loads(provenance.read_text(encoding="utf-8")) if provenance.is_file() else {}
+        recovered = {m["address"].lower(): m for m in data.get("methods", [])}
+        slices = {m["address"].lower(): m for m in data.get("slices", [])}
         result = []
         for entry in catalog["types"]:
             if entry.get("assembly") != "Assembly-CSharp.dll": continue
@@ -39,12 +42,13 @@ def methods():
                 record = recovered.get(address, {})
                 method_name = signature.split("(", 1)[0].split()[-1]
                 if record.get("method") != entry["name"] + "." + method_name: record = {}
+                behavior_slice = slices.get(address, {})
                 constructor = entry["name"].split(".")[-1].split("<", 1)[0]
                 signature = signature.replace("void .ctor", constructor)
                 if ".cctor" in signature: signature = "static " + constructor + "();"
                 result.append({"id": f"{entry['index']}:{ordinal}", "type": entry["name"], "namespace": entry["namespace"],
                     "signature": signature, "address": address, "source": record.get("source"), "confidence": record.get("confidence"),
-                    "evidence": record.get("evidence")})
+                    "evidence": record.get("evidence"), "behaviorSlice": behavior_slice or None})
                 ordinal += 1; address = None
         _cache, _stamp = result, stamp
         return result
@@ -78,10 +82,11 @@ def search(query="", offset=0, recovered=False, topic="all"):
         if '<' in m["type"] or m["signature"].startswith("static ") and ".cctor" in m["signature"]: return False
         patterns = [TOPICS[topic][1]] if topic in TOPICS else [pattern for _, pattern in TOPICS.values()]
         return any(re.match(pattern, m["type"]) for pattern in patterns)
-    selected = [m for m in entries if included(m) and (not recovered or m["source"]) and all(t in (m["type"] + " " + m["namespace"] + " " + m["signature"]).lower() for t in tokens)]
-    if topic != "all": selected.sort(key=lambda m: (not bool(m["source"]), m["type"], m["signature"]))
+    selected = [m for m in entries if included(m) and (not recovered or m.get("source") or m.get("behaviorSlice")) and all(t in (m["type"] + " " + m["namespace"] + " " + m["signature"]).lower() for t in tokens)]
+    if topic != "all": selected.sort(key=lambda m: (not bool(m.get("source")), m["type"], m["signature"]))
     offset = max(0, offset)
     return {"total": len(selected), "indexed": len(entries), "reconstructed": sum(bool(m["source"]) for m in entries),
+        "behaviorSlices": sum(bool(m.get("behaviorSlice")) for m in entries),
         "methods": [presentation(m) for m in selected[offset:offset + 80]], "offset": offset, "next": offset + 80 if offset + 80 < len(selected) else None,
         "message": "No local Il2CppDumper declarations indexed. Player controls still work; authors can import a dump with the analysis tools." if not entries else ""}
 
@@ -89,5 +94,10 @@ def search(query="", offset=0, recovered=False, topic="all"):
 def detail(identity):
     record = next((m for m in methods() if m["id"] == identity), None)
     if record is None: raise ValueError("Choose an indexed function")
-    return {**presentation(record), "declaration": record['signature'],
-            "status": "Editable reconstructed C# available" if record["source"] else "Declaration indexed; native implementation not reconstructed"}
+    if record.get("source"):
+        status = "Editable reconstructed C# method available"
+    elif record.get("behaviorSlice"):
+        status = "Partial C# behavior slice available"
+    else:
+        status = "Declaration indexed; native implementation not reconstructed"
+    return {**presentation(record), "declaration": record['signature'], "status": status}

@@ -69,6 +69,27 @@ class PseudocodeSearchTests(unittest.TestCase):
         self.first.write_text(self.first.read_text(encoding="utf-8") + "// changed evidence\n", encoding="utf-8")
         self.assertIsNone(pseudocode.read(item["id"], root=self.root)["reconstruction"])
 
+    def test_behavior_slice_is_linked_as_partial_coverage(self):
+        evidence = self.first.relative_to(self.root).as_posix()
+        source = self.root / "src/Reconstructed/BoostLogic.cs"
+        source.parent.mkdir(parents=True)
+        source.write_text("internal static class BoostLogic {}\n", encoding="utf-8")
+        provenance = self.root / "src/Reconstructed/provenance.json"
+        provenance.write_text(json.dumps({"slices": [{
+            "behavior": "Boost.Fire slider strength curve",
+            "address": "180000100",
+            "source": "src/Reconstructed/BoostLogic.cs",
+            "evidence": evidence,
+            "evidenceSha256": hashlib.sha256(self.first.read_bytes()).hexdigest(),
+            "confidence": "curve only; enclosing method not reconstructed",
+        }]}), encoding="utf-8")
+
+        item = pseudocode.search("groundFriction", root=self.root)["results"][0]
+        reconstruction = item["reconstruction"]
+        self.assertEqual(reconstruction["kind"], "behavior slice")
+        self.assertEqual(reconstruction["method"], "Boost.Fire slider strength curve")
+        self.assertEqual(reconstruction["source"], "src/Reconstructed/BoostLogic.cs")
+
     def test_blank_query_does_not_build_an_index(self):
         result = pseudocode.search("   ", root=self.root)
         self.assertEqual(result["indexed"], 1)

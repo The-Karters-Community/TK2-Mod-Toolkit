@@ -156,7 +156,7 @@ function Explorer({ native = false, onSource }) {
             checked={recovered}
             onChange={(event) => setRecovered(event.target.checked)}
           />
-          Has reconstructed C#
+          Has reviewed C# logic
         </label>
       )}
       {error && (
@@ -171,7 +171,7 @@ function Explorer({ native = false, onSource }) {
         {loading
           ? "Loading results…"
           : result
-            ? `${result.total?.toLocaleString() || 0} results · ${result.indexed?.toLocaleString() || 0} indexed. ${result.message || ""}`
+            ? `${result.total?.toLocaleString() || 0} results · ${result.indexed?.toLocaleString() || 0} indexed${native ? "" : ` · ${result.reconstructed || 0} full methods · ${result.behaviorSlices || 0} behavior slices`}. ${result.message || ""}`
             : "Enter a query to search."}
       </p>
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(230px,1fr)_minmax(0,1.6fr)]">
@@ -202,11 +202,15 @@ function Explorer({ native = false, onSource }) {
               <span className="mt-1 block text-xs text-muted">
                 {native
                   ? row.reconstruction
-                    ? "Reviewed C# reconstruction available · " + row.snippet
+                    ? (row.reconstruction.kind === "behavior slice"
+                        ? "Reviewed C# behavior slice · "
+                        : "Reviewed C# method reconstruction · ") + row.snippet
                     : row.snippet
                   : row.source
-                    ? "Reconstructed C#"
-                    : "API declaration"}
+                    ? "Reconstructed C# method"
+                    : row.behaviorSlice
+                      ? "Partial C# behavior slice · " + row.behaviorSlice.behavior
+                      : "API declaration"}
               </span>
             </button>
           ))}
@@ -253,10 +257,22 @@ function Explorer({ native = false, onSource }) {
                   Open reconstructed source
                 </Button>
               )}
+              {!native && !detail.source && detail.behaviorSlice && (
+                <div className="space-y-2 rounded-lg border border-line p-3">
+                  <p className="text-sm">Partial C# behavior slice: {detail.behaviorSlice.behavior}</p>
+                  <p className="text-xs text-muted">{detail.behaviorSlice.confidence}</p>
+                  <Button onClick={() => onSource(detail.behaviorSlice.source)}>
+                    Open reconstructed source
+                  </Button>
+                </div>
+              )}
               {native && detail.reconstruction && (
                 <div className="space-y-2 rounded-lg border border-line p-3">
                   <p className="text-sm">
-                    Reviewed C# reconstruction: {detail.reconstruction.method}
+                    {detail.reconstruction.kind === "behavior slice"
+                      ? "Reviewed C# behavior slice: "
+                      : "Reviewed C# method reconstruction: "}
+                    {detail.reconstruction.method}
                   </p>
                   <p className="text-xs text-muted">
                     {detail.reconstruction.confidence}

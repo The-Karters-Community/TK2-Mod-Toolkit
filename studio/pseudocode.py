@@ -65,18 +65,26 @@ def _reviewed_reconstruction(path: Path, root: Path) -> dict | None:
     if not provenance_path.is_file():
         return None
     try:
-        methods = json.loads(provenance_path.read_text(encoding="utf-8")).get("methods", [])
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
     relative = path.relative_to(root).as_posix()
-    for method in methods:
+    for method in provenance.get("methods", []):
         if method.get("evidence") != relative:
             continue
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         if digest != method.get("evidenceSha256", "").lower():
             return None
-        return {"method": method.get("method"), "source": method.get("source"),
+        return {"kind": "method", "method": method.get("method"), "source": method.get("source"),
                 "confidence": method.get("confidence")}
+    for behavior_slice in provenance.get("slices", []):
+        if behavior_slice.get("evidence") != relative:
+            continue
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != behavior_slice.get("evidenceSha256", "").lower():
+            return None
+        return {"kind": "behavior slice", "method": behavior_slice.get("behavior"),
+                "source": behavior_slice.get("source"), "confidence": behavior_slice.get("confidence")}
     return None
 
 
