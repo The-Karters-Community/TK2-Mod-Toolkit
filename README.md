@@ -168,4 +168,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change. See [LICENSE](LI
 
 The Toolkit uses BepInEx Unity IL2CPP, Il2CppInterop and Harmony APIs; those projects and their licenses remain separate from this repository. The repository's [LICENSE](LICENSE) is All Rights Reserved and does not grant general permission to redistribute or modify the Toolkit. Game names, logos and game content are not owned by this project; the default portable build does not include the game or BepInEx distribution.
 
-OpenAI Codex (GPT-6 series) provided AI coding and documentation assistance during development under the maintainer's direction. The maintainer remains responsible for review, testing, licensing and release decisions.
