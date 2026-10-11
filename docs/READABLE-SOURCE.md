@@ -22,6 +22,9 @@ The workshop now opens **C# with executable method bodies**, not dump declaratio
 | Ant_BoostManager.IsPhysicalManualBoostEnabled_OnlyAICanDisable | 0x180668210 | BoostLogic.IsPhysicalManualBoostEnabled | AI restriction covers manual boost kinds 0–2 and leaves boost pad, jump-landed, Booster and Star kinds enabled |
 | Ant_BoostManager.KartIsBreakingOnGround | 0x180668290 | BoostLogic.SetBreakingOnGround | Direct state assignment |
 | Ant_BoostManager.ForceReservesMinVal | 0x180667900 | BoostLogic.ForceReservesMinimum | Raises the decoded reserve only if it is below the requested floor |
+| Ant_BoostManager.AddReserves | 0x180665db0 | BoostLogic.AddReserves and ReadableGame.AddReserves | Adds the supplied value directly; no clamp or race-state guard |
+| Ant_BoostManager.KeepReservesAtMinimusVal | 0x1806682a0 | BoostLogic.KeepReservesAtMinimum and ReadableGame.KeepReservesAtMinimum | Applies the floor only when the global race-state value is nonzero |
+| Ant_BoostManager.GetCurrentBoostMaxSpeedIncrease | 0x180667b50 | BoostLogic.GetCurrentBoostMaxSpeedIncrease and ReadableGame.GetCurrentBoostMaxSpeedIncrease | Sums four decoded accumulated bonuses and adds configured Booster, Star and boost-pad bonuses only while their timers are positive |
 | Ant_BoostManager.WillWallCollisionReduceReserves | 0x180669a30 | BoostLogic.WillWallCollisionReduceReserves | Requires positive reserves and no tank weapon currently triggered/running |
 | Ant_BoostManager.GetTriggeredBoostClickedOnBoostingRangeStrengthNormalized | 0x180667dc0 | BoostLogic.GetTriggeredBoostStrengthNormalized | Normalizes fill time and clamps to `[0,1]`; native upper-bound float verified at 0x1837079b4 |
 | Ant_BoostManager.WallCollisionOccuredInTimeFromLastOne | 0x180669640 | BoostLogic.OnWallCollision | Clears loaded lateral velocity; multiplies positive reserves by native `0.7f` unless tank weapon is active; invokes event whenever subscribed |
@@ -49,7 +52,7 @@ The boost work is intentionally a first slice through `Ant_BoostManager`, not a 
 
 ## What remains to reconstruct
 
-Twenty-six native methods have reviewed normal-state semantic translations. The function browser indexes 32,350 Assembly-CSharp method declarations; selected native bodies are exported separately. There are 184,138 native function entries in the local index, including engine and library code. Fully recovering the original C# source, comments, variable names, stripped code, and original Unity editor project from optimized IL2CPP binaries is not achievable by simply translating all Ghidra listings.
+Twenty-nine native methods have reviewed normal-state semantic translations. The function browser indexes 32,350 Assembly-CSharp method declarations; selected native bodies are exported separately. There are 184,138 native function entries in the local index, including engine and library code. Fully recovering the original C# source, comments, variable names, stripped code, and original Unity editor project from optimized IL2CPP binaries is not achievable by simply translating all Ghidra listings.
 
 Continue subsystem by subsystem: boost state machine, complete jump motion, input dispatch, damage overloads, race rules, replay/save states, UI controller lifecycle, and native mod-content formats. For each method, record exact signature and aliases, resolve constants/call targets, reconstruct state transitions, test pure behavior, then compare against runtime observations. Do not substitute generated wrappers or fabricated stubs for a completed reconstruction.
 

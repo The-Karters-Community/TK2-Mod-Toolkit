@@ -1,4 +1,4 @@
-"""Readable method catalog. Declarations and recovered implementations stay distinct."""
+"""Readable method catalog. Declarations and semantic reconstructions stay distinct."""
 import json
 from pathlib import Path
 import re

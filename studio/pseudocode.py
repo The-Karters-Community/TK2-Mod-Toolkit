@@ -59,6 +59,27 @@ def _index(root: Path) -> tuple[Path | None, int]:
     return db_path, len(files)
 
 
+def _reviewed_reconstruction(path: Path, root: Path) -> dict | None:
+    """Link a native body only when its exact bytes match recorded evidence."""
+    provenance_path = root / "src/Reconstructed/provenance.json"
+    if not provenance_path.is_file():
+        return None
+    try:
+        methods = json.loads(provenance_path.read_text(encoding="utf-8")).get("methods", [])
+    except (OSError, json.JSONDecodeError):
+        return None
+    relative = path.relative_to(root).as_posix()
+    for method in methods:
+        if method.get("evidence") != relative:
+            continue
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != method.get("evidenceSha256", "").lower():
+            return None
+        return {"method": method.get("method"), "source": method.get("source"),
+                "confidence": method.get("confidence")}
+    return None
+
+
 def search(query: str, offset: int = 0, limit: int = 50, root: Path | None = None) -> dict:
     root = Path(root or core.ROOT).resolve()
     files = _files(root)
@@ -84,7 +105,9 @@ def search(query: str, offset: int = 0, limit: int = 50, root: Path | None = Non
     results = []
     for relative, name, snippet in rows:
         address = Path(relative).name.split("_", 1)[0]
-        results.append({"id": relative, "name": name, "address": address, "snippet": snippet})
+        path = root / relative
+        results.append({"id": relative, "name": name, "address": address, "snippet": snippet,
+                        "reconstruction": _reviewed_reconstruction(path, root)})
     return {"total": total, "indexed": indexed, "results": results,
             "next": offset + limit if offset + limit < total else None,
             "message": "Ghidra native pseudocode; approximate C-like output, not original C#. Review aliases, calls, and initialization before drawing conclusions."}
@@ -102,4 +125,5 @@ def read(identity: str, root: Path | None = None) -> dict:
     truncated = len(data) > _MAX_CODE_BYTES
     code = data[:_MAX_CODE_BYTES].decode("utf-8", errors="replace")
     return {"id": identity, "code": code, "truncated": truncated,
-            "message": "File truncated at 2 MB for display." if truncated else ""}
+            "message": "File truncated at 2 MB for display." if truncated else "",
+            "reconstruction": _reviewed_reconstruction(path, root)}

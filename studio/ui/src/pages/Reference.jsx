@@ -108,7 +108,7 @@ function Explorer({ native = false, onSource }) {
       <p className="max-w-3xl text-sm text-muted">
         {native
           ? "Search your local Ghidra exports. This is approximate native output, not original C#. First use may build a local index."
-          : "Browse signatures and reviewed reconstructions. A declaration lists types and parameters; it does not contain recovered implementation."}
+          : "Browse signatures and reviewed reconstructions. A declaration lists types and parameters; it does not contain executable game logic."}
       </p>
       <form
         className="flex flex-wrap items-end gap-3"
@@ -201,7 +201,9 @@ function Explorer({ native = false, onSource }) {
               </small>
               <span className="mt-1 block text-xs text-muted">
                 {native
-                  ? row.snippet
+                  ? row.reconstruction
+                    ? "Reviewed C# reconstruction available · " + row.snippet
+                    : row.snippet
                   : row.source
                     ? "Reconstructed C#"
                     : "API declaration"}
@@ -251,6 +253,19 @@ function Explorer({ native = false, onSource }) {
                   Open reconstructed source
                 </Button>
               )}
+              {native && detail.reconstruction && (
+                <div className="space-y-2 rounded-lg border border-line p-3">
+                  <p className="text-sm">
+                    Reviewed C# reconstruction: {detail.reconstruction.method}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {detail.reconstruction.confidence}
+                  </p>
+                  <Button onClick={() => onSource(detail.reconstruction.source)}>
+                    Open reconstructed source
+                  </Button>
+                </div>
+              )}
             </>
           ) : (
             <p className="text-sm text-muted">
@@ -268,7 +283,7 @@ export default function Reference({ onSource }) {
     <div className="space-y-8">
       <Explorer onSource={onSource} />
       <div className="border-t border-line pt-6">
-        <Explorer native />
+        <Explorer native onSource={onSource} />
       </div>
     </div>
   );

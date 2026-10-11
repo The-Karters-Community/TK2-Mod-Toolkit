@@ -1,3 +1,5 @@
+import hashlib
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -43,6 +45,29 @@ class PseudocodeSearchTests(unittest.TestCase):
         self.assertEqual(first["indexed"], 1)
         self.assertEqual(updated["indexed"], 2)
         self.assertEqual(updated["results"][0]["name"], "Kart$$Jump")
+
+    def test_reviewed_source_link_requires_exact_provenance_evidence(self):
+        evidence = self.first.relative_to(self.root).as_posix()
+        source = self.root / "src/Reconstructed/KartLogic.cs"
+        source.parent.mkdir(parents=True)
+        source.write_text("internal static class KartLogic {}\n", encoding="utf-8")
+        provenance = self.root / "src/Reconstructed/provenance.json"
+        provenance.write_text(json.dumps({"methods": [{
+            "method": "Kart.Update",
+            "address": "180000100",
+            "source": "src/Reconstructed/KartLogic.cs",
+            "evidence": evidence,
+            "evidenceSha256": hashlib.sha256(self.first.read_bytes()).hexdigest(),
+            "confidence": "reviewed normal-state semantics",
+        }]}), encoding="utf-8")
+
+        item = pseudocode.search("groundFriction", root=self.root)["results"][0]
+        self.assertEqual(item["reconstruction"]["method"], "Kart.Update")
+        self.assertEqual(item["reconstruction"]["source"], "src/Reconstructed/KartLogic.cs")
+        self.assertEqual(pseudocode.read(item["id"], root=self.root)["reconstruction"], item["reconstruction"])
+
+        self.first.write_text(self.first.read_text(encoding="utf-8") + "// changed evidence\n", encoding="utf-8")
+        self.assertIsNone(pseudocode.read(item["id"], root=self.root)["reconstruction"])
 
     def test_blank_query_does_not_build_an_index(self):
         result = pseudocode.search("   ", root=self.root)

@@ -42,6 +42,35 @@ public static class BoostLogic
     // GetManualBoostFillNormalized returns the requested array slot without normalization work.
     public static float GetManualBoostFillNormalized(float[] fillTimes, int boostIndex) => fillTimes[boostIndex];
 
+    // AddReserves adds the supplied amount directly; it does not clamp or validate it.
+    public static float AddReserves(float currentReserves, float amount) => currentReserves + amount;
+
+    // KeepReservesAtMinimusVal applies its floor only when the global race-state value is nonzero.
+    public static float KeepReservesAtMinimum(float currentReserves, float minimum, int raceState)
+    {
+        if (raceState != 0 && currentReserves < minimum) currentReserves = minimum;
+        return currentReserves;
+    }
+
+    // GetCurrentBoostMaxSpeedIncrease sums four decoded accumulated bonuses and the
+    // configured bonuses for each currently active power-up or boost pad.
+    public static float GetCurrentBoostMaxSpeedIncrease(
+        float tripleBoostReserveBonus,
+        float continuousBoostBonus,
+        float instantBoostBonus,
+        float reservePreviewBonus,
+        float boosterTimeRemaining,
+        float boosterBonus,
+        float starTimeRemaining,
+        float starBonus,
+        float boostPadTimeRemaining,
+        float boostPadBonus) =>
+        tripleBoostReserveBonus + continuousBoostBonus + instantBoostBonus + reservePreviewBonus
+        + (boosterTimeRemaining > 0f ? boosterBonus : 0f)
+        + 0f
+        + (starTimeRemaining > 0f ? starBonus : 0f)
+        + (boostPadTimeRemaining > 0f ? boostPadBonus : 0f);
+
     // IsManualBoostWithingFireRange uses slot zero and includes both boundaries.
     public static bool IsManualBoostWithinFireRange(float[] fillTimes, float minimumTime, float maximumTime)
     {

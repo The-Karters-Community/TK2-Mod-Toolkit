@@ -28,6 +28,33 @@ public static partial class ReadableGame
     // The interop implicit conversion preserves the game's ObscuredFloat decoding.
     public static float GetCurrentBoostReservesTime(Ant_BoostManager boost) => boost.fBoostingReserves;
 
+    // Ant_BoostManager.AddReserves @ 0x180665db0; native behavior is decoded addition then re-encoding.
+    public static void AddReserves(Ant_BoostManager boost, float amount) =>
+        boost.fBoostingReserves = BoostLogic.AddReserves(boost.fBoostingReserves, amount);
+
+    // Ant_BoostManager.KeepReservesAtMinimusVal @ 0x1806682a0.
+    // The native floor is applied only while eCurrentRaceState is nonzero.
+    public static void KeepReservesAtMinimum(Ant_BoostManager boost, float minimum)
+    {
+        int raceState = (int)Ant_CurrentGameConfiguration.eCurrentRaceState;
+        boost.fBoostingReserves = BoostLogic.KeepReservesAtMinimum(boost.fBoostingReserves, minimum, raceState);
+    }
+
+    // Ant_BoostManager.GetCurrentBoostMaxSpeedIncrease @ 0x180667b50.
+    // ObscuredFloat fields are decoded by the interop conversion, matching the native getter.
+    public static float GetCurrentBoostMaxSpeedIncrease(Ant_BoostManager boost) =>
+        BoostLogic.GetCurrentBoostMaxSpeedIncrease(
+            boost.fCurrentSpeedIncreaseFromTripleBoostReserves,
+            boost.fCurrentContinuousBoostMaxSpeedIncrease,
+            boost.fCurrentInstantBoostMaxSpeedIncrease,
+            boost.fCurrentMaxSpeedIncreaseFromReserves_Preview,
+            boost.fCurrentConstBoostingTimeLeft_PowerUpBooster,
+            boost.fPowerUp_Booster_MaxSpeedIncrease,
+            boost.fCurrentConstBoostingTimeLeft_PowerUpStar,
+            boost.fPowerUp_Star_MaxSpeedIncrease,
+            boost.fCurrentConstBoostingTimeFromBoostpad,
+            boost.fMaxSpeedIncreaseForBoostPad);
+
     // HpBarController.GetCurrentHP shares 0x18056d2b0 with PlayerGlobalStats.GetCurrentHP.
     // The native getter reads synchronized visible HP, rather than private currentHp.
     public static int GetCurrentHP(HpBarController hp) => hp.player.visualInstanceSyncedParams.iPlayerHP;

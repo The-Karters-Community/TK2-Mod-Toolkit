@@ -76,6 +76,12 @@ Check(BoostLogic.IsBoosting(0f, false, .1f, 0f), "boost-pad time contributes to 
 Check(BoostLogic.IsBoosting(0f, false, 0f, .1f), "booster power-up time contributes to aggregate state");
 Check(!BoostLogic.IsBoosting(0f, false, 0f, 0f), "aggregate state is false without its four native conditions");
 Check(BoostLogic.IsBoostingFromStar(.1f) && !BoostLogic.IsBoosting(0f, false, 0f, 0f), "star timer is omitted from the native aggregate predicate");
+Check(BoostLogic.GetCurrentBoostMaxSpeedIncrease(1, 2, 3, 4, 1, 5, 1, 6, 1, 7) == 28,
+    "max-speed getter sums accumulated bonuses and each active-source bonus");
+Check(BoostLogic.GetCurrentBoostMaxSpeedIncrease(1, 2, 3, 4, 0, 5, 0, 6, 0, 7) == 10,
+    "max-speed getter always includes accumulated bonuses but omits zero-timer sources");
+Check(BoostLogic.GetCurrentBoostMaxSpeedIncrease(1, 2, 3, 4, -.1f, 5, -.1f, 6, -.1f, 7) == 10,
+    "max-speed getter omits negative-timer sources");
 float[] boostFills = { .35f, .8f, 1.2f };
 Check(BoostLogic.GetManualBoostFillNormalized(boostFills, 1) == .8f, "manual boost getter returns the selected fill slot");
 foreach (var item in new[] { (.2f, true), (.5f, true), (.5001f, false), (.1999f, false), (float.NaN, false) })
@@ -83,6 +89,14 @@ foreach (var item in new[] { (.2f, true), (.5f, true), (.5001f, false), (.1999f,
 foreach (var item in new[] { (.2f, 0f), (.5f, .5f), (.8f, 1f), (1.1f, 1f), (.1f, 0f) })
     Check(BoostLogic.GetTriggeredBoostStrengthNormalized(new[] { item.Item1 }, 0, .2f, .8f) == item.Item2, "triggered boost strength normalizes and clamps to zero through one");
 Check(BoostLogic.HasMaximumManualBoostLevel(3) && !BoostLogic.HasMaximumManualBoostLevel(4), "maximum boost level is exactly three");
+Check(BoostLogic.AddReserves(2, 3) == 5 && BoostLogic.AddReserves(2, -3) == -1,
+    "reserve addition adds the amount directly without clamping");
+Check(BoostLogic.KeepReservesAtMinimum(.2f, .5f, 0) == .2f
+    && BoostLogic.KeepReservesAtMinimum(.2f, .5f, 1) == .5f
+    && BoostLogic.KeepReservesAtMinimum(.8f, .5f, 1) == .8f,
+    "conditional reserve floor is gated by a nonzero race-state value");
+Check(float.IsNaN(BoostLogic.KeepReservesAtMinimum(float.NaN, .5f, 1)),
+    "conditional reserve floor preserves NaN under the native comparison");
 Check(BoostLogic.ForceReservesMinimum(.2f, .5f) == .5f && BoostLogic.ForceReservesMinimum(.8f, .5f) == .8f, "reserve floor raises only values below the target");
 Check(float.IsNaN(BoostLogic.ForceReservesMinimum(float.NaN, .5f)), "reserve floor preserves a NaN current value like the native comparison");
 foreach (var item in new[] { (0f, false, false), (0f, true, false), (.1f, false, true), (.1f, true, false) })

@@ -75,6 +75,30 @@
       "confidence": "reviewed normal-object-state native translation; runtime equivalence not yet tested"
     },
     {
+      "method": "Ant_BoostManager.AddReserves",
+      "address": "180665db0",
+      "source": "src/Reconstructed/NativeAdapters.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180665db0_Ant_BoostManager__AddReserves.c",
+      "evidenceSha256": "4669fb330acf0da160efa9dcb8ba793bcf6e0be5b3e144ac52ccbedddb453646",
+      "confidence": "reviewed normal-state decoded addition; runtime equivalence not yet tested"
+    },
+    {
+      "method": "Ant_BoostManager.KeepReservesAtMinimusVal",
+      "address": "1806682a0",
+      "source": "src/Reconstructed/NativeAdapters.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/1806682a0_Ant_BoostManager__KeepReservesAtMinimusVal.c",
+      "evidenceSha256": "c21ba105dbc7b88eac9ef977784c39bab92f0f33c8020d25a9bc3dd792fdceb1",
+      "confidence": "reviewed normal-state reserve floor and nonzero race-state guard; runtime equivalence not yet tested"
+    },
+    {
+      "method": "Ant_BoostManager.GetCurrentBoostMaxSpeedIncrease",
+      "address": "180667b50",
+      "source": "src/Reconstructed/NativeAdapters.cs",
+      "evidence": "local/ghidra/assembly-csharp-full/pseudocode/180667b50_Ant_BoostManager__GetCurrentBoostMaxSpeedIncrease.c",
+      "evidenceSha256": "70cacadf806473d0d8b708e0fd357c0e64250d7b83c8c59c05a6612d24403c07",
+      "confidence": "reviewed normal-state field and timer semantics; runtime equivalence not yet tested"
+    },
+    {
       "method": "HpBarController.GetCurrentHP",
       "address": "18056d2b0",
       "source": "src/Reconstructed/NativeAdapters.cs",
