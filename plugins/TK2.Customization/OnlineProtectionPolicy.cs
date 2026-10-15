@@ -38,7 +38,10 @@ internal static class OnlineProtectionPolicy
         }
 
         foreach (string guid in pluginGuids)
-            if (!string.Equals(guid, PluginGuid, StringComparison.OrdinalIgnoreCase)) return true;
+            // Reviewed companion renders detached cosmetic copies in the menu.
+            // It has no profile writes, physics hooks, items or race commands.
+            if (!string.Equals(guid, PluginGuid, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(guid, "community.tk2.garage.preview", StringComparison.OrdinalIgnoreCase)) return true;
         return false;
     }
 }

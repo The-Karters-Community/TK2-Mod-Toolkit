@@ -32,4 +32,7 @@ Check(!OnlineProtectionPolicy.RequiresBlocking(new[] { ("Physics", "Enabled", fa
 Check(!OnlineProtectionPolicy.RequiresBlocking(new[] { ("Physics", "SpeedMultiplier", true) }, noPlugins), "non-Enabled setting keys do not count as active modules");
 Check(!OnlineProtectionPolicy.RequiresBlocking(Array.Empty<(string, string, bool)>(), new[] { "local.tk2.customization" }), "the toolkit plugin does not mark itself unapproved");
 Check(OnlineProtectionPolicy.RequiresBlocking(Array.Empty<(string, string, bool)>(), new[] { "third.party.plugin" }), "unknown loaded plugins are blocked");
+Check(!OnlineProtectionPolicy.RequiresBlocking(Array.Empty<(string, string, bool)>(), new[] { "local.tk2.customization", "community.tk2.garage.preview" }), "detached cosmetic menu renderer is approved");
+Check(OnlineProtectionPolicy.RequiresBlocking(new[] { ("Physics", "Enabled", true) }, new[] { "community.tk2.garage.preview" }), "preview companion cannot bypass gameplay protection");
+Check(OnlineProtectionPolicy.RequiresBlocking(Array.Empty<(string, string, bool)>(), new[] { "community.tk2.garage.preview", "third.party.plugin" }), "preview companion cannot approve another plugin");
 Console.WriteLine($"Online-protection policy: {assertions} assertions passed.");

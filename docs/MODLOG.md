@@ -1,3 +1,17 @@
+## 2026-10-15 — Garage cosmetic preview compatibility
+
+- Approved exactly `community.tk2.garage.preview`, the separate Garage companion
+  which renders detached cosmetic copies in MainMenuScene. No physics, item,
+  profile mutation or lobby commands. User explicitly requested online use of
+  cosmetic rendering; all other protection stays mandatory.
+- Policy harness: 31 assertions, including unknown-plugin and physics-mod blocking
+  even with the companion loaded. Plugin build: 0 warnings, 0 errors. Installed
+  with normal backup receipt `local/backups/1792060271413232900` after game exit.
+- User reopened the game; both plugins loaded. Garage captured correct modded,
+  original and rotated images; save bytes and all PresetIcons hashes unchanged.
+  Actual online-lobby rendering/join/upload behavior remains untested.
+- No version bump, portable build or release.
+
 # Mod log
 
 ## Mirror presentation correction and frontend ownership (2026-10-11, unreleased)

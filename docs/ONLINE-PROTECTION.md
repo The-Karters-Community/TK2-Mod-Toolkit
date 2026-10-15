@@ -1,6 +1,6 @@
 # Online protection
 
-The global **Online protection** module is mandatory and locked on. Users cannot disable the module or either protection rule in the toolkit. The plugin enforces both rules regardless of config-file values, and the toolkit repairs attempts to turn them off. An action is blocked while an unapproved Toolkit module, enabled recipe, or non-Toolkit BepInEx plugin is loaded. With no unapproved code active, normal leaderboard and online-room behavior continues.
+The global **Online protection** module is mandatory and locked on. Users cannot disable the module or either protection rule in the toolkit. The plugin enforces both rules regardless of config-file values, and the toolkit repairs attempts to turn them off. An action is blocked while an unapproved Toolkit module, enabled recipe, or unapproved BepInEx plugin is loaded. With no unapproved code active, normal leaderboard and online-room behavior continues.
 
 The built-in allowlist is an explicit list of local presentation and accessibility tools. New modules remain protected until their behavior has been reviewed:
 
@@ -14,6 +14,13 @@ The built-in allowlist is an explicit list of local presentation and accessibili
 | Character names (`BobbyGang`) | Allow | Replaces visible text in the local UI only. |
 | Performance diagnostics (`PerformanceDiagnostics`) | Allow | Measures local runtime counters; does not alter game state. |
 | Gamepad viewer (`GamepadOverlay`) | Allow | Reads local driving input and, when enabled, recorded leaderboard-ghost actions. It does not change controls, physics, items, or replay data. |
+
+The exact companion plugin GUID `community.tk2.garage.preview` is also approved.
+Its reviewed implementation renders detached cosmetic preset copies using the
+main-menu icon renderer and returns images through a current-user pipe. It has
+no save writes, gameplay/physics/item hooks, or lobby commands. Menu rendering is
+permitted while in an online lobby; actual lobby rendering still needs manual
+validation. All unknown plugin GUIDs remain blocked.
 
 Everything else is unapproved by default. Shadow-distance overrides can change visibility; track boundaries reveal collision and respawn information; boost training, proximity voice cues, and boost meters expose timing or positional information. Race performance includes an AI-physics cadence option, so the entire module stays protected. Physics, AI, race rules, items, respawn, teleportation, rewinds, and custom recipes can change gameplay directly. These remain blocked even if a particular setting looks cosmetic or is currently inactive inside its enabled module. Unknown modules and other BepInEx plugin IDs also require protection.
 
