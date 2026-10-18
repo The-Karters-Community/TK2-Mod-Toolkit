@@ -5,3 +5,8 @@ The vendored source is unchanged; only the Windows x64 sources are included.
 
 MinHook is licensed under the BSD 2-Clause License, with separate terms for its
 included HDE decoder. The complete notices follow in MinHook-LICENSE.txt.
+
+Dear ImGui v1.91.9b (core, Win32 and Direct3D 11 backends).
+Upstream: https://github.com/ocornut/imgui
+Pinned commit: f5befd2d29e66809cd1110a152e375a7f1981f06
+Vendored files are unchanged. Licensed under the MIT License; see ImGui-LICENSE.txt.
