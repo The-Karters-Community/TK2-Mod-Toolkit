@@ -37,12 +37,12 @@ def publish_directory(source, target):
 
 
 def write_portable_zip(root, package, target):
-    """Write a compatible DEFLATE ZIP at maximum compression to a temp file."""
+    """Write application contents directly at ZIP root, with no wrapper folder."""
     temporary = target.with_name(target.name + ".tmp")
     try:
         with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
             for path in sorted(package.rglob("*")):
-                if path.is_file(): archive.write(path, path.relative_to(root).as_posix())
+                if path.is_file(): archive.write(path, path.relative_to(package).as_posix())
         temporary.replace(target)
     finally:
         if temporary.exists(): temporary.unlink()

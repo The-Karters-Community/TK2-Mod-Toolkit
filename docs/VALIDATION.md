@@ -174,3 +174,13 @@ The plugin compiled against current installed references with **0 warnings and 0
 ## Track inspector UX simplification 0.6.16 (2026-10-09)
 
 Build verification and UI scope update: F10 is the single inspector open/close key; the settings panel is part of the inspector, and X-ray/F7 options have been removed. F8 selects an already displayed collider for details and does not alter physics. Checked states and panel backgrounds are custom-drawn for higher contrast in both Track Inspector and Camera panels. Unmarked respawn-trigger coverage remains unknown: current native evidence confirms kart collision masks and a generic physics-trigger system, but does not tie the generic trigger types to respawning. The inspector therefore labels only mask-matched respawn colliders.
+
+## Game-update compatibility repair (2026-10-18)
+
+The installation gate now treats a changed GameAssembly hash as a warning, while missing game files, loader ABI mismatches and plugin integrity failures still block installation. The shared offline permission no longer depends on fast-fall native verification, so Mirror Race and other independent recipes can use their own hooks after a compatible game update. Native fast-fall and reconstructed performance replacements retain their specific verification checks. Runtime startup detection now resolves ToolkitVersion.Value instead of requiring a literal version in Plugin.cs.
+
+Validation: 136 Python tests, 20 frontend tests, 68 Mirror Race production-source assertions and 31 online-protection assertions passed. The plugin compiled against the updated local installation with zero warnings/errors. The compiled UI asset smoke check and browser Installation-page inspection passed: loader ready, prior pack startup recognized, Update plugin available, no native-hash installation block. The rebuilt DLL has not been loaded in a game during this check; the game was already running and was not launched or closed automatically. Deployment requires the user to close it.
+
+## Flat ZIP migration (2026-10-18)
+
+The ZIP writer places application files at archive root. The updated extractor accepts both flat archives and legacy wrapper folders, normalizing flat contents into the rollback helper's existing private staging layout. Python regressions cover both layouts, version mismatch, traversal rejection and compressed ZIP contents. No portable executable or distribution ZIP was produced in this repair. Real packaged replacement/restart remains a release acceptance check. The updater shipped in 0.6.24 cannot read flat archives: its users need one manual update before automatic updates can use this layout; include the migration step in release notes.

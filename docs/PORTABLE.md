@@ -27,11 +27,17 @@ On the maintainer machine, install Python 3.10+ x64 and a .NET SDK. For plugin c
 
 The build script creates an isolated packaging environment at ignored `local/portable-build-env/`, unpacks a runnable folder under `artifacts/portable/TK2 Mod Toolkit <version>/`, and creates `artifacts/portable/TK2-Mod-Toolkit-<version>-win-x64.zip`. Build/packaging never deploys to the game. Close a running portable app before replacing that app folder. Build details and release checks are in [RELEASING.md](RELEASING.md).
 
+Future ZIPs contain `TK2 Mod Toolkit.exe`, `portable-manifest.json`, `tools/` and the other application files directly at the archive root. There is no extra versioned folder inside the ZIP. The updated application accepts both this layout and older wrapped archives, normalizing them only in temporary updater staging.
+
+The updater shipped in 0.6.24 requires a wrapper folder and cannot consume a flat ZIP. For the first release with this change, users on 0.6.24 must close the Toolkit and extract the new ZIP into their application folder manually, preserving `local/`. Subsequent updates use the fixed updater. Publish this migration step in that release's notes.
+
 ## What the app validates
 
 The Installation page detects Steam libraries and checks the game, loader fingerprint, Doorstop configuration, generated interop and BepInEx startup evidence. It backs up files before preparing or replacing them, preserves existing plugin/config files, and blocks DLL replacement while the game runs. Candidate plugin/config conflicts are not assumed to be definite conflicts: the player can disable one candidate reversibly and retest.
 
 The bundled prebuilt plugin is fingerprinted against the supported game and loader. An unknown/older loader does not get treated as compatible merely because its version string looks close. Use the exact supported BepInEx build or rebuild and validate the plugin against a different installation before distributing it.
+
+A changed native game hash alone now produces a warning instead of blocking plugin installation. Hooks resolve their required signatures individually at startup. This allows camera and Mirror Race modules to continue across compatible updates without a player-side compiler. It does not certify every future update: fast-fall physics and native performance replacements retain their specific native-build verification, and actual hook/runtime failures remain visible in diagnostics. Author build/deploy receipts still reject inputs changed during or after compilation.
 
 ## Package contents and exclusions
 

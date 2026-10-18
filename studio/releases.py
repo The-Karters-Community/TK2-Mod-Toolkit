@@ -74,20 +74,30 @@ def extract_verified_archive(archive_path: Path, destination: Path, expected_ver
         infos = archive.infolist()
         if not infos or len(infos) > 100_000: raise ValueError("Update archive has an invalid file count.")
         roots = set()
+        names = set()
         for info in infos:
             name = info.filename.replace("\\", "/")
             path = PurePosixPath(name)
             if path.is_absolute() or not path.parts or any(":" in part or part == ".." for part in path.parts):
                 raise ValueError("Update archive contains an unsafe path.")
-            if len(path.parts) < 2: raise ValueError("Update archive must contain one named application folder.")
+            if name.casefold() in names: raise ValueError("Update archive contains a duplicate path.")
+            names.add(name.casefold())
             roots.add(path.parts[0])
             mode = (info.external_attr >> 16) & 0xFFFF
             if mode and (mode & 0o170000) == 0o120000: raise ValueError("Update archive contains a symbolic link.")
             total += info.file_size
             if info.file_size < 0 or total > MAX_EXPANDED: raise ValueError("Update archive exceeds the expanded size limit.")
-        if len(roots) != 1: raise ValueError("Update archive must contain exactly one application folder.")
-        archive.extractall(destination)
-    root = destination / next(iter(roots))
+        if "portable-manifest.json" in names:
+            # Normalize flat release ZIPs into the existing updater's private staging
+            # layout. This folder is never included in the published archive.
+            root = destination / "package"
+            archive.extractall(root)
+        else:
+            # Continue accepting releases made before flat ZIP packaging.
+            if len(roots) != 1 or any(len(PurePosixPath(i.filename.replace('\\', '/')).parts) < 2 and not i.is_dir() for i in infos):
+                raise ValueError("Update archive must contain application files or one application folder.")
+            archive.extractall(destination)
+            root = destination / next(iter(roots))
     manifest_path = root / "portable-manifest.json"
     try: manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error: raise ValueError("Update package has no valid portable manifest.") from error

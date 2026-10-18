@@ -53,6 +53,20 @@ class ReleaseTests(unittest.TestCase):
                     checker.prepare_update()
                 request.assert_not_called()
 
+    def test_flat_zip_is_normalized_for_existing_rollback_updater(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp); archive = base / "flat.zip"
+            with zipfile.ZipFile(archive, "w") as output:
+                output.writestr("portable-manifest.json", json.dumps({"version": "0.7.0"}))
+                output.writestr("TK2 Mod Toolkit.exe", b"fixture")
+                output.writestr("tools/update_portable.ps1", b"fixture")
+                output.writestr("studio/web-dist/index.html", b"fixture")
+            package = releases.extract_verified_archive(archive, base / "extracted", "0.7.0")
+            self.assertEqual(package.parent, base / "extracted")
+            self.assertTrue((package / "studio/web-dist/index.html").is_file())
+            with self.assertRaisesRegex(ValueError, "version or executable"):
+                releases.extract_verified_archive(archive, base / "wrong-version", "0.8.0")
+
     def test_extraction_rejects_traversal_and_mismatched_version(self):
         with tempfile.TemporaryDirectory() as temp:
             base = Path(temp); archive = base / "unsafe.zip"; destination = base / "extract"

@@ -15,9 +15,9 @@ class PortablePublicationTests(unittest.TestCase):
             target = root / "Toolkit.zip"
             build_portable.write_portable_zip(root, package, target)
             with zipfile.ZipFile(target) as archive:
-                self.assertEqual(set(archive.namelist()), {"TK2 Mod Toolkit 0.6.4/README.md", "TK2 Mod Toolkit 0.6.4/large.json"})
-                self.assertEqual(archive.read("TK2 Mod Toolkit 0.6.4/README.md"), b"portable")
-                self.assertEqual(archive.getinfo("TK2 Mod Toolkit 0.6.4/large.json").compress_type, zipfile.ZIP_DEFLATED)
+                self.assertEqual(set(archive.namelist()), {"README.md", "large.json"})
+                self.assertEqual(archive.read("README.md"), b"portable")
+                self.assertEqual(archive.getinfo("large.json").compress_type, zipfile.ZIP_DEFLATED)
             self.assertFalse(target.with_name(target.name + ".tmp").exists())
 
     def test_transient_windows_sharing_error_retries_then_publishes(self):
