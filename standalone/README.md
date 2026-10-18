@@ -3,6 +3,8 @@
 A small Windows app for **camera framing** and a **driving input overlay** in
 The Karters 2 Turbo Charged. No BepInEx, .NET, Python, or browser runtime required.
 
+[Quick user manual](USER-MANUAL.md) · [Feature list](FEATURES.md)
+
 ## Use
 
 1. Run **BobbyRaceTools.exe** and start the game yourself.

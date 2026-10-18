@@ -22,7 +22,7 @@ HINSTANCE instance;HWND window{},body{},tabs{},titleLabel{},connectButton{},stat
 HFONT font{},headingFont{},titleFont{};HBRUSH background{},paper{};int dpi=96,page{},scrollY{},bodyHeight{},contentHeight{};
 Settings settings;Snapshot snapshot;
 HWND gameWindow{};DWORD gamePid{},gameThread{};HANDLE gameHandle{},mapHandle{};HMODULE bridge{};HHOOK hook{};Shared* shared{};uint64_t connectStarted{};
-uint64_t nonce{},lastPaint{},lastSnapshot{},lastReport{};std::wstring message=L"Open The Karters 2, then connect.";fs::path iniPath,reportPath;
+uint64_t nonce{},lastReport{};std::wstring message=L"Open The Karters 2, then connect.";fs::path iniPath,reportPath;
  bool probe{},offline{},closing{},syncing{},pendingSave{};uint64_t probeStart{};int cameraKey=VK_F8,inputKey=VK_F9;ULONG_PTR gdiplusToken{};
 LONG lastUiRevision{};
 uint32_t listedPlayers=~0u,listedSelection=~0u;
@@ -120,7 +120,7 @@ void disconnect(){
  if(hook){UnhookWindowsHookEx(hook);hook=nullptr;}
  if(shared){UnmapViewOfFile(shared);shared=nullptr;}if(mapHandle){CloseHandle(mapHandle);mapHandle=nullptr;}
  if(bridge){FreeLibrary(bridge);bridge=nullptr;}if(gameHandle){CloseHandle(gameHandle);gameHandle=nullptr;}
- gameWindow=nullptr;snapshot={};lastSnapshot=0;lastUiRevision=0;setText(connectButton,L"Connect");
+ gameWindow=nullptr;snapshot={};lastUiRevision=0;setText(connectButton,L"Connect");
  refreshPlayers();if(panelButton)EnableWindow(panelButton,FALSE);
  if(window&&!closing)SetTimer(window,1,100,nullptr);
 }
@@ -271,13 +271,28 @@ void tick(){
     if(settings.player<6&&settings.player!=snapshot.player)status(L"Player "+std::to_wstring(settings.player+1)+L" is not active \u00b7 using "+actual);
     else status(L"Connected \u00b7 "+actual+(snapshot.cameraTick&&GetTickCount64()-snapshot.cameraTick<1000?L" \u00b7 Racing camera ready":L" \u00b7 Waiting for racing camera"));
    }else status(snapshot.source==Ghost?L"Connected \u00b7 Recorded ghost inputs":L"Connected \u00b7 Waiting for a local racer");
-   if(preview&&lastSnapshot!=snapshot.sampleTick){lastSnapshot=snapshot.sampleTick;InvalidateRect(preview,nullptr,FALSE);}}
+  }
   else if(GetTickCount64()-connectStarted>10000){report();disconnect();status(L"The game did not respond. Return to its menu and reconnect.");}
  }
  if(!reportPath.empty()&&GetTickCount64()-lastReport>=1000){lastReport=GetTickCount64();report();}
  if(probe&&GetTickCount64()-probeStart>12000){report();DestroyWindow(window);}
 }
-LRESULT CALLBACK previewProc(HWND h,UINT m,WPARAM w,LPARAM l){if(m==WM_PAINT){PAINTSTRUCT p;HDC dc=BeginPaint(h,&p);Gdiplus::Graphics g(dc);RECT r;GetClientRect(h,&r);g.ScaleTransform(r.right/400.f,r.bottom/126.f);drawHud(g,true);EndPaint(h,&p);return 0;}return DefWindowProcW(h,m,w,l);}
+void paintPreview(HWND h,HDC dc){
+ RECT r{};GetClientRect(h,&r);if(r.right<=0||r.bottom<=0)return;
+ // Paint the complete, opaque frame offscreen; never expose partially drawn controls.
+ Gdiplus::Bitmap frame(r.right,r.bottom,PixelFormat32bppPARGB);
+ {
+  Gdiplus::Graphics buffered(&frame);buffered.Clear(Gdiplus::Color(255,247,246,242));
+  buffered.ScaleTransform(r.right/400.f,r.bottom/126.f);drawHud(buffered,true);
+ }
+ Gdiplus::Graphics screen(dc);screen.DrawImage(&frame,0,0,r.right,r.bottom);
+}
+LRESULT CALLBACK previewProc(HWND h,UINT m,WPARAM w,LPARAM l){
+ if(m==WM_ERASEBKGND)return 1;
+ if(m==WM_PRINTCLIENT){paintPreview(h,reinterpret_cast<HDC>(w));return 0;}
+ if(m==WM_PAINT){PAINTSTRUCT p;HDC dc=BeginPaint(h,&p);paintPreview(h,dc);EndPaint(h,&p);return 0;}
+ return DefWindowProcW(h,m,w,l);
+}
 LRESULT CALLBACK bodyProc(HWND h,UINT m,WPARAM w,LPARAM l){
  if(m==WM_COMMAND||m==WM_HSCROLL||m==WM_DRAWITEM||m==WM_CTLCOLORSTATIC||m==WM_CTLCOLOREDIT||m==WM_CTLCOLORBTN)return SendMessageW(window,m,w,l);
  if(m==WM_VSCROLL){int target=scrollY;switch(LOWORD(w)){case SB_LINEUP:target-=30;break;case SB_LINEDOWN:target+=30;break;case SB_PAGEUP:target-=bodyHeight;break;case SB_PAGEDOWN:target+=bodyHeight;break;case SB_THUMBTRACK:case SB_THUMBPOSITION:{SCROLLINFO i{sizeof(i),SIF_TRACKPOS};GetScrollInfo(h,SB_VERT,&i);target=i.nTrackPos;break;}}scroll(target);return 0;}

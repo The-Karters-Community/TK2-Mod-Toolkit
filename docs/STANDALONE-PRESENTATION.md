@@ -185,3 +185,20 @@ this work. Distribution: executable 1,196,032 bytes; ZIP 606,399 bytes, with lic
 and no user settings or game files. These checks cover this game/driver session;
 exclusive DXGI fullscreen and other controllers/display drivers remain distinct
 from the user's tested fullscreen configuration.
+
+
+## 0.2.1 desktop preview repaint fix (2026-10-19)
+
+The desktop layout preview was invalidated on every live input snapshot despite
+showing a static layout. Its GDI+ drawing went directly to the window DC, exposing
+partial frames and repeatedly blending the translucent background. The preview
+now redraws for settings/layout changes, renders a complete opaque frame offscreen,
+and displays that frame in one operation. Background erasure is suppressed.
+
+Native build/core and D3D11 renderer checks pass. One hundred repeated visible
+preview repaints produced identical captures with stable GDI resource counts;
+the captured preview shows all six input labels. Testing preserved user settings.
+The 0.2.1 package contains the short user manual and feature list. The project's
+license credit is DarkSlayer; third-party license notices remain intact. The ZIP
+was checked for archive integrity, guide inclusion and absence of the former
+personal-name credit in distributed text files.
