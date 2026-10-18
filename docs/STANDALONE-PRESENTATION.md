@@ -173,3 +173,15 @@ with the desktop app still available. Their follow-up requested normal driving
 while the panel remains visible; the explicit editing mode addresses that request.
 Exclusive DXGI fullscreen was not separately observed (the captured session
 reported DXGI fullscreen=false). No claim about every display/driver is made.
+
+
+Final live confirmation (2026-10-19): the user confirmed driving with Camera
+visible, entering editing with Ctrl+Tab / controller View, and returning to driving
+with B / Esc. Six desktop panel toggles retained the same visible HWND and styles.
+The final executable stayed connected with renderer state 1 and zero faults.
+The native renderer harness passed three consecutive runs after the device-identity
+fix; the Python suite passed all 136 tests. BepInEx's loader was not changed during
+this work. Distribution: executable 1,196,032 bytes; ZIP 606,399 bytes, with licenses
+and no user settings or game files. These checks cover this game/driver session;
+exclusive DXGI fullscreen and other controllers/display drivers remain distinct
+from the user's tested fullscreen configuration.
