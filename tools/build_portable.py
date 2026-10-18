@@ -102,7 +102,7 @@ def main():
         print(process.stdout + process.stderr)
         raise ValueError('Packaging failed. See local/portable-build.log. Existing output was not replaced.')
     fresh_output = core.contained(fresh_dist, fresh_dist / 'TK2 Mod Toolkit')
-    core.write_json(fresh_output / 'portable-manifest.json', {'version':VERSION, 'playerRequirements':['Windows x64', 'The Karters 2 0.1.4.18', 'BepInEx Unity IL2CPP x64 6.0.0-be.788 (5b766a3)', 'WebView2 Runtime recommended; Edge fallback'],
+    core.write_json(fresh_output / 'portable-manifest.json', {'version':VERSION, 'playerRequirements':['Windows x64', 'The Karters 2 Turbo Charged (Windows x64)', 'BepInEx Unity IL2CPP x64 6.0.0-be.788 (5b766a3)', 'WebView2 Runtime recommended; Edge fallback'],
         'pythonIncluded':True, 'loaderIncluded':source is not None, 'loaderVersion':setup.SUPPORTED_BEPINEX_VERSION, 'compilerRequiredForPlayerInstall':False, 'authorBuildRequires':'.NET SDK',
         'gameBinaryIncluded':False, 'supportedGameHash':json.loads((pack.ARTIFACT / 'build.json').read_text())['fingerprint']['files']['GameAssembly.dll']})
     previous = None

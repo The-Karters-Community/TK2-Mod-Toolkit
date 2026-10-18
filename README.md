@@ -4,7 +4,7 @@
 
 <p align="center"><img src="assets/Logo.png" alt="The Karters 2 Turbo Charged" width="260"></p>
 
-The supported game build is **0.1.4.18 (Windows x64)**. The validated loader is **BepInEx Unity IL2CPP x64 `6.0.0-be.788`**, commit `5b766a3`. This is a community project; gameplay-changing modules are intended for local/offline use. Online protection is mandatory and locked on.
+The 0.6.25 plugin is rebuilt against **0.1.4.24 (Windows x64)**. The validated loader is **BepInEx Unity IL2CPP x64 `6.0.0-be.788`**, commit `5b766a3`. Compatible game updates no longer block installation solely because the native game hash changed; individual hooks still need to work, and live Mirror Race rendering on the updated game remains unverified. Native fast-fall and performance replacements retain their specific build checks. This is a community project; gameplay-changing modules are intended for local/offline use. Online protection is mandatory and locked on.
 
 ## Standalone camera and inputs
 
@@ -26,6 +26,8 @@ The screenshots below show the current Mod library page and Workshop editor. The
 ## Install and use the application
 
 For a ready-to-run copy, download the Windows x64 ZIP from [GitHub Releases](https://github.com/The-Karters-Community/TK2-Mod-Toolkit/releases), extract it to a writable folder and run **TK2 Mod Toolkit.exe**. Keep the extracted folder together. The app bundles Python and needs no Python or .NET installation to configure the prebuilt plugin. The game itself is not bundled.
+
+**Updating from 0.6.24:** close the Toolkit and manually extract the new ZIP into your application folder, preserving `local/`. The new ZIP contains application files directly at its root; the updater shipped in 0.6.24 cannot read this layout. Later versions accept both flat and older wrapped archives.
 
 In **Installation**, select the folder containing `TheKarters2.exe` and `GameAssembly.dll`. Install or repair the supported BepInEx build if needed, start the game yourself once so BepInEx can generate IL2CPP interop, then close the game and run **Check**. Install/update the Toolkit plugin only after the app reports the installation is ready. Existing plugin and config files are preserved; the app identifies possible conflicts and offers reversible disable/restore actions.
 

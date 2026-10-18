@@ -113,7 +113,7 @@ export default function App() {
           <div className="mt-0 text-xs leading-6 text-muted md:mt-6">
             <span>Toolkit {version}</span>
             <br className="hidden md:block" />
-            <span className="hidden md:block">The Karters 2 · 0.1.4.18</span>
+            <span className="hidden md:block">The Karters 2</span>
           </div>
         </div>
       </aside>

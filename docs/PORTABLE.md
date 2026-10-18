@@ -4,7 +4,7 @@ The portable package runs the Toolkit on Windows x64 without installing Python. 
 
 ## Player prerequisites
 
-- The Karters 2 Turbo Charged **0.1.4.18**, Windows x64.
+- The Karters 2 Turbo Charged, Windows x64. The 0.6.25 plugin was rebuilt against **0.1.4.24**; live post-update Mirror Race rendering remains unverified.
 - BepInEx Unity IL2CPP x64 **6.0.0-be.788**, commit `5b766a3b7f6c164d4798924a93f3acf4db769d06` for the validated prebuilt plugin.
 - A browser. Edge app mode is used when available, with a normal browser fallback.
 
