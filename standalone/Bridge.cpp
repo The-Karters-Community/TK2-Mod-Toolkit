@@ -10,6 +10,7 @@ Shared* shared{}; HANDLE mapping{};
 DWORD unityThread{}; bool initialized{};
 bool cameraFault{},inputFault{},replayFault{};
 Settings settings; Snapshot snapshot;
+LocalPlayers players;
 using CameraFn=void(*)(void*,float,Vec3*,Quat*,float*,const void*);
 using InputFn=void(*)(void*,const void*);
 using ReplayFn=void(*)(void*,void*,const void*);
@@ -48,7 +49,13 @@ void fault(const wchar_t* text) {
  ++snapshot.faults;
  if(shared){wcsncpy_s(shared->error,text,_TRUNCATE);publish();}
 }
-bool local(void* player) {return player&&member<int>(player,playerType)==localType&&member<int>(player,playerSlot)==static_cast<int>(settings.player);}
+bool local(void* player) {
+ if(!player||member<int>(player,playerType)!=localType)return false;
+ int slot=member<int>(player,playerSlot);if(slot<0||slot>=6)return false;
+ players.observe(static_cast<uint32_t>(slot),GetTickCount64());
+ snapshot.localPlayers=players.mask(GetTickCount64());snapshot.player=choosePlayer(settings.player,snapshot.localPlayers);
+ return static_cast<uint32_t>(slot)==snapshot.player;
+}
 void* manager() {void* value{};if(replayInstance)staticRead(replayInstance,&value);return value;}
 uint32_t bits(float a,bool breaking,bool drift,bool boost,bool weapon) {
  return (a>.05f?Accelerate:0)|(a<-.05f?Reverse:0)|(breaking?Brake:0)|(drift?Drift:0)|(boost?Boost:0)|(weapon?Weapon:0);
@@ -61,7 +68,7 @@ void sampleLive(void* input) {
  if(inputPlayerReplay)return;
  auto data=member<void*>(input,inputData);auto rewired=member<void*>(input,inputRewired);if(!data||!rewired)return;
  float s=member<float>(data,steer),a=member<float>(data,accel);if(!std::isfinite(s)||!std::isfinite(a))return;
- liveTick=GetTickCount64();snapshot.sampleTick=liveTick;snapshot.source=Live;snapshot.player=settings.player;
+ liveTick=GetTickCount64();snapshot.sampleTick=liveTick;snapshot.source=Live;
  snapshot.steer=std::clamp(s,-1.f,1.f);snapshot.accel=std::clamp(a,-1.f,1.f);
  snapshot.actions=bits(a,member<bool>(data,brake),pressed(rewired,0)||pressed(rewired,1),pressed(rewired,2),pressed(rewired,3));
  ++snapshot.liveCalls;ghostIdentity=nullptr;jumpUntil=boostUntil=0;publish();
@@ -79,7 +86,7 @@ void sampleReplay(void* replay,void*) {
  float s=member<float>(replay,replaySteer),a=member<float>(replay,replayAccel);if(!std::isfinite(s)||!std::isfinite(a))return;
  if(member<bool>(replay,replayJump))jumpUntil=now+180;
  if(member<bool>(replay,replayBoost))boostUntil=now+180;
- snapshot.sampleTick=now;snapshot.source=Ghost;snapshot.player=settings.player;
+ snapshot.sampleTick=now;snapshot.source=Ghost;
  snapshot.steer=std::clamp(s,-1.f,1.f);snapshot.accel=std::clamp(a,-1.f,1.f);
  snapshot.actions=bits(a,member<bool>(replay,replayBrake),now<jumpUntil||member<bool>(replay,replayDrift),now<boostUntil,false);
  ++snapshot.ghostCalls;publish();
@@ -161,7 +168,7 @@ void connect(Shared* request,HANDLE handle) {
  HMODULE pinned{};GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,reinterpret_cast<LPCWSTR>(&connect),&pinned);
  if(shared){UnmapViewOfFile(shared);CloseHandle(mapping);}
  shared=request;mapping=handle;unityThread=GetCurrentThreadId();settings=sanitize(shared->settings);snapshot={};cameraFault=inputFault=replayFault=false;
- for(auto& frame:frames)frame={};liveTick=ghostSeen=jumpUntil=boostUntil=0;ghostIdentity=nullptr;inputPlayerReplay=false;
+ players={};for(auto& frame:frames)frame={};liveTick=ghostSeen=jumpUntil=boostUntil=0;ghostIdentity=nullptr;inputPlayerReplay=false;
  try{if(!initialized)initialize();shared->capabilities=capabilities;InterlockedExchange(reinterpret_cast<volatile LONG*>(&shared->state),2);}
  catch(const std::exception& e){MultiByteToWideChar(CP_UTF8,0,e.what(),-1,shared->error,256);InterlockedExchange(reinterpret_cast<volatile LONG*>(&shared->state),-1);}
 }
@@ -170,7 +177,7 @@ void safeConnect(Shared* request,HANDLE handle) {__try{connect(request,handle);}
 
 extern "C" __declspec(dllexport) LRESULT CALLBACK RaceToolsBootstrap(int code,WPARAM w,LPARAM l) {
  if(code>=0&&w==PM_REMOVE){auto msg=reinterpret_cast<MSG*>(l);
-  if(msg&&msg->message==RegisterWindowMessageW(L"Bobby.RaceTools.Connect.v1")){
+  if(msg&&msg->message==RegisterWindowMessageW(L"Bobby.RaceTools.Connect.v2")){
    wchar_t name[128];swprintf_s(name,L"Local\\BobbyRaceTools_%lu_%llx",GetCurrentProcessId(),static_cast<unsigned long long>(msg->wParam));
    HANDLE h=OpenFileMappingW(FILE_MAP_ALL_ACCESS,FALSE,name);
    if(h){auto view=static_cast<Shared*>(MapViewOfFile(h,FILE_MAP_ALL_ACCESS,0,0,sizeof(Shared)));

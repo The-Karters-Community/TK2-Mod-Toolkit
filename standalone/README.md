@@ -6,12 +6,18 @@ The Karters 2 Turbo Charged. No BepInEx, .NET, Python, or browser runtime requir
 ## Use
 
 1. Run **BobbyRaceTools.exe** and start the game yourself.
-2. Click **Connect**. Choose your local player under **Input viewer** if needed.
+2. Click **Connect**. **Automatic** finds your active local player.
 3. Enable **Camera overrides** to adjust framing. Each value has its own reset.
 
-**F8** opens or minimizes Camera. **F9** toggles the input overlay. Change either
-shortcut in Input viewer. Settings save automatically beside the executable;
+**F8** opens Camera over the game in windowed/borderless mode. Press F8 again
+or **Back to game** to close the panel while keeping the app connected. **Desktop**
+returns to the full settings window. **F9** toggles the input overlay. Change
+either shortcut in Input viewer. Settings save automatically beside the executable;
 read-only installations use `%LOCALAPPDATA%\BobbyRaceTools` instead.
+
+The local player selector is visible on both settings pages. It lists active
+local racers. If a saved player is no longer active, the app uses the first
+available local racer and tells you which one.
 
 Camera overrides start off in a fresh installation. Disabling them, disconnecting,
 or closing the app returns control to the game. Inputs follow the game's mapped

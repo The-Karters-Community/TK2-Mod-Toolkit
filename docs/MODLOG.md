@@ -1,3 +1,19 @@
+## 2026-10-18 - Standalone race tools 0.1.1
+
+- Fixed apparently inactive controls after a saved player choice stopped matching
+  the local racer. Reproduced Player 3 yielding zero callbacks; Player 1 resumed
+  immediately. Added automatic local-player detection, active choices on both
+  settings pages, and a visible fallback for unavailable saved slots.
+- F8 opens an interactive camera panel over the game in windowed/borderless mode.
+  Back to game closes the panel without exiting; Desktop returns to full settings.
+  The overlay follows app/game focus and has contrasting controls and resets.
+- Added selection/expiry regression assertions. Native core and Windows UI checks
+  passed; live FOV 75 -> 80 -> 75, repeated reconnects and continued sampling
+  passed with zero bridge faults. User confirmed the F8 overlay is visible over
+  the game. Python suite: 136 passed. Details: STANDALONE-PRESENTATION.md.
+- Preserved camera/input preferences and selected Automatic for this user's saved
+  player. No game files were changed.
+
 ## 2026-10-18 - Standalone race presentation app (unreleased)
 
 - Added Bobby's Race Tools: a native Win32 executable with embedded x64 bridge,

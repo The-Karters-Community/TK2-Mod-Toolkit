@@ -18,12 +18,15 @@ using namespace race;
 namespace fs=std::filesystem;
 namespace {
 constexpr wchar_t ClassName[]=L"BobbyRaceTools.Window.v1";
-HINSTANCE instance;HWND window{},body{},tabs{},titleLabel{},connectButton{},statusLabel{},resetButton{},footer{},overlay{},preview{},playerCombo{},cameraKeyCombo{},inputKeyCombo{};
-HFONT font{},headingFont{},titleFont{};HBRUSH background{};int dpi=96,page{},scrollY{},bodyHeight{},contentHeight{};
+HINSTANCE instance;HWND window{},body{},tabs{},titleLabel{},connectButton{},statusLabel{},resetButton{},panelButton{},footer{},overlay{},preview{},playerCombo{},cameraKeyCombo{},inputKeyCombo{};
+HFONT font{},headingFont{},titleFont{};HBRUSH background{},paper{},panelBackground{},panelEdit{};int dpi=96,page{},scrollY{},bodyHeight{},contentHeight{};
 Settings settings;Snapshot snapshot;
 HWND gameWindow{};DWORD gamePid{},gameThread{};HANDLE gameHandle{},mapHandle{};HMODULE bridge{};HHOOK hook{};Shared* shared{};uint64_t connectStarted{};
 uint64_t nonce{},lastPaint{},lastSnapshot{},lastReport{};std::wstring message=L"Open The Karters 2, then connect.";fs::path iniPath,reportPath;
  bool probe{},offline{},closing{},syncing{},pendingSave{};uint64_t probeStart{};int cameraKey=VK_F8,inputKey=VK_F9;ULONG_PTR gdiplusToken{};
+bool panelMode{},panelSuspended{};RECT desktopBounds{};
+uint32_t listedPlayers=~0u,listedSelection=~0u;
+void resize();void setPanel(bool enabled,bool returnToGame=false);
 std::unique_ptr<Gdiplus::Font> hudTitle,hudSmall,hudButton;
 struct Field {const wchar_t* key;const wchar_t* label;float Settings::*member;float low,high;HWND labelWindow{},slider{},edit{},reset{};};
 std::array<Field,13> fields{{
@@ -42,7 +45,7 @@ HWND groupA{},groupB{},playerLabel{},shortcutsLabel{},cameraKeyLabel{},inputKeyL
 int px(int value){return MulDiv(value,dpi,96);}
 std::wstring number(float value){wchar_t text[48];swprintf_s(text,L"%.3f",value);std::wstring s=text;while(s.back()==L'0')s.pop_back();if(s.back()==L'.')s.pop_back();return s;}
 void setText(HWND h,const std::wstring& text){if(!h)return;int size=GetWindowTextLengthW(h);std::wstring current(size+1,L'\0');GetWindowTextW(h,current.data(),size+1);current.resize(size);if(current!=text)SetWindowTextW(h,text.c_str());}
-HWND child(const wchar_t* type,const wchar_t* text,DWORD style,HWND parent,int id=0){auto h=CreateWindowExW(0,type,text,WS_CHILD|WS_VISIBLE|style,0,0,1,1,parent,reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),instance,nullptr);SendMessageW(h,WM_SETFONT,reinterpret_cast<WPARAM>(font),TRUE);return h;}
+HWND child(const wchar_t* type,const wchar_t* text,DWORD style,HWND parent,int id=0){if(!wcscmp(type,L"BUTTON")&&(style&BS_TYPEMASK)==BS_PUSHBUTTON)style=(style&~BS_TYPEMASK)|BS_OWNERDRAW;if(!wcscmp(type,L"STATIC"))style|=SS_NOPREFIX;auto h=CreateWindowExW(0,type,text,WS_CHILD|WS_VISIBLE|style,0,0,1,1,parent,reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),instance,nullptr);SendMessageW(h,WM_SETFONT,reinterpret_cast<WPARAM>(font),TRUE);return h;}
 void show(HWND h,bool visible){ShowWindow(h,visible?SW_SHOW:SW_HIDE);}
 void place(HWND h,int x,int y,int w,int hgt,bool inBody=true){MoveWindow(h,px(x),px(y-(inBody?scrollY:0)),px(w),px(hgt),TRUE);}
 void status(const std::wstring& text){message=text;setText(statusLabel,message);}
@@ -66,7 +69,7 @@ void loadSettings(){
  if(check==INVALID_HANDLE_VALUE){iniPath=localData()/L"BobbyRaceTools.ini";fs::create_directories(iniPath.parent_path());}else CloseHandle(check);
  wchar_t text[80];for(auto& f:fields){GetPrivateProfileStringW(L"Settings",f.key,number(settings.*f.member).c_str(),text,80,iniPath.c_str());wchar_t* end{};float v=wcstof(text,&end);if(end!=text&&!*end)settings.*f.member=v;}
  for(auto& f:flags)settings.*f.member=GetPrivateProfileIntW(L"Settings",f.key,settings.*f.member,iniPath.c_str());
- settings.player=GetPrivateProfileIntW(L"Settings",L"Player",0,iniPath.c_str());settings=sanitize(settings);
+ settings.player=GetPrivateProfileIntW(L"Settings",L"Player",AutomaticPlayer,iniPath.c_str());settings=sanitize(settings);
  cameraKey=GetPrivateProfileIntW(L"Settings",L"CameraKey",VK_F8,iniPath.c_str());inputKey=GetPrivateProfileIntW(L"Settings",L"InputKey",VK_F9,iniPath.c_str());
  if(cameraKey&&(cameraKey<VK_F1||cameraKey>VK_F12))cameraKey=VK_F8;if(inputKey&&(inputKey<VK_F1||inputKey>VK_F12))inputKey=VK_F9;
 }
@@ -83,11 +86,24 @@ void syncControls(bool all=true){
  syncing=true;
  for(auto& f:fields){SendMessageW(f.slider,TBM_SETPOS,TRUE,static_cast<LPARAM>((settings.*f.member-f.low)/(f.high-f.low)*1000));if(all||GetFocus()!=f.edit)setText(f.edit,number(settings.*f.member));}
  for(auto& f:flags)SendMessageW(f.control,BM_SETCHECK,settings.*f.member?BST_CHECKED:BST_UNCHECKED,0);
- SendMessageW(playerCombo,CB_SETCURSEL,settings.player,0);
- for(auto h:{fields[4].labelWindow,fields[4].slider,fields[4].edit,fields[4].reset})EnableWindow(h,settings.aim!=0);
+ int count=static_cast<int>(SendMessageW(playerCombo,CB_GETCOUNT,0,0));for(int i=0;i<count;i++)if(static_cast<uint32_t>(SendMessageW(playerCombo,CB_GETITEMDATA,i,0))==settings.player)SendMessageW(playerCombo,CB_SETCURSEL,i,0);
+ for(auto h:{fields[4].slider,fields[4].edit,fields[4].reset})EnableWindow(h,settings.aim!=0);
+ InvalidateRect(fields[4].labelWindow,nullptr,TRUE);
  syncing=false;
 }
+void refreshPlayers(){
+ uint32_t mask=shared?snapshot.localPlayers:0;
+ if(mask==listedPlayers&&settings.player==listedSelection)return;
+ listedPlayers=mask;listedSelection=settings.player;syncing=true;
+ SendMessageW(playerCombo,CB_RESETCONTENT,0,0);
+ auto add=[&](const std::wstring& label,uint32_t value){auto index=SendMessageW(playerCombo,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(label.c_str()));SendMessageW(playerCombo,CB_SETITEMDATA,index,value);if(value==settings.player)SendMessageW(playerCombo,CB_SETCURSEL,index,0);};
+ add(L"Automatic",AutomaticPlayer);
+ for(uint32_t i=0;i<6;i++)if((mask&(1u<<i))||settings.player==i)add(L"Player "+std::to_wstring(i+1)+((mask&(1u<<i))?L"":L" (not active)"),i);
+ syncing=false;
+}
+std::wstring panelButtonText(){return cameraKey?L"Over game · F"+std::to_wstring(cameraKey-VK_F1+1):L"Over game";}
 void shortcuts(){
+ setText(panelButton,panelButtonText());
  UnregisterHotKey(window,1);UnregisterHotKey(window,2);
  bool ok=true;if(cameraKey)ok=RegisterHotKey(window,1,MOD_NOREPEAT,cameraKey)!=0;
  if(inputKey)ok=(RegisterHotKey(window,2,MOD_NOREPEAT,inputKey)!=0)&&ok;
@@ -100,11 +116,13 @@ bool readSnapshot(){
  return false;
 }
 void disconnect(){
+ if(panelMode&&!closing)setPanel(false);
  if(shared)InterlockedExchange64(&shared->heartbeat,0);
  if(hook){UnhookWindowsHookEx(hook);hook=nullptr;}
  if(shared){UnmapViewOfFile(shared);shared=nullptr;}if(mapHandle){CloseHandle(mapHandle);mapHandle=nullptr;}
  if(bridge){FreeLibrary(bridge);bridge=nullptr;}if(gameHandle){CloseHandle(gameHandle);gameHandle=nullptr;}
  gameWindow=nullptr;snapshot={};lastSnapshot=0;show(overlay,false);setText(connectButton,L"Connect");
+ refreshPlayers();if(panelButton)EnableWindow(panelButton,FALSE);
  if(window&&!closing)SetTimer(window,1,100,nullptr);
 }
 std::wstring sha256(const uint8_t* data,DWORD size){
@@ -120,7 +138,7 @@ fs::path extractBridge(){
  auto resource=FindResourceW(instance,MAKEINTRESOURCEW(101),RT_RCDATA);if(!resource)throw std::runtime_error("Embedded native bridge is missing.");
  DWORD size=SizeofResource(instance,resource);auto data=static_cast<const uint8_t*>(LockResource(LoadResource(instance,resource)));auto hash=sha256(data,size);
  wchar_t temporaryRoot[32768];DWORD length=GetTempPathW(32768,temporaryRoot);if(!length||length>=32768)throw std::runtime_error("Cannot locate the temporary bridge cache.");
- auto folder=fs::path(temporaryRoot)/L"BobbyRaceTools"/hash;fs::create_directories(folder);auto path=folder/L"BobbyRaceTools.Bridge.dll";
+ auto folder=fs::path(temporaryRoot)/L"BobbyRaceTools"/hash;fs::create_directories(folder);auto path=folder/(L"Bridge-"+hash.substr(0,16)+L".dll");
  bool same=false;if(fs::exists(path)){std::ifstream file(path,std::ios::binary);std::vector<uint8_t> old((std::istreambuf_iterator<char>(file)),{});same=old.size()==size&&sha256(old.data(),static_cast<DWORD>(old.size()))==hash;}
  if(!same){auto temporary=folder/(L"bridge-"+std::to_wstring(GetCurrentProcessId())+L".tmp");std::ofstream file(temporary,std::ios::binary|std::ios::trunc);file.write(reinterpret_cast<const char*>(data),size);file.close();if(!file||!MoveFileExW(temporary.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))throw std::runtime_error("Cannot write the native bridge cache.");}
  return path;
@@ -146,7 +164,7 @@ void connect(){
   if(!hook)throw std::runtime_error("Cannot connect. Run both apps as the same Windows user and elevation level.");
   // Unity can filter out thread-only messages during a race. A window message
   // reaches the same main-thread hook in menus, races and modal input loops.
-  if(!PostMessageW(gameWindow,RegisterWindowMessageW(L"Bobby.RaceTools.Connect.v1"),static_cast<WPARAM>(nonce),0))throw std::runtime_error("The game is not responding to the connection.");
+  if(!PostMessageW(gameWindow,RegisterWindowMessageW(L"Bobby.RaceTools.Connect.v2"),static_cast<WPARAM>(nonce),0))throw std::runtime_error("The game is not responding to the connection.");
   connectStarted=GetTickCount64();status(L"Connecting to the game…");setText(connectButton,L"Disconnect");SetTimer(window,1,16,nullptr);
  }catch(const std::exception& error){std::string s=error.what();std::wstring w(s.begin(),s.end());disconnect();status(w);}
 }
@@ -182,24 +200,48 @@ void updateOverlay(){
  POINT destination{x,y},source{};SIZE size{width,height};BLENDFUNCTION blend{AC_SRC_OVER,0,255,AC_SRC_ALPHA};UpdateLayeredWindow(overlay,screen,&destination,&size,memory,&source,0,&blend,ULW_ALPHA);
  SelectObject(memory,old);DeleteDC(memory);ReleaseDC(nullptr,screen);DeleteObject(image);SetWindowPos(overlay,HWND_TOPMOST,x,y,width,height,SWP_NOACTIVATE|SWP_SHOWWINDOW);
 }
+bool appOrGameFocused(){DWORD foreground{};GetWindowThreadProcessId(GetForegroundWindow(),&foreground);return foreground==gamePid||foreground==GetCurrentProcessId();}
+void setPanel(bool enabled,bool returnToGame){
+ if(enabled&&(!shared||shared->state!=2||!IsWindow(gameWindow))){status(L"Connect to the game before opening Camera.");return;}
+ if(enabled==panelMode)return;
+ if(enabled){
+  WINDOWPLACEMENT placement{sizeof(placement)};GetWindowPlacement(window,&placement);desktopBounds=placement.rcNormalPosition;
+  panelMode=true;panelSuspended=false;background=panelBackground;page=0;scrollY=0;TabCtrl_SetCurSel(tabs,0);
+  SetWindowLongPtrW(window,GWL_STYLE,WS_POPUP|WS_THICKFRAME|WS_CLIPCHILDREN);
+  SetWindowLongPtrW(window,GWL_EXSTYLE,WS_EX_CONTROLPARENT|WS_EX_TOOLWINDOW|WS_EX_TOPMOST);
+  RECT game{};GetClientRect(gameWindow,&game);POINT origin{};ClientToScreen(gameWindow,&origin);
+  int gameWidth=static_cast<int>(game.right),gameHeight=static_cast<int>(game.bottom);
+  int width=std::min(px(720),std::max(px(510),gameWidth-px(32))),height=std::min(px(620),std::max(px(430),gameHeight-px(32)));
+  SetWindowPos(window,HWND_TOPMOST,origin.x+std::max(0,gameWidth-width-px(16)),origin.y+px(16),width,height,SWP_FRAMECHANGED|SWP_SHOWWINDOW);
+  setText(titleLabel,L"Camera");setText(connectButton,L"Back to game");setText(panelButton,L"Desktop");setText(resetButton,L"Reset framing");show(tabs,false);
+ }else{
+  panelMode=false;panelSuspended=false;background=paper;
+  SetWindowLongPtrW(window,GWL_STYLE,WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN);SetWindowLongPtrW(window,GWL_EXSTYLE,WS_EX_CONTROLPARENT);
+  SetWindowPos(window,HWND_NOTOPMOST,desktopBounds.left,desktopBounds.top,desktopBounds.right-desktopBounds.left,desktopBounds.bottom-desktopBounds.top,SWP_FRAMECHANGED|SWP_NOACTIVATE);
+  setText(titleLabel,L"Bobby’s Race Tools");setText(connectButton,shared?L"Disconnect":L"Connect");setText(panelButton,panelButtonText());show(tabs,true);
+ }
+ resize();RedrawWindow(window,nullptr,nullptr,RDW_INVALIDATE|RDW_ERASE|RDW_ALLCHILDREN|RDW_FRAME);
+ if(returnToGame){ShowWindow(window,SW_MINIMIZE);if(IsWindow(gameWindow))SetForegroundWindow(gameWindow);}
+ else{ShowWindow(window,SW_RESTORE);SetForegroundWindow(window);}
+}
 void layoutBody(){
  RECT rect{};GetClientRect(body,&rect);int width=MulDiv(rect.right,96,dpi),available=width-44;bool narrow=width<630;int col=narrow?available:(available-32)/2;int right=narrow?22:22+col+32;
  for(auto& f:fields)for(auto h:{f.labelWindow,f.slider,f.edit,f.reset})show(h,false);for(auto& f:flags)show(f.control,false);
  for(auto h:{groupA,groupB,preview,playerLabel,playerCombo,shortcutsLabel,cameraKeyLabel,cameraKeyCombo,inputKeyLabel,inputKeyCombo,sourceNote})show(h,false);
+ show(playerLabel,true);show(playerCombo,true);place(playerLabel,22+available-238,11,74,24);place(playerCombo,22+available-160,8,160,180);
  auto field=[&](int i,int x,int y,int w){auto& f=fields[i];for(auto h:{f.labelWindow,f.slider,f.edit,f.reset})show(h,true);place(f.labelWindow,x,y,w-115,21);place(f.edit,x+w-106,y-3,70,25);place(f.reset,x+w-29,y-3,29,25);place(f.slider,x,y+27,w,23);};
  if(page==0){
-  show(flags[0].control,true);place(flags[0].control,22,8,available,26);show(groupA,true);setText(groupA,L"Framing");place(groupA,22,51,col,25);
+  show(flags[0].control,true);place(flags[0].control,22,8,available-248,26);show(groupA,true);setText(groupA,L"Framing");place(groupA,22,51,col,25);
   for(int i=0;i<4;i++)field(i,22,86+i*62,col);show(flags[1].control,true);place(flags[1].control,22,338,col,28);
   int top=narrow?394:51;show(groupB,true);setText(groupB,L"Aim & rotation");place(groupB,right,top,col,25);show(flags[2].control,true);place(flags[2].control,right,top+32,col,27);
   for(int i=4;i<9;i++)field(i,right,top+70+(i-4)*62,col);contentHeight=top+70+5*62+15;
  }else{
-  show(flags[3].control,true);place(flags[3].control,22,8,available,26);show(flags[4].control,true);place(flags[4].control,22,42,available,26);
+  show(flags[3].control,true);place(flags[3].control,22,8,available-248,26);show(flags[4].control,true);place(flags[4].control,22,42,available,26);
   show(preview,true);place(preview,22,85,std::min(available,400),126);
   show(sourceNote,true);place(sourceNote,22,222,available,32);
   field(9,22,270,col);field(10,22,332,col);field(11,right,narrow?394:270,col);field(12,right,narrow?456:332,col);
-  int top=narrow?538:420;show(playerLabel,true);show(playerCombo,true);place(playerLabel,22,top,125,24);place(playerCombo,150,top-3,145,180);
-  show(shortcutsLabel,true);place(shortcutsLabel,22,top+43,available,24);show(cameraKeyLabel,true);show(cameraKeyCombo,true);show(inputKeyLabel,true);show(inputKeyCombo,true);
-  place(cameraKeyLabel,22,top+77,100,24);place(cameraKeyCombo,126,top+74,90,180);place(inputKeyLabel,244,top+77,70,24);place(inputKeyCombo,318,top+74,90,180);contentHeight=top+118;
+  int top=narrow?538:420;show(shortcutsLabel,true);place(shortcutsLabel,22,top,available,24);show(cameraKeyLabel,true);show(cameraKeyCombo,true);show(inputKeyLabel,true);show(inputKeyCombo,true);
+  place(cameraKeyLabel,22,top+34,100,24);place(cameraKeyCombo,126,top+31,90,180);place(inputKeyLabel,244,top+34,70,24);place(inputKeyCombo,318,top+31,90,180);contentHeight=top+75;
  }
  int maximum=std::max(0,contentHeight-bodyHeight);if(scrollY>maximum){scrollY=maximum;layoutBody();return;}
  SCROLLINFO info{sizeof(info),SIF_RANGE|SIF_PAGE|SIF_POS,0,contentHeight,static_cast<UINT>(std::max(1,bodyHeight)),scrollY,0};SetScrollInfo(body,SB_VERT,&info,TRUE);
@@ -208,17 +250,19 @@ void resize(){
  RECT r{};GetClientRect(window,&r);int w=MulDiv(r.right,96,dpi),h=MulDiv(r.bottom,96,dpi);
  place(titleLabel,24,15,w-180,33,false);
  MoveWindow(connectButton,px(w-126),px(20),px(102),px(32),TRUE);MoveWindow(statusLabel,px(24),px(55),px(w-48),px(26),TRUE);
- MoveWindow(tabs,px(22),px(91),px(w-44),px(29),TRUE);MoveWindow(body,0,px(129),r.right,px(std::max(120,h-184)),TRUE);bodyHeight=std::max(120,h-184);
- MoveWindow(resetButton,px(24),px(h-42),px(132),px(29),TRUE);MoveWindow(footer,px(174),px(h-40),px(w-198),px(29),TRUE);layoutBody();InvalidateRect(window,nullptr,FALSE);
+ MoveWindow(tabs,px(22),px(91),px(w-44),px(29),TRUE);int top=panelMode?91:129;bodyHeight=std::max(120,h-top-55);MoveWindow(body,0,px(top),r.right,px(bodyHeight),TRUE);
+ MoveWindow(resetButton,px(24),px(h-42),px(132),px(29),TRUE);MoveWindow(panelButton,px(168),px(h-42),px(142),px(29),TRUE);MoveWindow(footer,px(326),px(h-40),px(w-350),px(29),TRUE);layoutBody();InvalidateRect(window,nullptr,FALSE);
 }
 void scroll(int value){scrollY=std::clamp(value,0,std::max(0,contentHeight-bodyHeight));layoutBody();}
 void command(WPARAM w){
  if(syncing)return;
  int id=LOWORD(w),notification=HIWORD(w);
- if(id==10&&notification==BN_CLICKED){connect();return;}
+ if(id==IDCANCEL&&panelMode){setPanel(false,true);return;}
+ if(id==10&&notification==BN_CLICKED){if(panelMode)setPanel(false,true);else connect();return;}
+ if(id==13&&notification==BN_CLICKED){setPanel(!panelMode);return;}
  if(id==11&&notification==BN_CLICKED){Settings defaults;if(page==0){for(int i=0;i<9;i++)settings.*fields[i].member=defaults.*fields[i].member;settings.preserve=defaults.preserve;settings.aim=defaults.aim;}else{for(int i=9;i<13;i++)settings.*fields[i].member=defaults.*fields[i].member;}syncControls();push();return;}
  if(id>=200&&id<205&&notification==BN_CLICKED){auto& f=flags[id-200];settings.*f.member=SendMessageW(f.control,BM_GETCHECK,0,0)==BST_CHECKED;syncControls();push();return;}
- if(id==206&&notification==CBN_SELCHANGE){settings.player=static_cast<uint32_t>(SendMessageW(playerCombo,CB_GETCURSEL,0,0));push();return;}
+ if(id==206&&notification==CBN_SELCHANGE){auto index=SendMessageW(playerCombo,CB_GETCURSEL,0,0);if(index!=CB_ERR){settings.player=static_cast<uint32_t>(SendMessageW(playerCombo,CB_GETITEMDATA,index,0));push();refreshPlayers();}return;}
  if((id==207||id==208)&&notification==CBN_SELCHANGE){int value=static_cast<int>(SendMessageW(id==207?cameraKeyCombo:inputKeyCombo,CB_GETCURSEL,0,0));(id==207?cameraKey:inputKey)=value?VK_F1+value-1:0;shortcuts();pendingSave=true;SetTimer(window,2,350,nullptr);return;}
  if(id>=1000&&id<1000+int(fields.size())*3){int index=(id-1000)/3,kind=(id-1000)%3;auto& f=fields[index];
   if(kind==2&&notification==BN_CLICKED){Settings defaults;settings.*f.member=defaults.*f.member;syncControls();push();}
@@ -230,28 +274,45 @@ void report(){
  auto detail=shared&&shared->error[0]?std::wstring(shared->error):message;
  int bytes=WideCharToMultiByte(CP_UTF8,0,detail.c_str(),-1,nullptr,0,nullptr,nullptr);std::string utf8(bytes,'\0');WideCharToMultiByte(CP_UTF8,0,detail.c_str(),-1,utf8.data(),bytes,nullptr,nullptr);utf8.pop_back();
  // Status text contains no control characters; quoted escapes quotes and backslashes.
- std::ofstream out(reportPath);out<<"{\"connected\":"<<(shared&&shared->state==2?"true":"false")<<",\"state\":"<<(shared?shared->state:0)<<",\"status\":"<<std::quoted(utf8)<<",\"capabilities\":"<<(shared?shared->capabilities:0)<<",\"source\":"<<snapshot.source<<",\"actions\":"<<snapshot.actions<<",\"steer\":"<<snapshot.steer<<",\"accel\":"<<snapshot.accel<<",\"originalFov\":"<<snapshot.originalFov<<",\"appliedFov\":"<<snapshot.appliedFov<<",\"liveCalls\":"<<snapshot.liveCalls<<",\"ghostCalls\":"<<snapshot.ghostCalls<<",\"cameraCalls\":"<<snapshot.cameraCalls<<",\"faults\":"<<snapshot.faults<<"}";
+ std::ofstream out(reportPath);out<<"{\"connected\":"<<(shared&&shared->state==2?"true":"false")<<",\"state\":"<<(shared?shared->state:0)<<",\"status\":"<<std::quoted(utf8)<<",\"capabilities\":"<<(shared?shared->capabilities:0)<<",\"requestedPlayer\":"<<settings.player<<",\"activePlayer\":"<<snapshot.player<<",\"localPlayers\":"<<snapshot.localPlayers<<",\"source\":"<<snapshot.source<<",\"actions\":"<<snapshot.actions<<",\"steer\":"<<snapshot.steer<<",\"accel\":"<<snapshot.accel<<",\"originalFov\":"<<snapshot.originalFov<<",\"appliedFov\":"<<snapshot.appliedFov<<",\"liveCalls\":"<<snapshot.liveCalls<<",\"ghostCalls\":"<<snapshot.ghostCalls<<",\"cameraCalls\":"<<snapshot.cameraCalls<<",\"faults\":"<<snapshot.faults<<"}";
 }
 void tick(){
  if(shared){InterlockedExchange64(&shared->heartbeat,GetTickCount64());
   if(gameHandle&&WaitForSingleObject(gameHandle,0)==WAIT_OBJECT_0){report();disconnect();status(L"Game closed. Open it and connect again.");}
   else if(shared->state==-1){std::wstring error=shared->error;report();disconnect();status(error);}
-  else if(shared->state==2){readSnapshot();
+  else if(shared->state==2){readSnapshot();refreshPlayers();EnableWindow(panelButton,TRUE);
    if(shared->error[0])status(shared->error);
-   else status(snapshot.cameraTick&&GetTickCount64()-snapshot.cameraTick<1000?L"Connected · Racing camera ready":L"Connected · Waiting for a race or replay");
+   else if(snapshot.player<6){
+    auto actual=L"Player "+std::to_wstring(snapshot.player+1);
+    if(settings.player<6&&settings.player!=snapshot.player)status(L"Player "+std::to_wstring(settings.player+1)+L" is not active · using "+actual);
+    else status(L"Connected · "+actual+(snapshot.cameraTick&&GetTickCount64()-snapshot.cameraTick<1000?L" · Racing camera ready":L" · Waiting for racing camera"));
+   }else status(snapshot.source==Ghost?L"Connected · Recorded ghost inputs":L"Connected · Waiting for a local racer");
    if(preview&&lastSnapshot!=snapshot.sampleTick){lastSnapshot=snapshot.sampleTick;InvalidateRect(preview,nullptr,FALSE);}}
   else if(GetTickCount64()-connectStarted>10000){report();disconnect();status(L"The game did not respond. Return to its menu and reconnect.");}
  }
+ if(panelMode){bool focused=appOrGameFocused();if(!focused&&!panelSuspended){ShowWindow(window,SW_HIDE);panelSuspended=true;}else if(focused&&panelSuspended){ShowWindow(window,SW_SHOWNOACTIVATE);panelSuspended=false;}}
  updateOverlay();
  if(!reportPath.empty()&&GetTickCount64()-lastReport>=1000){lastReport=GetTickCount64();report();}
  if(probe&&GetTickCount64()-probeStart>12000){report();DestroyWindow(window);}
 }
 LRESULT CALLBACK previewProc(HWND h,UINT m,WPARAM w,LPARAM l){if(m==WM_PAINT){PAINTSTRUCT p;HDC dc=BeginPaint(h,&p);Gdiplus::Graphics g(dc);RECT r;GetClientRect(h,&r);g.ScaleTransform(r.right/400.f,r.bottom/126.f);drawHud(g,true);EndPaint(h,&p);return 0;}return DefWindowProcW(h,m,w,l);}
 LRESULT CALLBACK bodyProc(HWND h,UINT m,WPARAM w,LPARAM l){
- if(m==WM_COMMAND||m==WM_HSCROLL||m==WM_CTLCOLORSTATIC||m==WM_CTLCOLOREDIT||m==WM_CTLCOLORBTN)return SendMessageW(window,m,w,l);
+ if(m==WM_COMMAND||m==WM_HSCROLL||m==WM_DRAWITEM||m==WM_CTLCOLORSTATIC||m==WM_CTLCOLOREDIT||m==WM_CTLCOLORBTN)return SendMessageW(window,m,w,l);
  if(m==WM_VSCROLL){int target=scrollY;switch(LOWORD(w)){case SB_LINEUP:target-=30;break;case SB_LINEDOWN:target+=30;break;case SB_PAGEUP:target-=bodyHeight;break;case SB_PAGEDOWN:target+=bodyHeight;break;case SB_THUMBTRACK:case SB_THUMBPOSITION:{SCROLLINFO i{sizeof(i),SIF_TRACKPOS};GetScrollInfo(h,SB_VERT,&i);target=i.nTrackPos;break;}}scroll(target);return 0;}
  if(m==WM_MOUSEWHEEL){scroll(scrollY-GET_WHEEL_DELTA_WPARAM(w)/WHEEL_DELTA*80);return 0;}
  if(m==WM_ERASEBKGND){RECT r;GetClientRect(h,&r);FillRect(reinterpret_cast<HDC>(w),&r,background);return 1;}return DefWindowProcW(h,m,w,l);
+}
+LRESULT CALLBACK checkProc(HWND h,UINT m,WPARAM w,LPARAM l,UINT_PTR,DWORD_PTR){
+ if(panelMode&&m==WM_ERASEBKGND)return 1;
+ if(panelMode&&m==WM_PAINT){
+  PAINTSTRUCT paint;auto dc=BeginPaint(h,&paint);RECT area;GetClientRect(h,&area);FillRect(dc,&area,background);
+  int size=px(14),top=(area.bottom-size)/2;RECT box{0,top,size,top+size};bool checked=SendMessageW(h,BM_GETCHECK,0,0)==BST_CHECKED;
+  auto fill=CreateSolidBrush(checked?RGB(255,184,92):RGB(43,47,40));FillRect(dc,&box,fill);DeleteObject(fill);
+  auto border=CreateSolidBrush(GetFocus()==h?RGB(255,184,92):RGB(143,151,131));FrameRect(dc,&box,border);DeleteObject(border);
+  if(checked){auto pen=CreatePen(PS_SOLID,px(2),RGB(36,31,22));auto old=SelectObject(dc,pen);MoveToEx(dc,px(3),top+px(7),nullptr);LineTo(dc,px(6),top+px(10));LineTo(dc,px(11),top+px(4));SelectObject(dc,old);DeleteObject(pen);}
+  wchar_t text[160];GetWindowTextW(h,text,160);auto old=SelectObject(dc,font);SetBkMode(dc,TRANSPARENT);SetTextColor(dc,RGB(237,241,229));area.left=px(21);DrawTextW(dc,text,-1,&area,DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);SelectObject(dc,old);EndPaint(h,&paint);return 0;
+ }
+ auto result=DefSubclassProc(h,m,w,l);if(panelMode&&(m==BM_SETCHECK||m==WM_SETFOCUS||m==WM_KILLFOCUS))InvalidateRect(h,nullptr,TRUE);return result;
 }
 LRESULT CALLBACK windowProc(HWND h,UINT m,WPARAM w,LPARAM l){
  switch(m){
@@ -261,15 +322,15 @@ LRESULT CALLBACK windowProc(HWND h,UINT m,WPARAM w,LPARAM l){
   TCITEMW item{};item.mask=TCIF_TEXT;item.pszText=const_cast<wchar_t*>(L"  Camera  ");TabCtrl_InsertItem(tabs,0,&item);item.pszText=const_cast<wchar_t*>(L"  Input viewer  ");TabCtrl_InsertItem(tabs,1,&item);
   body=CreateWindowExW(WS_EX_CONTROLPARENT,L"BobbyRaceTools.Body",L"",WS_CHILD|WS_VISIBLE|WS_VSCROLL|WS_CLIPCHILDREN,0,0,1,1,h,nullptr,instance,nullptr);
   for(int i=0;i<int(fields.size());i++){auto& f=fields[i];f.labelWindow=child(L"STATIC",f.label,0,body);f.slider=child(TRACKBAR_CLASSW,L"",TBS_NOTICKS|WS_TABSTOP,body,1000+i*3);SendMessageW(f.slider,TBM_SETRANGE,TRUE,MAKELPARAM(0,1000));f.edit=child(L"EDIT",L"",WS_TABSTOP|WS_BORDER|ES_RIGHT|ES_AUTOHSCROLL,body,1001+i*3);SendMessageW(f.edit,EM_SETLIMITTEXT,24,0);f.reset=child(L"BUTTON",L"↺",WS_TABSTOP|BS_PUSHBUTTON,body,1002+i*3);}
-  for(int i=0;i<int(flags.size());i++)flags[i].control=child(L"BUTTON",flags[i].label,BS_AUTOCHECKBOX|WS_TABSTOP,body,200+i);
+  for(int i=0;i<int(flags.size());i++){flags[i].control=child(L"BUTTON",flags[i].label,BS_AUTOCHECKBOX|WS_TABSTOP,body,200+i);SetWindowSubclass(flags[i].control,checkProc,1,0);}
   groupA=child(L"STATIC",L"",0,body);groupB=child(L"STATIC",L"",0,body);for(auto label:{groupA,groupB})SendMessageW(label,WM_SETFONT,reinterpret_cast<WPARAM>(headingFont),TRUE);
   preview=CreateWindowExW(0,L"BobbyRaceTools.Preview",L"",WS_CHILD|WS_VISIBLE,0,0,400,126,body,nullptr,instance,nullptr);
-  playerLabel=child(L"STATIC",L"Local player",0,body);playerCombo=child(L"COMBOBOX",L"",CBS_DROPDOWNLIST|WS_VSCROLL|WS_TABSTOP,body,206);for(int i=1;i<=6;i++){std::wstring s=L"Player "+std::to_wstring(i);SendMessageW(playerCombo,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(s.c_str()));}
+  playerLabel=child(L"STATIC",L"Local player",0,body);playerCombo=child(L"COMBOBOX",L"",CBS_DROPDOWNLIST|WS_VSCROLL|WS_TABSTOP,body,206);refreshPlayers();
   shortcutsLabel=child(L"STATIC",L"Shortcuts",0,body);cameraKeyLabel=child(L"STATIC",L"Camera window",0,body);inputKeyLabel=child(L"STATIC",L"Inputs",0,body);cameraKeyCombo=child(L"COMBOBOX",L"",CBS_DROPDOWNLIST|WS_VSCROLL|WS_TABSTOP,body,207);inputKeyCombo=child(L"COMBOBOX",L"",CBS_DROPDOWNLIST|WS_VSCROLL|WS_TABSTOP,body,208);
   for(auto combo:{cameraKeyCombo,inputKeyCombo}){SendMessageW(combo,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"None"));for(int i=1;i<=12;i++){std::wstring s=L"F"+std::to_wstring(i);SendMessageW(combo,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(s.c_str()));}}
   SendMessageW(cameraKeyCombo,CB_SETCURSEL,cameraKey?cameraKey-VK_F1+1:0,0);SendMessageW(inputKeyCombo,CB_SETCURSEL,inputKey?inputKey-VK_F1+1:0,0);
   sourceNote=child(L"STATIC",L"Your inputs take priority over opponent ghosts.",0,body);
-  resetButton=child(L"BUTTON",L"Reset framing",WS_TABSTOP|BS_PUSHBUTTON,h,11);footer=child(L"STATIC",L"Changes save automatically.",0,h);
+  resetButton=child(L"BUTTON",L"Reset framing",WS_TABSTOP|BS_PUSHBUTTON,h,11);panelButton=child(L"BUTTON",L"Over game · F8",WS_TABSTOP|BS_PUSHBUTTON,h,13);EnableWindow(panelButton,FALSE);footer=child(L"STATIC",L"Changes save automatically.",0,h);
   syncControls();shortcuts();SetTimer(h,1,100,nullptr);return 0;
  }
  case WM_SIZE:if(body)resize();return 0;
@@ -278,12 +339,20 @@ LRESULT CALLBACK windowProc(HWND h,UINT m,WPARAM w,LPARAM l){
  case WM_COMMAND:command(w);return 0;
  case WM_HSCROLL:{HWND source=reinterpret_cast<HWND>(l);for(auto& f:fields)if(f.slider==source){settings.*f.member=f.low+(f.high-f.low)*static_cast<float>(SendMessageW(source,TBM_GETPOS,0,0))/1000;setText(f.edit,number(settings.*f.member));push();break;}return 0;}
  case WM_NOTIFY:if(reinterpret_cast<NMHDR*>(l)->hwndFrom==tabs&&reinterpret_cast<NMHDR*>(l)->code==TCN_SELCHANGE){page=TabCtrl_GetCurSel(tabs);scrollY=0;setText(resetButton,page?L"Reset layout":L"Reset framing");layoutBody();}return 0;
- case WM_CTLCOLORSTATIC:case WM_CTLCOLORBTN:SetTextColor(reinterpret_cast<HDC>(w),RGB(38,43,37));SetBkColor(reinterpret_cast<HDC>(w),RGB(247,246,242));return reinterpret_cast<LRESULT>(background);
- case WM_CTLCOLOREDIT:SetTextColor(reinterpret_cast<HDC>(w),RGB(38,43,37));SetBkColor(reinterpret_cast<HDC>(w),RGB(255,254,250));return reinterpret_cast<LRESULT>(GetSysColorBrush(COLOR_WINDOW));
+ case WM_CTLCOLORSTATIC:case WM_CTLCOLORBTN:SetTextColor(reinterpret_cast<HDC>(w),reinterpret_cast<HWND>(l)==fields[4].labelWindow&&!settings.aim?RGB(136,142,129):panelMode?RGB(237,241,229):RGB(38,43,37));SetBkColor(reinterpret_cast<HDC>(w),panelMode?RGB(25,28,25):RGB(247,246,242));return reinterpret_cast<LRESULT>(background);
+ case WM_CTLCOLOREDIT:SetTextColor(reinterpret_cast<HDC>(w),panelMode?RGB(237,241,229):RGB(38,43,37));SetBkColor(reinterpret_cast<HDC>(w),panelMode?RGB(43,47,40):RGB(255,254,250));return reinterpret_cast<LRESULT>(panelMode?panelEdit:GetSysColorBrush(COLOR_WINDOW));
+ case WM_DRAWITEM:{auto draw=reinterpret_cast<DRAWITEMSTRUCT*>(l);if(draw->CtlType!=ODT_BUTTON)break;
+  bool disabled=(draw->itemState&ODS_DISABLED)!=0,pressed=(draw->itemState&ODS_SELECTED)!=0,primary=draw->CtlID==10&&!disabled;
+  COLORREF fill=primary?RGB(255,184,92):panelMode?(pressed?RGB(62,67,57):RGB(43,47,40)):(pressed?RGB(226,226,219):RGB(252,251,248));
+  auto brush=CreateSolidBrush(fill);FillRect(draw->hDC,&draw->rcItem,brush);DeleteObject(brush);
+  auto border=CreateSolidBrush((draw->itemState&ODS_FOCUS)?RGB(199,131,48):panelMode?RGB(75,82,69):RGB(196,198,190));FrameRect(draw->hDC,&draw->rcItem,border);DeleteObject(border);
+  SetBkMode(draw->hDC,TRANSPARENT);SetTextColor(draw->hDC,disabled?RGB(136,142,129):primary?RGB(36,31,22):panelMode?RGB(237,241,229):RGB(38,43,37));
+  auto previous=SelectObject(draw->hDC,font);wchar_t text[128];GetWindowTextW(draw->hwndItem,text,128);DrawTextW(draw->hDC,text,-1,&draw->rcItem,DT_CENTER|DT_VCENTER|DT_SINGLELINE);SelectObject(draw->hDC,previous);return TRUE;}
  case WM_ERASEBKGND:{RECT r;GetClientRect(h,&r);FillRect(reinterpret_cast<HDC>(w),&r,background);return 1;}
  case WM_TIMER:if(w==1)tick();else if(w==2){KillTimer(h,2);pendingSave=false;setText(footer,saveSettings()?L"Saved":L"Could not save settings. Check folder permissions.");}return 0;
- case WM_HOTKEY:if(GetForegroundWindow()==gameWindow||GetForegroundWindow()==window){if(w==2){settings.viewer=!settings.viewer;syncControls();push();}else if(GetForegroundWindow()==window&&!IsIconic(window)){ShowWindow(window,SW_MINIMIZE);if(gameWindow)SetForegroundWindow(gameWindow);}else{page=0;TabCtrl_SetCurSel(tabs,0);scrollY=0;setText(resetButton,L"Reset framing");layoutBody();ShowWindow(window,SW_RESTORE);SetForegroundWindow(window);}}return 0;
- case WM_CLOSE:DestroyWindow(h);return 0;
+ case WM_HOTKEY:if(appOrGameFocused()){if(w==2){settings.viewer=!settings.viewer;syncControls();push();}else setPanel(!panelMode,panelMode);}return 0;
+ case WM_KEYDOWN:if(w==VK_ESCAPE&&panelMode){setPanel(false,true);return 0;}break;
+ case WM_CLOSE:if(panelMode)setPanel(false,true);else DestroyWindow(h);return 0;
  case WM_DESTROY:closing=true;if(pendingSave)saveSettings();disconnect();UnregisterHotKey(h,1);UnregisterHotKey(h,2);PostQuitMessage(0);return 0;
  }
  return DefWindowProcW(h,m,w,l);
@@ -298,7 +367,7 @@ int WINAPI wWinMain(HINSTANCE app,HINSTANCE,PWSTR,int showCommand){
  HANDLE single=CreateMutexW(nullptr,FALSE,L"Local\\BobbyRaceTools.Desktop.v1");if(GetLastError()==ERROR_ALREADY_EXISTS&&!probe){auto old=FindWindowW(ClassName,nullptr);if(old){ShowWindow(old,SW_RESTORE);SetForegroundWindow(old);}if(single)CloseHandle(single);return 0;}
  try{
   loadSettings();INITCOMMONCONTROLSEX controls{sizeof(controls),ICC_STANDARD_CLASSES|ICC_BAR_CLASSES|ICC_TAB_CLASSES};InitCommonControlsEx(&controls);
-  Gdiplus::GdiplusStartupInput input;Gdiplus::GdiplusStartup(&gdiplusToken,&input,nullptr);background=CreateSolidBrush(RGB(247,246,242));
+  Gdiplus::GdiplusStartupInput input;Gdiplus::GdiplusStartup(&gdiplusToken,&input,nullptr);paper=CreateSolidBrush(RGB(247,246,242));panelBackground=CreateSolidBrush(RGB(25,28,25));panelEdit=CreateSolidBrush(RGB(43,47,40));background=paper;
   WNDCLASSEXW cls{sizeof(cls)};cls.hInstance=instance;cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);cls.hIcon=LoadIconW(nullptr,IDI_APPLICATION);cls.hbrBackground=background;cls.lpfnWndProc=windowProc;cls.lpszClassName=ClassName;RegisterClassExW(&cls);
   cls.lpfnWndProc=bodyProc;cls.lpszClassName=L"BobbyRaceTools.Body";RegisterClassExW(&cls);cls.lpfnWndProc=previewProc;cls.lpszClassName=L"BobbyRaceTools.Preview";RegisterClassExW(&cls);
   cls.lpfnWndProc=DefWindowProcW;cls.lpszClassName=L"BobbyRaceTools.Overlay";cls.hbrBackground=nullptr;RegisterClassExW(&cls);
@@ -307,6 +376,6 @@ int WINAPI wWinMain(HINSTANCE app,HINSTANCE,PWSTR,int showCommand){
   if(!window)throw std::runtime_error("Cannot create the application window.");
   if(!probe)ShowWindow(window,offline?SW_SHOWNOACTIVATE:showCommand);else{settings.camera=0;settings.viewer=1;probeStart=GetTickCount64();connect();}
   MSG msg;while(GetMessageW(&msg,nullptr,0,0)>0){if(!IsDialogMessageW(window,&msg)){TranslateMessage(&msg);DispatchMessageW(&msg);}}
-  hudTitle.reset();hudSmall.reset();hudButton.reset();Gdiplus::GdiplusShutdown(gdiplusToken);DeleteObject(font);DeleteObject(headingFont);DeleteObject(titleFont);DeleteObject(background);if(single)CloseHandle(single);return 0;
+  hudTitle.reset();hudSmall.reset();hudButton.reset();Gdiplus::GdiplusShutdown(gdiplusToken);DeleteObject(font);DeleteObject(headingFont);DeleteObject(titleFont);DeleteObject(paper);DeleteObject(panelBackground);DeleteObject(panelEdit);if(single)CloseHandle(single);return 0;
  }catch(const std::exception& e){std::string s=e.what();std::wstring w(s.begin(),s.end());MessageBoxW(nullptr,w.c_str(),L"Bobby's Race Tools",MB_ICONERROR);if(single)CloseHandle(single);return 1;}
 }

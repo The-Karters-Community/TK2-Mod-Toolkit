@@ -1,9 +1,11 @@
 # Standalone input viewer and camera controls
 
 `standalone/` implements **Bobby's Race Tools**, a native Windows x64 application
-containing the Gamepad viewer and Camera setup. Build with
+containing the Gamepad viewer and Camera setup. F8 opens a compact interactive
+camera panel above the game; this is an external Windows overlay, not injected
+game UI. It targets windowed/borderless play like the input HUD. Build with
 `python standalone/build.py`; the output is `artifacts/BobbyRaceTools`.
-The first implementation is approximately 580 KiB including its embedded bridge
+The current implementation is approximately 586 KiB including its embedded bridge
 and statically linked C++ runtime. No BepInEx, Python, .NET or WebView is required
 on the player's PC. The main Toolkit remains separate and unchanged.
 
@@ -12,6 +14,10 @@ on the player's PC. The main Toolkit remains separate and unchanged.
 - Win32 controls, GDI+ click-through overlay, individual resets, portable INI
   settings and configurable F8/F9 shortcuts. Controls stack and scroll on narrow
   windows; display scaling recreates fonts as well as resizing controls.
+- Automatic local-player detection is the default. Input/camera callbacks observe
+  only local human slots in a bounded six-entry timestamp table. A saved inactive
+  slot falls back to the first active local racer, with explicit status. The
+  selector is available on both pages and lists current local players.
 - Explicit Connect loads an authored DLL through a thread-scoped Windows message
   hook. The bridge is SHA-256 verified in a versioned temporary cache. A bounded,
   current-owner shared mapping carries settings and snapshots; no network server.
@@ -81,3 +87,37 @@ records compilation and core tests only; live checks above are separate evidence
 Standalone ghost playback, split-screen, actual controller remapping and a timed
 performance comparison have not yet been verified. No claim of zero frame cost
 or universal future-build compatibility is made.
+
+
+## 0.1.1 player-selection regression and camera overlay
+
+The user reported responsive controls with no effect, persisting after restarting
+the app. There was no corresponding application crash event. The saved setting
+was local slot 2 (Player 3); the current race had only local slot 0 (Player 1).
+The unmodified executable connected with all three capabilities but recorded zero
+input and camera callbacks for that selection. Running the same bridge against
+Player 1 immediately recorded 737 live samples and 1,441 camera callbacks.
+This establishes a selection error, not a timed bridge/process failure.
+
+The corrected executable was tested with the same saved Player 3 setting. It
+reported `Player 3 is not active · using Player 1`, active mask 1, and resumed
+input/camera snapshots without restarting the game. Automatic selection is the
+new default; explicit active split-screen selections remain available. Regression
+assertions cover missing slots, valid explicit selection, no local player and
+expiry across scene/player changes.
+
+F8 now restyles the existing controls into a dark tool window within the game
+viewport, with independent resets, Back to game and Desktop actions. It hides
+while another application has focus. Closing the panel does not disconnect or
+exit the application. No extra game hook, renderer hook or BepInEx dependency is
+introduced for this UI. Checkboxes and disabled labels have explicit contrasting
+colors in the dark panel.
+
+Live checks passed saved-slot fallback, switching to Automatic, FOV 75 -> 80 ->
+75, three disconnect/reconnect cycles, panel close/reopen from a minimized
+window, desktop/panel transitions and continued updates during a longer session,
+all with zero reported bridge faults. The user also confirmed the F8 camera
+panel appears over the game. The Toolkit's two equivalent modules were
+already disabled in this session. Test diagnostics and captures remain in ignored
+`local/standalone-*`. The user's FOV and other preferences were preserved; their
+local-player selection was switched to Automatic. No game files were changed.

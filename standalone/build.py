@@ -42,7 +42,7 @@ batch = BUILD / "build.cmd"
 batch.write_text("\n".join(commands) + "\n", encoding="utf-8")
 subprocess.run(["cmd.exe", "/d", "/c", str(batch)], cwd=BUILD, check=True)
 exe = OUTPUT / "BobbyRaceTools.exe"
-receipt = {"version": "0.1.0", "executable": exe.name, "bytes": exe.stat().st_size,
+receipt = {"version": "0.1.1", "executable": exe.name, "bytes": exe.stat().st_size,
            "sha256": hashlib.sha256(exe.read_bytes()).hexdigest(),
            "bridgeBytes": (BUILD / "Bridge.dll").stat().st_size,
            "dependencies": "Windows system libraries only; embedded bridge; static C++ runtime",

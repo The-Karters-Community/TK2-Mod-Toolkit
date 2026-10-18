@@ -1,10 +1,25 @@
 #pragma once
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 
 namespace race {
-constexpr uint32_t Magic = 0x42525431, Version = 1;
+constexpr uint32_t Magic = 0x42525431, Version = 2, AutomaticPlayer = 6;
+inline uint32_t choosePlayer(uint32_t requested,uint32_t available) {
+ available&=63;
+ if(requested<6&&(available&(1u<<requested)))return requested;
+ for(uint32_t i=0;i<6;i++)if(available&(1u<<i))return i;
+ return AutomaticPlayer;
+}
+struct LocalPlayers {
+ std::array<uint64_t,6> seen{};
+ void observe(uint32_t slot,uint64_t now){if(slot<6)seen[slot]=now;}
+ uint32_t mask(uint64_t now) const {
+  uint32_t result{};for(uint32_t i=0;i<6;i++)if(seen[i]&&now>=seen[i]&&now-seen[i]<1000)result|=1u<<i;
+  return result;
+ }
+};
 struct Vec3 { float x{}, y{}, z{}; };
 struct Quat { float x{}, y{}, z{}, w{1}; };
 inline Vec3 operator+(Vec3 a, Vec3 b) { return {a.x+b.x,a.y+b.y,a.z+b.z}; }
@@ -33,13 +48,13 @@ inline Quat look(Vec3 forward, Quat fallback) {
  return q;
 }
 struct Settings {
- uint32_t camera{}, preserve{1}, aim{}, viewer{1}, ghosts{1}, player{};
+ uint32_t camera{}, preserve{1}, aim{}, viewer{1}, ghosts{1}, player{AutomaticPlayer};
  float fov{65},distance{1},height{},side{},target{.5f},pitch{},yaw{},roll{},smoothing{.12f};
  float overlayX{50},overlayY{0},overlayScale{1},opacity{.92f};
 };
 inline float bound(float v,float lo,float hi,float fallback) {return std::isfinite(v)?std::clamp(v,lo,hi):fallback;}
 inline Settings sanitize(Settings s) {
- s.camera=!!s.camera;s.preserve=!!s.preserve;s.aim=!!s.aim;s.viewer=!!s.viewer;s.ghosts=!!s.ghosts;s.player=std::min(s.player,5u);
+ s.camera=!!s.camera;s.preserve=!!s.preserve;s.aim=!!s.aim;s.viewer=!!s.viewer;s.ghosts=!!s.ghosts;s.player=std::min(s.player,AutomaticPlayer);
  s.fov=bound(s.fov,35,110,65);s.distance=bound(s.distance,.25f,4,1);s.height=bound(s.height,-5,8,0);s.side=bound(s.side,-4,4,0);
  s.target=bound(s.target,-1,3,.5f);s.pitch=bound(s.pitch,-45,45,0);s.yaw=bound(s.yaw,-90,90,0);s.roll=bound(s.roll,-30,30,0);
  s.smoothing=bound(s.smoothing,0,2,.12f);s.overlayX=bound(s.overlayX,0,100,50);s.overlayY=bound(s.overlayY,0,100,0);
@@ -60,7 +75,7 @@ enum Action:uint32_t { Accelerate=1,Brake=2,Reverse=4,Drift=8,Boost=16,Weapon=32
 inline bool useGhost(bool hasLive,bool localReplay,bool playing,bool enabled) {return playing&&enabled&&(!hasLive||localReplay);}
 struct Snapshot {
  uint64_t sampleTick{},cameraTick{};
- uint32_t source{},actions{},player{},faults{};
+ uint32_t source{},actions{},player{AutomaticPlayer},faults{},localPlayers{};
  float steer{},accel{},originalFov{},appliedFov{};
  Vec3 nativePosition{},appliedPosition{};
  uint32_t liveCalls{},ghostCalls{},cameraCalls{};
