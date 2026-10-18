@@ -9,11 +9,19 @@ The Karters 2 Turbo Charged. No BepInEx, .NET, Python, or browser runtime requir
 2. Click **Connect**. **Automatic** finds your active local player.
 3. Enable **Camera overrides** to adjust framing. Each value has its own reset.
 
-**F8** opens Camera over the game in windowed/borderless mode. Press F8 again
-or **Back to game** to close the panel while keeping the app connected. **Desktop**
-returns to the full settings window. **F9** toggles the input overlay. Change
-either shortcut in Input viewer. Settings save automatically beside the executable;
-read-only installations use `%LOCALAPPDATA%\BobbyRaceTools` instead.
+**F8** shows or hides Camera inside the game, including fullscreen. The desktop
+app stays available in the taskbar and Alt+Tab. You can keep driving with the panel
+visible and adjust values with the mouse.
+
+Press **Ctrl+Tab**, controller **View/Back**, or select **Keyboard / controller
+editing** to navigate the panel instead of driving. Tab/arrows or D-pad/stick move
+between controls; A selects a slider, the D-pad adjusts it, and Y resets it. **B**, **Esc**,
+Ctrl+Tab or View returns control to the race while leaving the panel visible.
+Driving inputs are held neutral only during this explicit editing mode.
+
+**F9** toggles the input viewer. Change either shortcut in Input viewer.
+Settings save automatically beside the executable; read-only installations use
+`%LOCALAPPDATA%\BobbyRaceTools` instead.
 
 The local player selector is visible on both settings pages. It lists active
 local racers. If a saved player is no longer active, the app uses the first
@@ -24,14 +32,15 @@ or closing the app returns control to the game. Inputs follow the game's mapped
 keyboard/controller actions. Your inputs take priority when racing opponent ghosts;
 recorded input viewing is optional.
 
-Use windowed or borderless mode for the overlay. Exclusive fullscreen is not
-supported by the external overlay. Do not enable the Toolkit's Camera and
-Gamepad viewer at the same time as these standalone equivalents.
+The input viewer and Camera panel are drawn by the game's Direct3D 11 renderer.
+They follow its window, resolution and fullscreen mode. The equivalent Toolkit
+Camera and Gamepad viewer should be disabled when using Race Tools.
 
 ## Compatibility
 
-Windows 10/11 x64. Tested in a local race on game **0.1.4.24** with BepInEx
-disabled: connection, live input HUD, camera changes and immediate camera restore.
+Windows 10/11 x64, Direct3D 11. Connection, live inputs and camera changes were
+verified on game **0.1.4.24** with BepInEx disabled. Fullscreen rendering uses
+the same in-game back buffer as the race.
 Replay source selection has regression coverage, but a standalone ghost session
 has not yet been tested. The two programs should run with the same permissions.
 
@@ -61,5 +70,5 @@ embedded. Only Windows system DLLs are required. Build records and intermediates
 stay under ignored `artifacts/` and `local/`.
 
 Implementation evidence is in `docs/STANDALONE-PRESENTATION.md` in the source
-repository. MinHook's license and provenance are in
-[THIRD-PARTY.txt](THIRD-PARTY.txt) and [MinHook-LICENSE.txt](MinHook-LICENSE.txt).
+repository. Open-source notices are in [THIRD-PARTY.txt](THIRD-PARTY.txt),
+[MinHook-LICENSE.txt](MinHook-LICENSE.txt) and [ImGui-LICENSE.txt](ImGui-LICENSE.txt).

@@ -1,5 +1,6 @@
 #include "Runtime.h"
 #include "Core.h"
+#include "Renderer.h"
 #include "vendor/minhook/include/MinHook.h"
 #include <array>
 
@@ -8,6 +9,7 @@ namespace {
 HMODULE self{}; Runtime rt;
 Shared* shared{}; HANDLE mapping{};
 DWORD unityThread{}; bool initialized{};
+HWND gameWindow{};
 bool cameraFault{},inputFault{},replayFault{};
 Settings settings; Snapshot snapshot;
 LocalPlayers players;
@@ -29,6 +31,34 @@ bool inputPlayerReplay{};uint64_t liveTick{},ghostSeen{},jumpUntil{},boostUntil{
 uint32_t capabilities{};
 struct Frame {void* camera{};void* player{};uint64_t seen{};Settings value;};
 std::array<Frame,16> frames;
+std::array<int,9> inputButtons{};
+using GetLock=int(*)(const void*);using GetVisible=bool(*)(const void*);
+using SetLock=void(*)(int,const void*);using SetVisible=void(*)(bool,const void*);
+GetLock getLock{};GetVisible getVisible{};SetLock setLockOriginal{};SetVisible setVisibleOriginal{};
+void *getLockMethod{},*getVisibleMethod{},*setLockMethod{},*setVisibleMethod{};
+void *lockTarget{},*visibleTarget{};bool cursorManaged{},wantedVisible{};int wantedLock{};
+bool uiCapturing(){
+ if(!shared||shared->state!=2||shared->rendererState!=1||!shared->panelOpen||GetForegroundWindow()!=gameWindow)return false;
+ auto heartbeat=InterlockedCompareExchange64(&shared->heartbeat,0,0);return heartbeat&&GetTickCount64()<static_cast<uint64_t>(heartbeat)+1500;
+}
+void uiTick(){
+ if(GetCurrentThreadId()!=unityThread||!setLockOriginal||!setVisibleOriginal)return;
+ bool capture=uiCapturing();
+ if(capture&&!cursorManaged){wantedLock=getLock(getLockMethod);wantedVisible=getVisible(getVisibleMethod);cursorManaged=true;setLockOriginal(0,setLockMethod);setVisibleOriginal(false,setVisibleMethod);ClipCursor(nullptr);}
+ else if(!capture&&cursorManaged){cursorManaged=false;setLockOriginal(wantedLock,setLockMethod);setVisibleOriginal(wantedVisible,setVisibleMethod);}
+}
+void safeUiTick(){__try{uiTick();}__except(EXCEPTION_EXECUTE_HANDLER){if(shared)InterlockedExchange(reinterpret_cast<volatile LONG*>(&shared->panelOpen),0);}}
+void lockHook(int value,const void* method){wantedLock=value;setLockOriginal(cursorManaged?0:value,method);}
+void visibleHook(bool value,const void* method){wantedVisible=value;setVisibleOriginal(cursorManaged?false:value,method);}
+bool consumeInput(void* input){
+ if(!uiCapturing()||!shared->editMode)return false;
+ auto player=member<void*>(input,inputPlayer);if(!player||member<int>(player,playerType)!=localType)return false;
+ auto data=member<void*>(input,inputData);if(!data)return false;
+ *reinterpret_cast<float*>(static_cast<char*>(data)+steer)=0;*reinterpret_cast<float*>(static_cast<char*>(data)+accel)=0;
+ for(int offset:inputButtons)*reinterpret_cast<bool*>(static_cast<char*>(data)+offset)=false;
+ return true;
+}
+bool safeConsume(void* input){__try{return consumeInput(input);}__except(EXCEPTION_EXECUTE_HANDLER){if(shared)InterlockedExchange(reinterpret_cast<volatile LONG*>(&shared->panelOpen),0);return false;}}
 
 void publish() {
  if(!shared)return;
@@ -119,8 +149,8 @@ void cameraFrame(void* camera,float dt,Vec3* pos,Quat* rot,float* fov) {
 void safeInput(void* o) {if(inputFault)return;__try{sampleLive(o);}__except(EXCEPTION_EXECUTE_HANDLER){inputFault=true;fault(L"Input reading stopped. Disconnect and reconnect before retrying.");}}
 void safeReplay(void* o,void* input) {if(replayFault)return;__try{sampleReplay(o,input);}__except(EXCEPTION_EXECUTE_HANDLER){replayFault=true;fault(L"Replay input reading stopped. Reconnect before retrying.");}}
 void safeCamera(void* o,float dt,Vec3* p,Quat* q,float* f) {if(cameraFault)return;__try{cameraFrame(o,dt,p,q,f);}__except(EXCEPTION_EXECUTE_HANDLER){cameraFault=true;fault(L"Camera adjustment stopped. Disconnect and reconnect before retrying.");}}
-void cameraHook(void* o,float dt,Vec3* p,Quat* q,float* f,const void* m) {cameraOriginal(o,dt,p,q,f,m);safeCamera(o,dt,p,q,f);}
-void inputHook(void* o,const void* m) {inputOriginal(o,m);safeInput(o);}
+void cameraHook(void* o,float dt,Vec3* p,Quat* q,float* f,const void* m) {cameraOriginal(o,dt,p,q,f,m);safeUiTick();safeCamera(o,dt,p,q,f);}
+void inputHook(void* o,const void* m) {safeUiTick();if(!safeConsume(o))inputOriginal(o,m);safeInput(o);}
 // The native replay method clears click pulses after applying them to the kart.
 // Capture those recorded values before calling it; never consume or modify them.
 void replayHook(void* o,void* input,const void* m) {safeReplay(o,input);replayOriginal(o,input,m);}
@@ -145,6 +175,8 @@ void initialize() {
  try{
   auto input=rt.type("","Ant_KartInput");inputPlayer=rt.offset(input,"antPlayer",0);inputData=rt.offset(input,"inputData",0);inputRewired=rt.offset(input,"player",0);
   auto data=rt.fieldClass(input,"inputData");steer=rt.offset(data,"fTurningInput",12);accel=rt.offset(data,"fAccelInput",12);brake=rt.offset(data,"bIsBreakingInput",2);
+  const char* inputNames[]={"bJumpButton_ClickedDown","bDriftInput","bBoostInput_ClickedDown","bUseWeaponInput_ClickDown","bIsBreakingInput","bIsTargetLockUp_ClickUp","bIsTargetLockDown_ClickDown","bBackDirInputButtonDown","bWeaponPickupButtomClicked_ClickedDown"};
+  for(size_t i=0;i<inputButtons.size();i++)inputButtons[i]=rt.offset(data,inputNames[i],2);
   auto rm=rt.type("","PTK_ReplayManager");replayInstance=rt.field(rm,"Instance");staticRead=rt.api<StaticRead>("il2cpp_field_static_get_value");
   controlledMethod=rt.method(rm,"IsPlayerControlledByReplayInput",{"Ant_Player"},"System.Boolean");controlled=reinterpret_cast<ControlledFn>(rt.pointer(controlledMethod));
   auto rewired=rt.fieldClass(input,"player");buttonMethod=rt.method(rewired,"GetButton",{"System.String"},"System.Boolean");button=reinterpret_cast<ButtonFn>(rt.pointer(buttonMethod));
@@ -157,31 +189,40 @@ void initialize() {
   replayBrake=rt.offset(replay,"bIsBreakingInput_Get",2);replayJump=rt.offset(replay,"bJumpButton_Get_Click",2);replayDrift=rt.offset(replay,"bDriftInput_Get",2);replayBoost=rt.offset(replay,"bBoostInput_Get_Click",2);
   hook(rt.method(replay,"ProcessAndSetPlayerInputFromReplay",{"PTK_KartInputBase"},"System.Void"),reinterpret_cast<void*>(replayHook),reinterpret_cast<void**>(&replayOriginal),&replayTarget);capabilities|=4;
  }catch(const std::exception& e){errors+=(errors.empty()?"":"; ")+std::string("Replay: ")+e.what();}
+ try{
+  if(!(capabilities&2))throw std::runtime_error("Local input routing is unavailable.");
+  auto cursor=rt.type("UnityEngine","Cursor");getLockMethod=rt.method(cursor,"get_lockState",{},"UnityEngine.CursorLockMode");getLock=reinterpret_cast<GetLock>(rt.pointer(getLockMethod));
+  getVisibleMethod=rt.method(cursor,"get_visible",{},"System.Boolean");getVisible=reinterpret_cast<GetVisible>(rt.pointer(getVisibleMethod));
+  setLockMethod=rt.method(cursor,"set_lockState",{"UnityEngine.CursorLockMode"},"System.Void");setVisibleMethod=rt.method(cursor,"set_visible",{"System.Boolean"},"System.Void");
+  hook(setLockMethod,reinterpret_cast<void*>(lockHook),reinterpret_cast<void**>(&setLockOriginal),&lockTarget);hook(setVisibleMethod,reinterpret_cast<void*>(visibleHook),reinterpret_cast<void**>(&setVisibleOriginal),&visibleTarget);
+  gameui::install(gameWindow,safeUiTick);capabilities|=8;
+ }catch(const std::exception& e){errors+=(errors.empty()?"":"; ")+std::string("Game controls: ")+e.what();}
  if(!capabilities)throw std::runtime_error(errors);
  auto enabled=MH_ApplyQueued();if(enabled!=MH_OK)throw std::runtime_error(std::string("Native hooks could not start: ")+MH_StatusToString(enabled));
  initialized=true;
  if(!errors.empty())MultiByteToWideChar(CP_UTF8,0,errors.c_str(),-1,shared->error,256);
 }
-void connect(Shared* request,HANDLE handle) {
+void connect(Shared* request,HANDLE handle,HWND window) {
  if(request->magic!=Magic||request->version!=Version||request->size!=sizeof(Shared)){UnmapViewOfFile(request);CloseHandle(handle);return;}
  if(shared&&shared->hostPid!=request->hostPid&&shared->heartbeat&&GetTickCount64()<static_cast<uint64_t>(shared->heartbeat)+1500){wcscpy_s(request->error,L"Another Race Tools window is already connected.");InterlockedExchange(reinterpret_cast<volatile LONG*>(&request->state),-1);UnmapViewOfFile(request);CloseHandle(handle);return;}
  HMODULE pinned{};GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,reinterpret_cast<LPCWSTR>(&connect),&pinned);
+ if(cursorManaged){cursorManaged=false;setLockOriginal(wantedLock,setLockMethod);setVisibleOriginal(wantedVisible,setVisibleMethod);}
  if(shared){UnmapViewOfFile(shared);CloseHandle(mapping);}
- shared=request;mapping=handle;unityThread=GetCurrentThreadId();settings=sanitize(shared->settings);snapshot={};cameraFault=inputFault=replayFault=false;
+ cursorManaged=false;shared=request;mapping=handle;gameWindow=window;unityThread=GetCurrentThreadId();settings=sanitize(shared->settings);snapshot={};cameraFault=inputFault=replayFault=false;
  players={};for(auto& frame:frames)frame={};liveTick=ghostSeen=jumpUntil=boostUntil=0;ghostIdentity=nullptr;inputPlayerReplay=false;
- try{if(!initialized)initialize();shared->capabilities=capabilities;InterlockedExchange(reinterpret_cast<volatile LONG*>(&shared->state),2);}
+ try{if(!initialized)initialize();if(capabilities&8)gameui::bind(handle);shared->capabilities=capabilities;InterlockedExchange(reinterpret_cast<volatile LONG*>(&shared->state),2);}
  catch(const std::exception& e){MultiByteToWideChar(CP_UTF8,0,e.what(),-1,shared->error,256);InterlockedExchange(reinterpret_cast<volatile LONG*>(&shared->state),-1);}
 }
-void safeConnect(Shared* request,HANDLE handle) {__try{connect(request,handle);}__except(EXCEPTION_EXECUTE_HANDLER){wcscpy_s(request->error,L"The runtime contract could not be initialized.");InterlockedExchange(reinterpret_cast<volatile LONG*>(&request->state),-1);}}
+void safeConnect(Shared* request,HANDLE handle,HWND window) {__try{connect(request,handle,window);}__except(EXCEPTION_EXECUTE_HANDLER){wcscpy_s(request->error,L"The runtime contract could not be initialized.");InterlockedExchange(reinterpret_cast<volatile LONG*>(&request->state),-1);}}
 }
 
 extern "C" __declspec(dllexport) LRESULT CALLBACK RaceToolsBootstrap(int code,WPARAM w,LPARAM l) {
  if(code>=0&&w==PM_REMOVE){auto msg=reinterpret_cast<MSG*>(l);
-  if(msg&&msg->message==RegisterWindowMessageW(L"Bobby.RaceTools.Connect.v2")){
+  if(msg&&msg->message==RegisterWindowMessageW(L"Bobby.RaceTools.Connect.v3")){
    wchar_t name[128];swprintf_s(name,L"Local\\BobbyRaceTools_%lu_%llx",GetCurrentProcessId(),static_cast<unsigned long long>(msg->wParam));
    HANDLE h=OpenFileMappingW(FILE_MAP_ALL_ACCESS,FALSE,name);
    if(h){auto view=static_cast<Shared*>(MapViewOfFile(h,FILE_MAP_ALL_ACCESS,0,0,sizeof(Shared)));
-    if(view&&InterlockedCompareExchange(reinterpret_cast<volatile LONG*>(&view->state),1,0)==0)safeConnect(view,h);
+    if(view&&InterlockedCompareExchange(reinterpret_cast<volatile LONG*>(&view->state),1,0)==0)safeConnect(view,h,msg->hwnd);
     else{if(view)UnmapViewOfFile(view);CloseHandle(h);}}}
  }
  return CallNextHookEx(nullptr,code,w,l);

@@ -5,7 +5,7 @@
 #include <cstdint>
 
 namespace race {
-constexpr uint32_t Magic = 0x42525431, Version = 2, AutomaticPlayer = 6;
+constexpr uint32_t Magic = 0x42525431, Version = 3, AutomaticPlayer = 6;
 inline uint32_t choosePlayer(uint32_t requested,uint32_t available) {
  available&=63;
  if(requested<6&&(available&(1u<<requested)))return requested;
@@ -87,6 +87,9 @@ struct Shared {
  alignas(8) volatile int64_t heartbeat{};
  Settings settings;
  Snapshot snapshot;
+ volatile int32_t panelOpen{},editMode{},rendererState{},renderFrames{},controllerPresent{},fullscreen{};
+ volatile int32_t uiSequence{},uiRevision{},uiAck{};
+ Settings uiSettings;
  wchar_t error[256]{};
 };
 static_assert(sizeof(float)==4&&sizeof(Vec3)==12&&sizeof(Quat)==16,"Unexpected native ABI");

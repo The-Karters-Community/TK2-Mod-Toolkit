@@ -42,8 +42,8 @@ on the player's PC. The main Toolkit remains separate and unchanged.
 - Live driving samples win over opponent ghosts. Replay ownership uses the game's
   `IsPlayerControlledByReplayInput(Ant_Player)`. Replay click pulses are sampled
   before the native method consumes/clears them, and cleared on source changes.
-- The overlay targets windowed/borderless play. Exclusive-fullscreen visibility
-  is not supported. Do not run the equivalent Toolkit features simultaneously.
+- Version 0.2.0 draws directly in the D3D11 back buffer for windowed, borderless
+  and fullscreen play. Do not run equivalent Toolkit features simultaneously.
 
 ## Current evidence and validation (2026-10-18)
 
@@ -121,3 +121,55 @@ panel appears over the game. The Toolkit's two equivalent modules were
 already disabled in this session. Test diagnostics and captures remain in ignored
 `local/standalone-*`. The user's FOV and other preferences were preserved; their
 local-player selection was switched to Automatic. No game files were changed.
+
+
+## 0.2.0 fullscreen controls and desktop lifetime
+
+The 0.1.1 floating-window approach did not reliably survive fullscreen or repeated
+F8 toggles. Its `WS_EX_TOOLWINDOW` conversion also removed the app from the
+taskbar. That implementation is removed. The desktop HWND remains a normal
+`WS_OVERLAPPEDWINDOW`; F8 only toggles a shared panel-open flag.
+
+An authored renderer uses unchanged Dear ImGui 1.91.9b Win32/DX11 backends to draw
+the Camera panel and input HUD into the game's back buffer before DXGI Present.
+The stable IDXGISwapChain COM slots for Present and ResizeBuffers are discovered
+with a temporary D3D11 device, not game-version offsets. The real swap chain is
+accepted only for the game's HWND and a D3D11 device. Back-buffer references are
+released before resize; replacement devices/swap chains recreate renderer resources.
+Device identity is checked as well as the swap-chain pointer, since COM allocations
+can reuse a previous chain address during a mode change.
+No extra overlay HWND, game-window restyling or desktop focus cycling is used.
+
+Windows events are queued to the render thread; Dear ImGui has a private context.
+Keyboard navigation uses the upstream backend. XInput discovery is cached and
+controller events are fed only in explicit editing mode; the upstream backend
+is compiled with its always-on gamepad feeder disabled. Driving cannot move
+focused UI sliders while the panel is passive. The camera UI
+publishes changes through a revision/acknowledgement mailbox; the desktop process
+remains the sole settings writer and saves changes automatically. The renderer owns
+a separate mapping handle/view, so reconnect cannot invalidate render-thread reads.
+
+While the panel is visible and the game is foreground, Unity's main thread unlocks
+the cursor and saves/restores the game's requested lock and visibility state. The panel permits normal driving by default. Ctrl+Tab, controller View/Back or
+the editing checkbox explicitly enables keyboard/gamepad navigation. Local
+human driving input data is neutralized only in that mode; CPU and remote player input
+is unchanged. Closing, losing focus or a missing desktop heartbeat releases capture.
+Engine calls are never made from the render thread. The current Cursor getters and
+setters are resolved by exact runtime signatures. Focused Ghidra extracts at RVAs
+0x329BAC0, 0x329BAF0, 0x329BB20 and 0x329BB60 show cached engine-call dispatch,
+with int32 lock mode and one-byte visibility arguments. Return types and static
+signatures come from current IL2CPP declarations. These RVAs are evidence only.
+Input field types and the ProcessRacingInput body are the same current evidence
+listed above. No generated game code or game data is distributed.
+
+Validation so far: the real D3D11 renderer harness passes Present, ResizeBuffers,
+swap-chain/device replacement, mapping rebind and heartbeat shutdown. Mocked
+XInput in the isolated test process verifies that controller editing changes
+settings, then the same held D-pad/stick cannot alter settings after returning to
+passive driving. The harness never sends real keys or changes foreground focus. The running
+game connected with all four capabilities, renderer state 1, an XInput controller
+present and zero bridge faults. The user confirmed repeated F8 toggles and mouse/controller interaction work
+with the desktop app still available. Their follow-up requested normal driving
+while the panel remains visible; the explicit editing mode addresses that request.
+Exclusive DXGI fullscreen was not separately observed (the captured session
+reported DXGI fullscreen=false). No claim about every display/driver is made.
