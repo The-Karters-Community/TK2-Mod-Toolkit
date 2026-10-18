@@ -6,6 +6,14 @@
 
 The supported game build is **0.1.4.18 (Windows x64)**. The validated loader is **BepInEx Unity IL2CPP x64 `6.0.0-be.788`**, commit `5b766a3`. This is a community project; gameplay-changing modules are intended for local/offline use. Online protection is mandatory and locked on.
 
+## Standalone camera and inputs
+
+[Bobby's Race Tools](standalone/README.md) separates Camera setup and the Gamepad
+viewer into a small Windows executable that runs without BepInEx. Build it with
+`python standalone/build.py`; the rest of this README describes the full Toolkit.
+
+![Standalone camera controls](docs/images/race-tools-camera.png)
+
 ## Toolkit screenshots
 
 The screenshots below show the current Mod library page and Workshop editor. The web UI adapts to the app window; controls and module catalog may change between toolkit builds.

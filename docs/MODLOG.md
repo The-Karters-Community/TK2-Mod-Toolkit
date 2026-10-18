@@ -1,3 +1,23 @@
+## 2026-10-18 - Standalone race presentation app (unreleased)
+
+- Added Bobby's Race Tools: a native Win32 executable with embedded x64 bridge,
+  camera controls, individual resets, an input overlay and portable settings.
+  Defaults keep camera overrides off. No BepInEx or bundled managed/web runtime.
+- Resolves exact game contracts from IL2CPP metadata at connection time; no fixed
+  game addresses or game-build allowlist. Main-thread detours exchange bounded
+  snapshots without per-frame metadata walks or scene scans. Heartbeat expiry and
+  disconnect return to native camera behavior without unloading active detours.
+- Preserved mapped keyboard/controller actions and local-input priority when
+  opponent ghosts are present. Sample replay click pulses before native clearing.
+- Native core tests and real Win32 UI smoke checks passed, including resets,
+  tab switching, narrow scrolling, saved settings and relocated-folder launch.
+  Existing Python suite: 136 passed.
+- User-opened local race with BepInEx disabled passed
+  connection, live input HUD and camera FOV on/off (75 -> 65 -> 75), zero reported
+  faults. Restored original loader after game exit, SHA-256 verified. Detailed
+  current native evidence and remaining runtime checks are in
+  STANDALONE-PRESENTATION.md. No game was launched by the agent.
+
 ## 2026-10-18 - Input viewer and camera presentation (unreleased)
 
 - Replaced the 440x196 input card, repeated headings, nested outlines and

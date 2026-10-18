@@ -1,0 +1,7 @@
+Bobby's Race Tools includes MinHook v1.3.4.
+Upstream: https://github.com/TsudaKageyu/minhook
+Pinned commit: c3fcafdc10146beb5919319d0683e44e3c30d537
+The vendored source is unchanged; only the Windows x64 sources are included.
+
+MinHook is licensed under the BSD 2-Clause License, with separate terms for its
+included HDE decoder. The complete notices follow in MinHook-LICENSE.txt.
