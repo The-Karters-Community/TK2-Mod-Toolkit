@@ -98,6 +98,34 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(len(result["mismatches"]), 3)
         self.assertIn("BepInEx/core/BepInEx.Unity.IL2CPP.dll", result["reason"])
 
+    def test_game_update_warns_but_allows_install_without_a_compiler(self):
+        artifact = self.root / "artifacts/TK2.Customization"; artifact.mkdir(parents=True)
+        dll = artifact / "TK2.Customization.dll"; dll.write_bytes(b"built")
+        for relative in ("BepInEx/core/BepInEx.Unity.IL2CPP.dll", "BepInEx/core/Il2CppInterop.Runtime.dll"):
+            path = self.game / relative; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(b"loader")
+        stamp = core.fingerprint(self.game)
+        core.write_json(artifact / "build.json", {"dll": dll.name, "dllSha256": core.sha256(dll), "fingerprint": stamp})
+        (self.game / "GameAssembly.dll").write_bytes(b"new game update")
+        result = setup.prebuilt_compatibility(self.game)
+        self.assertTrue(result["compatible"])
+        self.assertEqual(result["mismatches"], ["GameAssembly.dll"])
+        self.assertIn("game has updated", result["warning"])
+        with patch.object(core, "require_game_stopped"), patch.object(setup, "readiness", return_value={"ready": True}):
+            setup.install_prebuilt(self.game)
+        self.assertEqual((self.game / "BepInEx/plugins/TK2-Mod-Studio/TK2.Customization.dll").read_bytes(), b"built")
+        (self.game / "GameAssembly.dll").unlink()
+        self.assertFalse(setup.prebuilt_compatibility(self.game)["compatible"])
+
+    def test_runtime_check_resolves_shared_plugin_version_constant(self):
+        source = self.root / 'plugins/TK2.Customization/Plugin.cs'; source.parent.mkdir(parents=True)
+        source.write_text('[BepInPlugin("local.tk2.customization", "TK2 Mod Toolkit Pack", ToolkitVersion.Value)]')
+        source.with_name('ToolkitVersion.cs').write_text('internal const string Value = "0.6.25";')
+        log = self.game / 'BepInEx/LogOutput.log'; log.parent.mkdir(parents=True)
+        log.write_text('[Info: TK2 Mod Toolkit Pack] TK2 Mod Toolkit 0.6.25: startup complete.\n')
+        self.assertTrue(setup.readiness(self.game)['checks'][-1]['ok'])
+        log.write_text('[Info: BepInEx] Loading [TK2 Mod Toolkit Pack 0.6.25]\n')
+        self.assertFalse(setup.readiness(self.game)['checks'][-1]['ok'])
+
     def test_function_browser_uses_real_va_and_matches_recovered_name(self):
         (self.root / "local").mkdir()
         dump = self.root / "dump.cs"

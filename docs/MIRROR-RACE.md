@@ -10,9 +10,9 @@ The previous enabled module searched all kart controllers every 50 milliseconds 
 
 The module now checks enabled/offline state, absence of MenuManager and a live Ant_MapData before any scene search. In menus or while no map exists it removes its injected effects and performs no scene scans. During track setup/racing it searches at most four times a second and reuses its working collection. Stale, inactive or spectator cameras lose the injected callback. Both rendering and steering check the current context directly, covering transitions before the next update. A race-running-only gate is deliberately avoided so mirroring still starts before the countdown. The native camera and GameObject are never destroyed.
 
-## Current-build evidence
+## Original native evidence (0.1.4.18)
 
-Read-only Ghidra analysis matches the installed `GameAssembly.dll` SHA-256 `e55fab2cdcbf3852160183504a847b1a1b7af61c24bc9619e3736e3753aee130`.
+The original read-only Ghidra analysis used `GameAssembly.dll` SHA-256 `e55fab2cdcbf3852160183504a847b1a1b7af61c24bc9619e3736e3753aee130`. This is historical evidence, not a claim that later game binaries have the same implementation.
 
 | Native method | Address | Evidence |
 | --- | --- | --- |
@@ -22,6 +22,8 @@ Read-only Ghidra analysis matches the installed `GameAssembly.dll` SHA-256 `e55f
 The image flip is implemented by the Toolkit's injected `MirrorImageEffect.OnRenderImage` callback. The plugin logs when it attaches before the countdown and when the callback first runs. The game draws opponent nameplates on a separate screen-space canvas after camera rendering, so Mirror Race also mirrors the projected nameplate container horizontally; its portrait and name move together while keeping their normal readable orientation.
 
 ## Limits and validation
+
+The 2026-10-18 update repair separates the offline permission check from fast-fall's native-build verification. Previously an unknown game hash left `GameplayReady` false and silently blocked Mirror Race through the shared offline guard. Mirror Race now depends on its own resolved hooks and the offline check. The regression harness links the production offline check and verifies mirroring with native physics unverified, as well as online exclusion. Live rendering after this game update still needs a manual offline check.
 
 This mirrors the camera output, not a second mirrored track simulation. Camera-rendered text or world-space interface elements may also appear reversed; screen-space overlay UI is outside the camera image. The module is guarded by the Toolkit's offline gameplay check and only reverses steering for local human players.
 

@@ -139,7 +139,7 @@ export default function Installation() {
           One DLL contains the modules. Close the game before installation.
           Settings reload live after the plugin loads.
         </p>
-        {compatibility?.compatible === false && (
+        {(compatibility?.compatible === false || compatibility?.warning) && (
           <p className="text-sm text-warning">{compatibility.reason}</p>
         )}
         <Button

@@ -89,9 +89,9 @@ namespace UnityEngine
 namespace TK2.Customization
 {
     public interface IModRecipe { string Name { get; } bool ChangesGameplay { get; } void Configure(BepInEx.Configuration.ConfigFile config); void Tick(); void Restore(); }
-    public class Plugin
+    public sealed partial class Plugin
     {
-        public static Plugin? Instance = new(); public static bool OfflineLabAllowed = true;
+        public static Plugin? Instance = new(); public bool GameplayReady = false;
         public HarmonyLib.Harmony Harmony = new(); public Logger Log = new();
     }
     public class Logger { public readonly List<string> Lines = new(); public void LogInfo(string text) => Lines.Add(text); public void LogWarning(string text) => Lines.Add(text); }
@@ -100,6 +100,7 @@ public class MenuManager : UnityEngine.Object { public static MenuManager? Insta
 public class Ant_MapData : UnityEngine.Object { public static Ant_MapData? instance; }
 public static class Ant_CurrentGameConfiguration
 {
+    public static bool IsOnlineGame_InRoom_WithInternet;
     public enum ERaceState { E_321_COUNTING_BEFORE_RACE, E_RACE_RUNNING, E_WHOLE_RACE_FINISHED_SHOWING_SUMMARY }
     public static ERaceState eCurrentRaceState;
 }

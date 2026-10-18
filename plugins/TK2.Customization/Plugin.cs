@@ -23,6 +23,7 @@ public sealed partial class Plugin : BasePlugin
     internal ConfigEntry<bool> VignetteDisabled = null!;
     internal ConfigEntry<float> CameraDistance = null!, CameraHeight = null!;
     internal ConfigEntry<float> MusicVolume = null!, SfxVolume = null!, VoiceVolume = null!, UiVolume = null!;
+    // GameplayReady records native physics verification, not permission for all offline modules.
     internal bool GameplayReady, PhysicsFaulted, SessionModified;
     private StudioBehaviour? _behaviour;
 

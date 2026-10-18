@@ -88,6 +88,10 @@ def readiness(game):
     plugin_source = core.ROOT / 'plugins/TK2.Customization/Plugin.cs'
     match = re.search(r'BepInPlugin\("local\.tk2\.customization",\s*"[^"]+",\s*"([^"]+)"', plugin_source.read_text(encoding='utf-8-sig')) if plugin_source.is_file() else None
     version = match[1] if match else None
+    if version is None and plugin_source.is_file() and 'ToolkitVersion.Value' in plugin_source.read_text(encoding='utf-8-sig'):
+        shared_version = plugin_source.with_name('ToolkitVersion.cs')
+        shared_match = re.search(r'const\s+string\s+Value\s*=\s*"([^"]+)"', shared_version.read_text(encoding='utf-8-sig')) if shared_version.is_file() else None
+        version = shared_match[1] if shared_match else None
     # Chainloader's "Loading [...]" line is emitted before Plugin.Load runs;
     # require the plugin's own final startup marker and reject explicit load errors.
     plugin_errors = [line for line in text.splitlines()
@@ -145,14 +149,22 @@ def prebuilt_compatibility(game):
         return {"compatible": False, "reason": "The plugin build receipt is missing or invalid. Rebuild the plugin.", "mismatches": []}
     names = ("GameAssembly.dll", "BepInEx/core/BepInEx.Unity.IL2CPP.dll", "BepInEx/core/Il2CppInterop.Runtime.dll")
     mismatches = []
+    blockers = []
     for relative in names:
         expected = expected_files.get(relative)
         target = game / relative
         actual = core.sha256(target) if target.is_file() else None
         if not expected or actual != expected:
             mismatches.append(relative)
+            # Native game hashes identify the build, not managed API compatibility.
+            # Keep loader ABI and missing-installation failures blocking.
+            if relative != "GameAssembly.dll" or actual is None:
+                blockers.append(relative)
+    if blockers:
+        return {"compatible": False, "reason": "The bundled plugin requires matching loader files and a complete game installation: " + ", ".join(blockers) + ". Repair the loader or rebuild for this installation.", "mismatches": mismatches}
     if mismatches:
-        return {"compatible": False, "reason": "The bundled plugin was built against different game/interop files: " + ", ".join(mismatches) + ". Rebuild it against this installation before installing.", "mismatches": mismatches}
+        warning = "The game has updated since this plugin was built. Installation is available; individual modules check their hooks when loaded. Test an offline race after updating."
+        return {"compatible": True, "reason": warning, "warning": warning, "mismatches": mismatches}
     return {"compatible": True, "reason": "The bundled plugin matches this game and BepInEx/IL2CPP interop.", "mismatches": []}
 
 

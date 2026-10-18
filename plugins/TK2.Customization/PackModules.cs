@@ -58,9 +58,6 @@ public sealed partial class Plugin
         LegacyMK.BeforeAdvancedTuning = ReleaseSimpleTuning;
     }
 
-    internal static bool OfflineLabAllowed => Instance != null && Instance.GameplayReady &&
-        !Ant_CurrentGameConfiguration.IsOnlineGame_InRoom_WithInternet;
-
     private static bool VignettePrefix(ref bool __result)
     {
         if (Instance?.VignetteDisabled.Value != true) return true;

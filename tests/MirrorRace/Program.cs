@@ -7,6 +7,7 @@ using UObject = UnityEngine.Object;
 int assertions = 0;
 void Check(bool condition, string name) { assertions++; if (!condition) throw new Exception(name); }
 var config = new BepInEx.Configuration.ConfigFile();
+Check(!Plugin.Instance!.GameplayReady && Plugin.OfflineLabAllowed, "updated native build does not block offline mirror access");
 var mirror = new MirrorRace(); mirror.Configure(config); config.Enabled.Value = true;
 var camera = new GameObject().AddComponent<Camera>();
 var player = new GameObject().AddComponent<Ant_Player>();
@@ -53,10 +54,10 @@ config.Enabled.Value = false;
 Check(!MirrorRace.ShouldMirror(camera) && Steering(kart) == .6f, "config reload guarded before Tick");
 Idle("disabled", 61); Check(second!.Destroyed, "disable destroys callback");
 config.Enabled.Value = true; Tick(80);
-Plugin.OfflineLabAllowed = false;
+Ant_CurrentGameConfiguration.IsOnlineGame_InRoom_WithInternet = true;
 Check(!MirrorRace.ShouldMirror(camera) && Steering(kart) == .6f, "online callbacks immediately guarded");
 Idle("online", 81);
-Plugin.OfflineLabAllowed = true; Tick(100);
+Ant_CurrentGameConfiguration.IsOnlineGame_InRoom_WithInternet = false; Tick(100);
 Ant_MapData.instance!.Destroyed = true;
 Idle("destroyed map", 101);
 Ant_MapData.instance = new(); Tick(120);
@@ -131,4 +132,6 @@ Check(camera.gameObject.GetComponent<MirrorImageEffect>() == null && Steering(ka
 kart.gameObject.activeInHierarchy = true; Tick(122);
 mirror.Restore(); mirror.Restore();
 Check(camera.gameObject.GetComponent<MirrorImageEffect>() == null && Steering(kart) == .6f, "repeated cleanup safe");
+Plugin.Instance = null;
+Check(!Plugin.OfflineLabAllowed, "no plugin instance grants no offline access");
 Console.WriteLine($"Mirror Race: {assertions} production-source assertions passed.");
