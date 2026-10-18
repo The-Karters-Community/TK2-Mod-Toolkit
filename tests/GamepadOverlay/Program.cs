@@ -28,4 +28,10 @@ Check(custom.X == 1462 && custom.Y == 18, "custom percentage sliders map to clam
 Check(!InputOverlayResolution.ShouldResolve(true, 12, 0), "a cached scene input never triggers another full-object search");
 Check(!InputOverlayResolution.ShouldResolve(false, .9f, 1) && InputOverlayResolution.ShouldResolve(false, 1, 1), "missing inputs are searched at a one-second retry cadence");
 Check(InputOverlayResolution.NextRetryAt(2) == 3, "missing-input retry deadline is deterministic");
+Check(!InputOverlayResolution.UseReplay(true, false, true, true), "racing against an active ghost keeps local inputs");
+Check(InputOverlayResolution.UseReplay(true, true, true, true), "a local kart controlled by playback displays recorded actions");
+Check(InputOverlayResolution.UseReplay(false, false, true, true), "watching a ghost without a local kart displays recorded actions");
+Check(!InputOverlayResolution.UseReplay(true, true, true, false), "turning ghost viewing off suppresses replay-controlled inputs");
+Check(!InputOverlayResolution.UseReplay(true, false, false, true), "ordinary racing keeps the live source");
+Check(!InputOverlayResolution.UseReplay(false, false, false, true), "menus do not invent a ghost source");
 Console.WriteLine($"Gamepad overlay model: {assertions} assertions passed.");

@@ -10,14 +10,16 @@ internal static class CameraPanel
     private static bool _open, _advanced, _cursorOwned, _failed;
     private static bool _previousCursorVisible;
     private static CursorLockMode _previousCursorLock;
-    private static GUIStyle? _title, _label, _hint;
-    private const float Width = 440;
+    private static GUIStyle? _title, _label, _hint, _value;
+    private static Vector2 _scroll;
+    private const float Width = 384;
 
     internal static void Tick(Plugin p)
     {
         try
         {
-            if (!p.CameraEnabled.Value || !p.CameraPanelEnabled.Value || !CameraFeature.RaceAvailable)
+            // Turning overrides off restores the native view; the editor must stay usable.
+            if (!p.CameraPanelEnabled.Value || !CameraFeature.RaceAvailable)
             { if (_open) Close(p); return; }
             if (Enum.TryParse(p.CameraPanelKey.Value, out KeyCode key) && key != KeyCode.None && Input.GetKeyDown(key))
             {
@@ -64,45 +66,61 @@ internal static class CameraPanel
         bool enabled = GUI.enabled;
         try
         {
-            _title ??= new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold };
-            _label ??= new GUIStyle(GUI.skin.label) { fontSize = 13 };
-            _hint ??= new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = true };
-            float height = _advanced ? 680 : 440;
-            float scale = Math.Max(.1f, Math.Min(p.CameraPanelScale.Value,
-                Math.Min(Screen.width / (Width + 40), Screen.height / (height + 40))));
+            if (_title == null)
+            {
+                _title = new GUIStyle(GUI.skin.label) { fontSize = 19, fontStyle = FontStyle.Bold };
+                _label = new GUIStyle(GUI.skin.label) { fontSize = 13 };
+                _title.normal.textColor = _label.normal.textColor = new Color(.94f, .95f, .90f, 1);
+                _hint = new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = true };
+                _hint.normal.textColor = new Color(.72f, .74f, .68f, 1);
+                _value = new GUIStyle(_label) { alignment = TextAnchor.MiddleRight };
+            }
+            // Scroll a short panel on small displays rather than shrinking the text.
+            float scale = Math.Max(.1f, Math.Min(p.CameraPanelScale.Value, Screen.width / (Width + 40)));
+            float height = Math.Min(_advanced ? 704 : 480, Screen.height / scale - 40);
             GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(scale, scale, 1));
             GUI.depth = -10000;
-            GUI.color = new Color(.94f, .96f, .99f, 1);
-            GUI.backgroundColor = new Color(.17f, .21f, .28f, 1);
-            GUI.contentColor = new Color(.94f, .96f, .99f, 1);
+            GUI.color = Color.white;
+            GUI.backgroundColor = new Color(.25f, .26f, .23f, 1);
+            GUI.contentColor = new Color(.94f, .95f, .90f, 1);
             float x = Screen.width / scale - Width - 20, y = 20;
-            StudioBehaviour.DrawSolidPanel(new Rect(x, y, Width, height));
-            GUI.Label(new Rect(x + 18, y + 12, 330, 26), "TK2 Mod Toolkit · Camera", _title);
-            if (GUI.Button(new Rect(x + Width - 48, y + 12, 30, 25), "×")) { Close(p); return; }
-            y += 47;
-            Toggle(p, p.CameraEnabled, "Enable camera overrides", x, ref y);
-            Toggle(p, p.PreserveKartFraming, "Keep kart size when FOV changes", x, ref y);
-            Slider(p, p.Fov, "Field of view", 35, 110, 1, x, ref y);
-            Slider(p, p.CameraDistance, "Distance multiplier", .25f, 4, .05f, x, ref y);
-            Slider(p, p.CameraHeight, "Height offset", -5, 8, .05f, x, ref y);
-            Slider(p, p.CameraLateral, "Side offset", -4, 4, .05f, x, ref y);
-            Toggle(p, p.AimAtKart, "Aim toward kart", x, ref y);
-            if (GUI.Button(new Rect(x + 18, y, 185, 26), _advanced ? "Hide advanced settings" : "Advanced settings")) _advanced = !_advanced;
-            if (GUI.Button(new Rect(x + 216, y, 206, 26), "Reset camera to defaults")) Reset(p);
-            y += 34;
-            if (_advanced)
+            Fill(new Rect(x, y, Width, height), new Color(.075f, .08f, .075f, .98f));
+            GUI.Label(new Rect(x + 18, y + 12, 240, 28), "Camera", _title);
+            GUI.Label(new Rect(x + 18, y + 42, 300, 20), $"Changes apply live  ·  {p.CameraPanelKey.Value} / Esc to close", _hint);
+            if (GUI.Button(new Rect(x + Width - 46, y + 15, 28, 28), "×")) { Close(p); return; }
+            Fill(new Rect(x + 18, y + 69, Width - 36, 1), new Color(.29f, .30f, .28f, 1));
+            _scroll = GUI.BeginScrollView(new Rect(x, y + 78, Width - 4, height - 154), _scroll,
+                new Rect(0, 0, Width - 24, _advanced ? 548 : 320));
+            try
             {
-                bool oldEnabled = GUI.enabled;
-                GUI.enabled = p.AimAtKart.Value;
-                Slider(p, p.CameraTargetHeight, "Look-at target height", -1, 3, .05f, x, ref y);
-                GUI.enabled = oldEnabled;
-                Slider(p, p.CameraPitch, "Pitch offset", -45, 45, 1, x, ref y);
-                Slider(p, p.CameraYaw, "Yaw offset", -90, 90, 1, x, ref y);
-                Slider(p, p.CameraRoll, "Roll offset", -30, 30, 1, x, ref y);
-                Slider(p, p.CameraSmoothing, "Smoothing seconds", 0, 2, .05f, x, ref y);
+                float row = 0;
+                Toggle(p, p.CameraEnabled, "Camera overrides", 0, ref row);
+                GUI.Label(new Rect(18, row + 2, Width - 60, 22), "Framing", _hint);
+                row += 26;
+                Slider(p, p.Fov, "Field of view", 35, 110, 1, 0, ref row, "°");
+                Slider(p, p.CameraDistance, "Distance", .25f, 4, .05f, 0, ref row, "×");
+                Slider(p, p.CameraHeight, "Height", -5, 8, .05f, 0, ref row);
+                Slider(p, p.CameraLateral, "Side offset", -4, 4, .05f, 0, ref row);
+                Toggle(p, p.PreserveKartFraming, "Keep kart size when FOV changes", 0, ref row);
+                Toggle(p, p.AimAtKart, "Aim toward kart", 0, ref row);
+                if (GUI.Button(new Rect(18, row + 4, Width - 60, 28), _advanced ? "Hide aim, rotation & smoothing" : "Aim, rotation & smoothing…")) _advanced = !_advanced;
+                row += 40;
+                if (_advanced)
+                {
+                    GUI.enabled = enabled && p.AimAtKart.Value;
+                    Slider(p, p.CameraTargetHeight, "Target height", -1, 3, .05f, 0, ref row);
+                    GUI.enabled = enabled;
+                    Slider(p, p.CameraPitch, "Pitch", -45, 45, 1, 0, ref row, "°");
+                    Slider(p, p.CameraYaw, "Yaw", -90, 90, 1, 0, ref row, "°");
+                    Slider(p, p.CameraRoll, "Roll", -30, 30, 1, 0, ref row, "°");
+                    Slider(p, p.CameraSmoothing, "Smoothing", 0, 2, .05f, 0, ref row, " s");
+                }
             }
-            GUI.Label(new Rect(x + 18, y, Width - 36, 34), LiveConfig.Status, _hint);
-            GUI.Label(new Rect(x + 18, y + 36, Width - 36, 28), $"{p.CameraPanelKey.Value} / Esc closes · +/- fine tune · Shift = finer", _hint);
+            finally { GUI.EndScrollView(); }
+            Fill(new Rect(x + 18, y + height - 69, Width - 36, 1), new Color(.29f, .30f, .28f, 1));
+            if (GUI.Button(new Rect(x + 18, y + height - 57, 128, 27), "Reset framing")) Reset(p);
+            GUI.Label(new Rect(x + 158, y + height - 57, Width - 176, 27), "Hold Shift for fine steps", _hint);
+            GUI.Label(new Rect(x + 18, y + height - 27, Width - 36, 24), string.IsNullOrEmpty(GUI.tooltip) ? LiveConfig.Status : GUI.tooltip, _hint);
         }
         catch (Exception ex) { Fail(p, ex); }
         finally
@@ -111,24 +129,33 @@ internal static class CameraPanel
 
     private static void Toggle(Plugin p, ConfigEntry<bool> entry, string text, float x, ref float y)
     {
-        bool value = StudioBehaviour.DrawCheckBox(new Rect(x + 18, y, Width - 36, 24), entry.Value, text);
+        bool value = StudioBehaviour.DrawCheckBox(new Rect(x + 18, y, Width - 94, 24), entry.Value, text);
         if (value != entry.Value) LiveConfig.Change(p, entry, value, Time.unscaledTime);
-        y += 26;
+        if (GUI.Button(new Rect(x + Width - 66, y, 24, 24), new GUIContent("↺", "Reset " + text)))
+            LiveConfig.Change(p, entry, (bool)entry.DefaultValue, Time.unscaledTime);
+        y += 28;
     }
 
-    private static void Slider(Plugin p, ConfigEntry<float> entry, string text, float low, float high, float step, float x, ref float y)
+    private static void Slider(Plugin p, ConfigEntry<float> entry, string text, float low, float high, float step, float x, ref float y, string unit = "")
     {
-        GUI.Label(new Rect(x + 18, y, Width - 36, 22), $"{text}: {entry.Value:0.00}    [{low:0.##} … {high:0.##}]", _label);
-        float value = GUI.HorizontalSlider(new Rect(x + 18, y + 27, Width - 126, 18), entry.Value, low, high);
+        GUI.Label(new Rect(x + 18, y, Width - 158, 22), text, _label);
+        GUI.Label(new Rect(x + Width - 137, y, 91, 22), entry.Value.ToString("0.##") + unit, _value);
+        float value = GUI.HorizontalSlider(new Rect(x + 18, y + 25, Width - 156, 16), entry.Value, low, high);
         float delta = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ? step * .1f : step;
-        if (GUI.Button(new Rect(x + Width - 98, y + 22, 36, 23), "−")) value -= delta;
-        if (GUI.Button(new Rect(x + Width - 56, y + 22, 36, 23), "+")) value += delta;
+        if (GUI.Button(new Rect(x + Width - 126, y + 19, 24, 25), "−")) value -= delta;
+        if (GUI.Button(new Rect(x + Width - 96, y + 19, 24, 25), "+")) value += delta;
+        if (GUI.Button(new Rect(x + Width - 66, y + 19, 24, 25), new GUIContent("↺", "Reset " + text))) value = (float)entry.DefaultValue;
         if (value != entry.Value)
-        {
-            value = Mathf.Clamp((float)Math.Round(value, 3), low, high);
-            LiveConfig.Change(p, entry, value, Time.unscaledTime);
-        }
-        y += 48;
+            LiveConfig.Change(p, entry, Mathf.Clamp((float)Math.Round(value, 3), low, high), Time.unscaledTime);
+        y += 44;
+    }
+
+    private static void Fill(Rect rect, Color color)
+    {
+        Color old = GUI.color;
+        GUI.color = color;
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = old;
     }
 
     private static void Reset(Plugin p)

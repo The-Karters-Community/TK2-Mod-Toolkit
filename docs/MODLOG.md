@@ -1,3 +1,46 @@
+## 2026-10-18 - Input viewer and camera presentation (unreleased)
+
+- Replaced the 440x196 input card, repeated headings, nested outlines and
+  per-action colors with a 400x126 display, steering rail and consistent amber
+  pressed states. Input sampling and replay behavior are unchanged.
+- Camera panel now separates framing from advanced aim/rotation/smoothing.
+  Numeric values align separately from labels; the body scrolls on small screens
+  instead of reducing text size to fit. Reset and save status remain reachable.
+- User testing exposed the old enable-state visibility guard closing the editor
+  when overrides were disabled. The editor now stays open with overrides off;
+  individual rows have resets. A headless harness executes the real panel through
+  both toggle transitions, numeric/toggle/advanced resets, small-screen scrolling,
+  Escape and scene exit (10 behavior assertions). It does not prove rendering.
+- Read the current interop's Rewired player property directly for device detection
+  instead of looking for a CLR field which is absent from that wrapper.
+- Racing against a ghost keeps local driving inputs. Replay inputs are used only
+  when the local kart is replay-controlled or there is no local kart. The game's
+  `IsPlayerControlledByReplayInput(Ant_Player)` check selects the source; ghost
+  pulse state is cleared across source changes. Input-model harness: 22 assertions,
+  including opponent ghosts, replay viewing and disabled ghost inputs.
+- Native evidence: installed GameAssembly SHA-256
+  `55f5c88972fe1ccf4c9d5f3871b71bcfa261b3e42a379e18438e92623fc4d6a2`;
+  freshly generated metadata locates that method at RVA `0x6C6D60`. Ghidra 12.1.4
+  decompiled its extracted 0x120-byte body and confirmed player-type/playback-mode
+  branches. External callees were not analyzed by this focused extraction. Native
+  bytes, pseudocode and metadata stay in ignored `local/input-source-evidence`.
+  REA's Windows adapter rejected raw x64 input, so the installed Ghidra headless
+  importer was used directly. Production code calls the named API, not that RVA.
+- Desktop settings for these two modules use flat field groups, compact numeric
+  controls, accessible labels and a two-column layout that stacks on small
+  screens. Other modules retain their existing setting layout.
+- Standalone feasibility is recorded in STANDALONE-PRESENTATION.md. Existing
+  native discovery can be reused, but per-frame input/camera hooks are a new
+  implementation. No standalone executable has been built.
+- Plugin compilation passed with zero warnings/errors; Python suite: 136 tests;
+  React suite: 20 tests; input model: 22 assertions. Desktop settings were checked
+  in the browser at normal width and 760px (no horizontal overflow). GPU captures
+  confirmed the compact input HUD and corrected camera panel with per-value
+  resets in the running game. User reported the original toggle-close issue;
+  the corrected panel was installed with backup `1792347920261217100` and its
+  installed hash verified. Ghost-source selection was built and regression
+  tested afterward; its installation/runtime result is recorded below when done.
+
 ## 2026-10-15 — Garage cosmetic preview compatibility
 
 - Approved exactly `community.tk2.garage.preview`, the separate Garage companion

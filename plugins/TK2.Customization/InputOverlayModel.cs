@@ -60,4 +60,8 @@ internal static class InputOverlayResolution
         !hasCachedTarget && now >= retryAt;
 
     internal static float NextRetryAt(float now) => now + RetryDelaySeconds;
+
+    // A time-trial opponent ghost is a replay too. It must not replace the driver.
+    internal static bool UseReplay(bool hasLocalInput, bool localControlledByReplay, bool replayPlaying, bool showReplay) =>
+        replayPlaying && showReplay && (!hasLocalInput || localControlledByReplay);
 }

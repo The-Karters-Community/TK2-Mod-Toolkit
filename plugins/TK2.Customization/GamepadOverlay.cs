@@ -12,7 +12,7 @@ internal static class GamepadOverlay
     private static ConfigEntry<string> _hotkey = null!, _corner = null!;
     private static ConfigEntry<float> _scale = null!, _opacity = null!;
     private static ConfigEntry<float> _positionX = null!, _positionY = null!;
-    private static bool _visible, _hasSample, _faulted, _replayActive;
+    private static bool _visible, _hasSample, _faulted, _replayActive, _liveInputAvailable;
     private static float _nextResolve;
     private static float _ghostJumpPulseUntil, _ghostBoostPulseUntil;
     private static InputOverlayModel _sample;
@@ -20,11 +20,10 @@ internal static class GamepadOverlay
     private static PTK_PlayerReplayInput_ReplaySerializer? _replayInput;
     private static Ant_Player? _resolvedReplayTarget;
     private static string _liveDevice = "GAMEPAD / KEYBOARD";
-    private static readonly FieldInfo? RewiredPlayer = AccessTools.Field(typeof(Ant_KartInput), "player");
-    private static GUIStyle? _title, _small, _pill, _section, _secondary, _status;
+    private static GUIStyle? _title, _small, _pill, _status;
     private static Texture2D? _disc;
 
-    internal static bool Visible => _enabled?.Value == true && _visible && (_hasSample || _localInput != null || _replayActive);
+    internal static bool Visible => _enabled?.Value == true && _visible && (_hasSample || _liveInputAvailable || _replayActive);
 
     internal static void Install(Plugin plugin)
     {
@@ -66,6 +65,7 @@ internal static class GamepadOverlay
         catch (Exception ex)
         {
             _hasSample = false;
+            _liveInputAvailable = false;
             _localInput = null;
             _replayInput = null;
             _nextResolve = Time.unscaledTime;
@@ -77,13 +77,27 @@ internal static class GamepadOverlay
     private static void SampleInput()
     {
         bool replayActive = false;
+        bool localControlledByReplay = false;
         PTK_ReplayManager manager = PTK_ReplayManager.Instance;
         if (manager != null)
         {
-            try { replayActive = manager.IsPlayingReplay(); }
+            try
+            {
+                replayActive = manager.IsPlayingReplay();
+                if (replayActive && _localInput != null && _localInput.antPlayer != null)
+                    localControlledByReplay = manager.IsPlayerControlledByReplayInput(_localInput.antPlayer);
+            }
             catch { replayActive = false; }
         }
-        _replayActive = replayActive && _showReplayInputs.Value;
+        bool showReplay = InputOverlayResolution.UseReplay(_localInput != null,
+            localControlledByReplay, replayActive, _showReplayInputs.Value);
+        _liveInputAvailable = _localInput != null && !localControlledByReplay;
+        if (showReplay != _replayActive)
+        {
+            _ghostJumpPulseUntil = _ghostBoostPulseUntil = 0;
+            _hasSample = false;
+        }
+        _replayActive = showReplay;
 
         if (_replayActive)
         {
@@ -100,7 +114,8 @@ internal static class GamepadOverlay
             return;
         }
 
-        if (_localInput == null || _localInput.inputData == null) { _hasSample = false; return; }
+        if (localControlledByReplay || _localInput == null || _localInput.inputData == null)
+        { _hasSample = false; return; }
         var data = _localInput.inputData;
         // Discrete inputData fields are mostly click events, and the game deliberately
         // combines Jump/Drift and swaps the boost route during a drift. Sample the
@@ -154,7 +169,7 @@ internal static class GamepadOverlay
     {
         try
         {
-            object? player = RewiredPlayer?.GetValue(input);
+            object? player = input.player;
             if (player == null) return "GAMEPAD / KEYBOARD";
             PropertyInfo? controllersProperty = player.GetType().GetProperty("controllers", BindingFlags.Public | BindingFlags.Instance);
             object? controllers = controllersProperty?.GetValue(player);
@@ -191,7 +206,7 @@ internal static class GamepadOverlay
         EnsureStyles();
         if (!Visible) return;
         float scale = Mathf.Clamp(_scale.Value, .25f, 2f);
-        const float baseWidth = 440, baseHeight = 196;
+        const float baseWidth = 400, baseHeight = 126;
         float availableScale = Mathf.Max(.1f, Mathf.Min((Screen.width - 24f) / (baseWidth + 36f), (Screen.height - 24f) / (baseHeight + 36f)));
         scale = Mathf.Min(scale, availableScale);
         float width = baseWidth * scale, height = baseHeight * scale, margin = 18 * scale;
@@ -205,20 +220,17 @@ internal static class GamepadOverlay
         try
         {
             DrawCard(new Rect(0, 0, baseWidth, baseHeight), _opacity.Value);
-            GUI.Label(new Rect(12, 5, 260, 24), "INPUT VIEWER", _title);
-            DrawStatus(new Rect(336, 7, 92, 20), !_hasSample ? "WAIT" : _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
-            GUI.Label(new Rect(12, 28, 320, 18), !_hasSample ? "WAITING FOR INPUT" : _sample.IsReplay ? "RECORDED INPUTS" : _sample.Device, _small);
-            DrawPanel(new Rect(10, 50, 132, 138), _opacity.Value);
-            DrawPanel(new Rect(150, 50, 278, 114), _opacity.Value);
-            DrawSteering(new Rect(20, 54, 112, 50), _sample.Steering);
-            DrawButton(new Rect(20, 109, 112, 29), "ACCELERATE", _sample.Accelerate, new Color(1f,.57f,.12f));
-            DrawButton(new Rect(20, 145, 112, 29), "REVERSE", _sample.Reverse, new Color(.24f,.67f,1f));
-            GUI.Label(new Rect(162, 52, 250, 19), _sample.IsReplay ? "GHOST INPUTS" : "LIVE INPUTS", _section);
-            DrawButton(new Rect(162, 75, 120, 31), "JUMP / DRIFT", _sample.JumpDrift, new Color(.18f,.72f,.95f));
-            DrawButton(new Rect(290, 75, 120, 31), "BOOST", _sample.Boost, new Color(1f,.57f,.12f));
-            DrawButton(new Rect(162, 112, 120, 31), "BRAKE", _sample.Brake, new Color(.84f,.88f,.94f));
+            GUI.Label(new Rect(14, 8, 66, 22), "Inputs", _title);
+            GUI.Label(new Rect(79, 10, 216, 20), !_hasSample ? "Waiting for input" : _sample.IsReplay ? "Recorded ghost" : _sample.Device, _small);
+            DrawStatus(new Rect(319, 10, 66, 20), !_hasSample ? "WAIT" : _sample.IsReplay ? "GHOST" : "LIVE", _sample.IsReplay);
+            DrawSteering(new Rect(14, 46, 96, 61), _hasSample ? _sample.Steering : 0);
+            DrawButton(new Rect(124, 45, 82, 28), "Accelerate", _hasSample && _sample.Accelerate);
+            DrawButton(new Rect(213, 45, 82, 28), "Brake", _hasSample && _sample.Brake);
+            DrawButton(new Rect(302, 45, 82, 28), "Reverse", _hasSample && _sample.Reverse);
+            DrawButton(new Rect(124, 81, 82, 28), "Jump / drift", _hasSample && _sample.JumpDrift);
+            DrawButton(new Rect(213, 81, 82, 28), "Boost", _hasSample && _sample.Boost);
             if (!_sample.IsReplay)
-                DrawButton(new Rect(290, 112, 120, 31), "USE WEAPON", _sample.Weapon, new Color(.98f,.3f,.34f));
+                DrawButton(new Rect(302, 81, 82, 28), "Weapon", _hasSample && _sample.Weapon);
         }
         finally
         {
@@ -229,63 +241,45 @@ internal static class GamepadOverlay
 
     private static void DrawCard(Rect rect, float alpha)
     {
+        Fill(rect, new Color(.075f, .08f, .075f, Mathf.Clamp01(alpha)));
+        Fill(new Rect(14, 36, rect.width - 28, 1), new Color(.29f, .30f, .28f, .75f));
+    }
+
+    private static void Fill(Rect rect, Color color)
+    {
         Color old = GUI.color;
-        GUI.color = new Color(.025f, .045f, .075f, Mathf.Clamp01(alpha));
+        GUI.color = color;
         GUI.DrawTexture(rect, Texture2D.whiteTexture);
-        GUI.color = new Color(.1f,.7f,.94f,.95f); GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 2), Texture2D.whiteTexture);
-        GUI.color = new Color(.2f,.28f,.39f,.95f);
-        GUI.DrawTexture(new Rect(rect.x, rect.yMax-1, rect.width, 1), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.x, rect.y, 1, rect.height), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.xMax-1, rect.y, 1, rect.height), Texture2D.whiteTexture);
         GUI.color = old;
     }
 
     private static void DrawSteering(Rect rect, float value)
     {
-        GUI.Label(new Rect(rect.x, rect.y, rect.width, 13), "STEERING  " + value.ToString("+0.00;-0.00;0.00"), _small);
-        float cx = rect.x + 23, cy = rect.y + 32;
-        DrawCircle(new Vector2(cx, cy), 15, new Color(.07f,.11f,.17f,1), new Color(.26f,.36f,.49f,1));
-        DrawCircle(new Vector2(cx + value * 9, cy), 6,
-            Mathf.Abs(value) > .08f ? new Color(.1f,.76f,1f,1) : new Color(.55f,.65f,.78f,1), Color.clear);
+        GUI.Label(new Rect(rect.x, rect.y, rect.width, 20), "Steer", _small);
+        GUI.Label(new Rect(rect.x + 43, rect.y, 53, 20), value.ToString("+0.00;-0.00;0.00"), _small);
+        float cy = rect.y + 39, cx = rect.x + rect.width * .5f;
+        Fill(new Rect(rect.x + 4, cy - 2, rect.width - 8, 4), new Color(.28f, .29f, .27f, 1));
+        Fill(new Rect(cx, cy - 6, 1, 12), new Color(.56f, .57f, .53f, 1));
+        DrawCircle(new Vector2(cx + value * (rect.width * .5f - 8), cy), 6,
+            Mathf.Abs(value) > .08f ? new Color(1f, .72f, .36f, 1) : new Color(.86f, .87f, .82f, 1), Color.clear);
     }
 
-    private static void DrawButton(Rect rect, string label, bool pressed, Color accent)
+    private static void DrawButton(Rect rect, string label, bool pressed)
     {
-        Color old = GUI.color;
-        GUI.color = pressed ? new Color(accent.r, accent.g, accent.b, .28f) : new Color(.055f,.08f,.12f,.98f);
-        GUI.DrawTexture(rect, Texture2D.whiteTexture);
-        GUI.color = pressed ? accent : new Color(.26f,.35f,.48f,.9f);
-        const float border = 1;
-        GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, border), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.x, rect.yMax-border, rect.width, border), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.x, rect.y, border, rect.height), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.xMax-border, rect.y, border, rect.height), Texture2D.whiteTexture);
-        GUI.color = pressed ? Color.white : new Color(.75f,.82f,.9f,1);
+        Fill(rect, pressed ? new Color(1f, .72f, .36f, 1) : new Color(.17f, .18f, .165f, 1));
+        Color old = GUI.contentColor;
+        GUI.contentColor = pressed ? new Color(.14f, .12f, .085f, 1) : new Color(.82f, .83f, .78f, 1);
         GUI.Label(rect, label, _pill);
-        GUI.color = old;
+        GUI.contentColor = old;
     }
 
     private static void DrawStatus(Rect rect, string label, bool replay)
     {
-        Color old = GUI.color;
-        GUI.color = replay ? new Color(.37f,.7f,1f,.2f) : new Color(.17f,.88f,.64f,.2f);
-        GUI.DrawTexture(rect, Texture2D.whiteTexture);
-        GUI.color = replay ? new Color(.55f,.8f,1f,1) : new Color(.36f,1f,.74f,1);
-        GUI.Label(rect, "● " + label, _status);
-        GUI.color = old;
-    }
-
-    private static void DrawPanel(Rect rect, float opacity)
-    {
-        Color old = GUI.color;
-        GUI.color = new Color(.035f,.055f,.08f,Mathf.Clamp01(opacity * .82f));
-        GUI.DrawTexture(rect, Texture2D.whiteTexture);
-        GUI.color = new Color(.18f,.27f,.38f,Mathf.Clamp01(opacity * .95f));
-        GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 1), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.x, rect.yMax-1, rect.width, 1), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.x, rect.y, 1, rect.height), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(rect.xMax-1, rect.y, 1, rect.height), Texture2D.whiteTexture);
-        GUI.color = old;
+        Color old = GUI.contentColor;
+        GUI.contentColor = !_hasSample ? new Color(.66f, .68f, .62f, 1)
+            : replay ? new Color(.65f, .8f, .93f, 1) : new Color(1f, .72f, .36f, 1);
+        GUI.Label(rect, label, _status);
+        GUI.contentColor = old;
     }
 
     private static void DrawCircle(Vector2 center, float radius, Color fill, Color outline)
@@ -326,19 +320,16 @@ internal static class GamepadOverlay
     private static void EnsureStyles()
     {
         if (_title != null) return;
-        _title = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Overflow, wordWrap = false };
-        _title.normal.textColor = Color.white;
-        _small = new GUIStyle(GUI.skin.label) { fontSize = 10, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Overflow, wordWrap = false };
-        _small.normal.textColor = new Color(.68f,.8f,.91f,1);
-        _pill = new GUIStyle(GUI.skin.label) { fontSize = 9, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Clip, wordWrap = false };
+        _title = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(0, 0, 0, 0), wordWrap = false };
+        _title.normal.textColor = new Color(.94f, .95f, .90f, 1);
+        _small = new GUIStyle(_title) { fontSize = 11, fontStyle = FontStyle.Normal };
+        _small.normal.textColor = new Color(.72f, .74f, .68f, 1);
+        _pill = new GUIStyle(_title) { fontSize = 11, alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Clip };
         _pill.normal.textColor = Color.white;
-        _section = new GUIStyle(GUI.skin.label) { fontSize = 10, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Overflow, wordWrap = false };
-        _section.normal.textColor = new Color(.52f,.68f,.83f,1);
-        _secondary = new GUIStyle(GUI.skin.label) { fontSize = 9, alignment = TextAnchor.MiddleLeft, padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Overflow, wordWrap = false };
-        _secondary.normal.textColor = new Color(.74f,.81f,.89f,1);
-        _status = new GUIStyle(GUI.skin.label) { fontSize = 9, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Clip, wordWrap = false };
+        _status = new GUIStyle(_pill) { fontSize = 10 };
+
     }
 
     internal static void Restore() { ResetState(); _faulted = false; }
-    private static void ResetState() { _visible = _startVisible?.Value == true; _hasSample = false; _replayActive = false; _nextResolve = 0; _localInput = null; _replayInput = null; _resolvedReplayTarget = null; _ghostJumpPulseUntil = _ghostBoostPulseUntil = 0; }
+    private static void ResetState() { _visible = _startVisible?.Value == true; _hasSample = false; _replayActive = false; _liveInputAvailable = false; _nextResolve = 0; _localInput = null; _replayInput = null; _resolvedReplayTarget = null; _ghostJumpPulseUntil = _ghostBoostPulseUntil = 0; }
 }

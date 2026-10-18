@@ -92,6 +92,7 @@ export function Setting({
   fallback,
   disabled,
   override,
+  compact = false,
 }) {
   const id = useId();
   const options = choices?.map(String);
@@ -101,6 +102,10 @@ export function Setting({
     fallback === undefined
       ? null
       : `Default: ${fallback === "" ? "empty" : fallback}${low != null && high != null ? ` · ${low}–${high}` : ""}`;
+  const describedBy =
+    [description && `${id}-description`, hint && `${id}-default`]
+      .filter(Boolean)
+      .join(" ") || undefined;
   const update = (event) =>
     onChange(
       boolean
@@ -110,20 +115,26 @@ export function Setting({
           : event.target.value,
     );
   return (
-    <div className="min-w-0 space-y-2">
-      <div className="flex items-center justify-between gap-2">
+    <div className={compact ? "setting-compact" : "min-w-0 space-y-2"}>
+      <div className="setting-label flex items-center justify-between gap-2">
         <label htmlFor={id} className="text-sm font-medium">
           {label}
         </label>
         {override && <Switch label={"Override " + label} {...override} />}
       </div>
       {description && (
-        <p className="text-xs leading-relaxed text-muted">{description}</p>
+        <p
+          id={`${id}-description`}
+          className={compact ? "sr-only" : "text-xs leading-relaxed text-muted"}
+        >
+          {description}
+        </p>
       )}
-      <div className="flex items-center gap-2">
+      <div className="setting-input flex items-center gap-2">
         {options?.length ? (
           <select
             id={id}
+            aria-describedby={describedBy}
             value={value ?? ""}
             disabled={disabled}
             onChange={update}
@@ -141,6 +152,7 @@ export function Setting({
         ) : boolean ? (
           <input
             id={id}
+            aria-describedby={describedBy}
             type="checkbox"
             className="checkbox"
             checked={Boolean(value)}
@@ -150,6 +162,7 @@ export function Setting({
         ) : (
           <input
             id={id}
+            aria-describedby={describedBy}
             type={numeric ? "number" : "text"}
             min={low ?? undefined}
             max={high ?? undefined}
@@ -175,8 +188,9 @@ export function Setting({
       {numeric && low != null && high != null && high - low <= 10000 && (
         <input
           aria-label={label + " slider"}
+          aria-describedby={describedBy}
           type="range"
-          className="range w-full"
+          className="setting-range range w-full"
           min={low}
           max={high}
           step={kind === "int" ? 1 : Math.max(0.001, (high - low) / 1000)}
@@ -185,7 +199,14 @@ export function Setting({
           onChange={(event) => onChange(Number(event.target.value))}
         />
       )}
-      {hint && <p className="text-xs text-muted">{hint}</p>}
+      {hint && (
+        <p
+          id={`${id}-default`}
+          className={compact ? "sr-only" : "text-xs text-muted"}
+        >
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

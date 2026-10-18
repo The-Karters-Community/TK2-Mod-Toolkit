@@ -1,13 +1,24 @@
 # Gamepad viewer
 
+The compact display uses one steering rail and six action labels. Held actions
+turn amber; idle actions remain neutral. Live input and recorded ghost input
+are labeled separately. Placement, size, shortcut and replay options are grouped
+without nested settings panels in the desktop Toolkit.
+
 The Gamepad viewer is a read-only in-game HUD card for driving input. Enable **Gamepad viewer** in Toolkit → Mod packs. It appears as soon as the local kart is created, then changes from **WAIT** to live input when data is ready; replay mode displays recorded inputs when available. Press the configured hotkey (default **F9**) to hide or show it. Choose one of the nine screen presets or select **Custom** and adjust the horizontal and vertical position sliders; scale and background opacity are adjustable too. Top presets use the top margin, and middle presets center the card vertically. The toolkit’s optional **Apply as you adjust** mode previews settings on already-enabled modules after a short pause; module enable and disable changes still wait for **Save changes**.
 
 The live viewer shows Steering, Accelerate, Reverse, Jump / Drift, Boost, Brake and Use Weapon. The game maps Jump and Drift through one combined action, so they share one indicator. The viewer reads Drift and Boost from the named Rewired actions (`Drift_left_right` and `Boost`), because the game rewrites gameplay Drift/Boost fields when it swaps boost-key behavior. The live source label uses Rewired's last active controller when that API is available.
 
-During ghost playback, the card switches to `PTK_PlayerReplayInput_ReplaySerializer` and shows only Steering, Accelerate, Reverse, Jump / Drift, Boost and Brake. It hides Use Weapon and other live-only actions. The game records semantic gameplay actions and axes, not the physical keyboard/controller type or original button bindings; replay cards therefore identify their source as **GHOST** and label the actions as recorded game actions. Until replay input data arrives, the card displays a waiting state.
+When you race against a ghost, the viewer keeps showing **your inputs**. Watching
+a replay instead uses `PTK_PlayerReplayInput_ReplaySerializer`: Steering,
+Accelerate, Reverse, Jump / Drift, Boost and Brake. The game records actions,
+not physical button bindings, so playback is labeled **GHOST** and omits Weapon.
+The source is chosen using the game's per-player replay-control check; an active
+opponent ghost alone cannot replace the local driver's inputs. Ghost action
+pulses are cleared when the source changes.
 
 The runtime implementation is `plugins/TK2.Customization/GamepadOverlay.cs`; the normalized display model and position math are in `InputOverlayModel.cs`. The built-in module catalog exposes settings before first launch. The whole viewer is allowlisted by mandatory online protection, including recorded ghost inputs when **Show leaderboard ghost inputs** is enabled. Ghost input viewing can reveal opponents' recorded controls; it does not change input, physics, items or replay data.
 
-The card uses a compact 440×180 layout. Its steering texture is prepared during Update and GUI styles are initialized on earlier GUI passes. Local kart inputs are captured by Harmony hooks as the kart is created or processes input; the live path does not scan every scene object. The waiting card can therefore appear during track setup instead of being gated until the countdown ends. Ghost serializer discovery remains a throttled scene lookup. Verify first appearance and restart behavior in a local race and leaderboard playback with the installed build.
+The card uses a compact 400×126 layout. Its steering texture is prepared during Update and GUI styles are initialized on earlier GUI passes. Local kart inputs are captured by Harmony hooks as the kart is created or processes input; the live path does not scan every scene object. The waiting card can therefore appear during track setup instead of being gated until the countdown ends. Ghost serializer discovery remains a throttled scene lookup. Verify first appearance and restart behavior in a local race and leaderboard playback with the installed build.
 
 Current-build evidence: `Ant_KartInput.ProcessRacingInput` reads the named Rewired actions, rewrites gameplay Drift/Boost fields based on `bUseSwappedBoostKey`, then registers that processed `inputData` with `PTK_PlayerReplayInput_ReplaySerializer.RegisterCurrentInputForReplaySerializeSet`. Ghost processing applies the serialized values through `ProcessAndSetPlayerInputFromReplay`. Serializer metadata exposes applied steering/acceleration and corresponding discrete actions (`PTK_PlayerReplayInput_ReplaySerializer`, TypeDefIndex 1165; replay input functions around `0x180617330` and `0x180617490`). Ghidra pseudocode is approximate native C-like output, and these declarations alone do not certify visible behavior in a running game. Validate the live Drift/Boost labels with the player's swapped bindings and check the HUD in both a local race and leaderboard playback.

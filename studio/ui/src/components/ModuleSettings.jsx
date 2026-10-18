@@ -12,6 +12,9 @@ export default function ModuleSettings({ module, allOpen }) {
     module.locked ||
     module.available === false;
   const groups = new Map();
+  const presentation =
+    module.field === "values" &&
+    ["Camera", "GamepadOverlay"].includes(module.id);
   const required = new Set(
     (module.settings || []).map((setting) => setting[8]).filter(Boolean),
   );
@@ -20,8 +23,18 @@ export default function ModuleSettings({ module, allOpen }) {
       ? module.settings.filter((setting) => !required.has(setting[0]))
       : module.entries.filter((entry) => entry.key !== "Enabled");
   settings.forEach((setting) => {
-    const group =
+    let group =
       module.field === "values" ? parameterGroup(module, setting[0]) : "";
+    if (presentation) {
+      group =
+        module.id === "Camera"
+          ? group || "Framing"
+          : ["Corner", "PositionX", "PositionY"].includes(setting[0])
+            ? "Placement"
+            : ["Scale", "Opacity"].includes(setting[0])
+              ? "Size & visibility"
+              : "Playback & shortcut";
+    }
     if (!groups.has(group)) groups.set(group, []);
     groups.get(group).push(setting);
   });
@@ -71,6 +84,7 @@ export default function ModuleSettings({ module, allOpen }) {
     return (
       <Setting
         key={key}
+        compact={presentation}
         label={label}
         kind={kind}
         value={displayValue(state, `${module.id}/${key}`) ?? fallback}
@@ -80,7 +94,11 @@ export default function ModuleSettings({ module, allOpen }) {
         description={description}
         choices={choices}
         disabled={
-          disabled || Boolean(requireKey && !state.settings[requireKey])
+          disabled ||
+          Boolean(requireKey && !state.settings[requireKey]) ||
+          (module.id === "Camera" &&
+            key === "TargetHeight" &&
+            !state.settings["Camera/AimAtKart"])
         }
         override={
           requireKey && {
@@ -95,6 +113,50 @@ export default function ModuleSettings({ module, allOpen }) {
   }
   if (!settings.length)
     return <p className="text-sm text-muted">No additional settings.</p>;
+  if (presentation) {
+    // These small presentation modules should not be a stack of nested accordions.
+    const columns =
+      module.id === "GamepadOverlay"
+        ? [["Placement"], ["Size & visibility", "Playback & shortcut"]]
+        : [
+            ["Framing", "In-race panel"],
+            ["Aim & rotation", "Transitions"],
+          ];
+    const assigned = new Set(columns.flat());
+    columns[1].push(
+      ...[...groups.keys()].filter((group) => !assigned.has(group)),
+    );
+    return (
+      <div className="presentation-settings">
+        {columns.map((column, index) => (
+          <div className="presentation-column" key={index}>
+            {column
+              .filter((group) => groups.has(group))
+              .map((group) => (
+                <fieldset className="presentation-section" key={group}>
+                  <legend>{group}</legend>
+                  {group === "Placement" && (
+                    <p className="presentation-note">
+                      Choose a screen position, or adjust either axis to place
+                      it yourself.
+                    </p>
+                  )}
+                  {group === "Framing" && (
+                    <p className="presentation-note">
+                      Keep kart size compensates distance when you change the
+                      field of view.
+                    </p>
+                  )}
+                  <div className="presentation-fields">
+                    {groups.get(group).map(control)}
+                  </div>
+                </fieldset>
+              ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="space-y-3">
       {[...groups].map(([group, items]) => {

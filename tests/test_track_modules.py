@@ -47,12 +47,10 @@ class TrackModuleIntegrationTests(unittest.TestCase):
         self.assertFalse(any('/Models/' in path for path in paths))
         self.assertNotIn('Enabled', [s[0] for s in features[identity]['settings']])
 
-    def test_camera_panel_requires_camera_module(self):
-        source = (pack.PROJECT.parent / 'CameraPanel.cs').read_text(encoding='utf-8')
-        self.assertIn('!p.CameraEnabled.Value || !p.CameraPanelEnabled.Value', source)
+    def test_camera_panel_documents_access_while_overrides_are_off(self):
         camera = next(f for f in pack.catalog_features() if f['id'] == 'Camera')
         panel = next(setting for setting in camera['settings'] if setting[0] == 'PanelEnabled')
-        self.assertIn('only while the Camera setup module is enabled', panel[6])
+        self.assertIn('including while camera overrides are off', panel[6])
 
     def test_boundary_export_includes_render_callback_host(self):
         feature = next(f for f in pack.catalog_features() if f['id'] == 'TrackBoundaries')

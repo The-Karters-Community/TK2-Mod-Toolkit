@@ -156,6 +156,68 @@ pre {
 .disclosure {
   @apply rounded-lg border border-line bg-panel;
 }
+.presentation-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 40px;
+  padding-top: 6px;
+  align-items: start;
+}
+.presentation-column {
+  display: grid;
+  gap: 28px;
+}
+@media (max-width: 1050px) {
+  .presentation-settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.presentation-section {
+  min-width: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.presentation-section legend {
+  padding: 0;
+  margin-bottom: 14px;
+  font-size: 14px;
+  font-weight: 650;
+}
+.presentation-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 46ch;
+  margin: -6px 0 16px;
+}
+.presentation-fields {
+  display: grid;
+  gap: 18px;
+}
+.setting-compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(94px, 40%);
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+.setting-compact .setting-input {
+  justify-content: flex-end;
+}
+.setting-compact .field {
+  width: 100%;
+  padding: 5px 8px;
+  min-height: 32px;
+  font-variant-numeric: tabular-nums;
+}
+.setting-compact .button {
+  min-height: 30px;
+  padding: 6px;
+}
+.setting-compact .setting-range {
+  grid-column: 1 / -1;
+}
 .library-toolbar {
   @apply border-b border-line pb-4;
 }
