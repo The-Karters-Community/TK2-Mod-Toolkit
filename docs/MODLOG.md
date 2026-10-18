@@ -39,7 +39,9 @@
   resets in the running game. User reported the original toggle-close issue;
   the corrected panel was installed with backup `1792347920261217100` and its
   installed hash verified. Ghost-source selection was built and regression
-  tested afterward; its installation/runtime result is recorded below when done.
+  tested afterward, then installed with backup `1792348676629098500`; its installed
+  DLL checksum matches the verified build. A live race against a ghost after that
+  final installation remains unverified. No game was launched by the agent.
 
 ## 2026-10-15 — Garage cosmetic preview compatibility
 
