@@ -24,7 +24,7 @@ public sealed partial class Plugin
         CameraYaw = CameraNumber("YawOffset", 0, -90, 90, "Extra yaw in degrees.");
         CameraRoll = CameraNumber("RollOffset", 0, -30, 30, "Extra roll in degrees.");
         CameraSmoothing = CameraNumber("SmoothingSeconds", .12f, 0, 2, "Adjustment smoothing time; zero applies changes instantly.");
-        CameraPanelEnabled = Config.Bind("Camera", "PanelEnabled", true, "Allow the in-race camera panel, including while camera overrides are off.");
+        CameraPanelEnabled = Config.Bind("Camera", "PanelEnabled", true, "Allow the in-race camera panel while the Camera module is enabled.");
         CameraPanelKey = Config.Bind("Camera", "PanelHotkey", "F8",
             new ConfigDescription("Press this key during a local race. Escape closes the panel.",
                 new AcceptableValueList<string>("F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",

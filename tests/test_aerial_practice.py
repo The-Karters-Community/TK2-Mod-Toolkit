@@ -61,6 +61,11 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
             sources = module_packages._source_dependencies([feature])
             self.assertIn('plugins/TK2.Customization/ShortcutInput.cs', sources)
 
+    def test_aerial_exports_include_shared_hook_installer(self):
+        for identity in ('AirShift', 'RicochetItems', 'MineTraps', 'PracticeRewind', 'SaveStates'):
+            feature = next(f for f in pack.catalog_features() if f['id'] == identity)
+            self.assertIn('plugins/TK2.Customization/FeatureHook.cs', module_packages._source_dependencies([feature]))
+
 
 if __name__ == '__main__':
     unittest.main()

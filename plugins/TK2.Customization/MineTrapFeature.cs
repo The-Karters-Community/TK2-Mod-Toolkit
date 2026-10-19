@@ -42,21 +42,18 @@ internal static class MineTrapFeature
         Behind = p.Config.Bind("MineTraps", "DropDistance", 4f, "Distance behind the kart in metres; suggested 3-6. No upper limit.");
         Damage = p.Config.Bind("MineTraps", "Damage", 0, "Zero keeps the native mine damage; positive values override it. No upper limit.");
         OwnerCanTrigger = p.Config.Bind("MineTraps", "OwnerCanTrigger", false, "Allow a mine to hit its owner after arming.");
-        Patch(p, typeof(Ant_KartInput), "ProcessRacingInput", Type.EmptyTypes, nameof(InputPostfix), false);
-        Patch(p, typeof(WeaponsController), "WeaponBoxReward_AddWeapon", new[] { typeof(PixelWeaponObject.EWeaponType), typeof(int), typeof(PixelWeaponObject.EWeaponType), typeof(int), typeof(bool) }, nameof(RewardPrefix), true);
-        Patch(p, typeof(WeaponsView), "GetWeapon", new[] { typeof(PixelWeaponObject.EWeaponType) }, nameof(GetWeaponPrefix), true);
-        Patch(p, typeof(WeaponsView), "FireWeapon", new[] { typeof(int), typeof(bool), typeof(int[]), typeof(bool), typeof(int), typeof(int), typeof(int) }, nameof(FirePrefix), true);
-        Patch(p, typeof(MineBehavior), "OnTriggerStay", new[] { typeof(Collider) }, nameof(TriggerPrefix), true);
-        Patch(p, typeof(PlayerRaceLogic), "OnRaceResetted", Type.EmptyTypes, nameof(Reset), false);
+        FeatureHook.Install(p.Harmony, typeof(MineTrapFeature), Hooks());
         Installed = true;
     }
 
-    private static void Patch(Plugin p, Type type, string name, Type[] args, string hook, bool prefix)
-    {
-        var target = AccessTools.DeclaredMethod(type, name, args) ?? throw new MissingMethodException(type.Name, name);
-        if (prefix) p.Harmony.Patch(target, prefix: new HarmonyMethod(typeof(MineTrapFeature), hook));
-        else p.Harmony.Patch(target, postfix: new HarmonyMethod(typeof(MineTrapFeature), hook));
-    }
+    internal static FeatureHook[] Hooks() => new[] {
+        new FeatureHook(typeof(Ant_KartInput), nameof(Ant_KartInput.ProcessRacingInput), Type.EmptyTypes, Postfix: nameof(InputPostfix)),
+        new FeatureHook(typeof(WeaponsController), nameof(WeaponsController.WeaponBoxReward_AddWeapon), new[] { typeof(PixelWeaponObject.EWeaponType), typeof(int), typeof(PixelWeaponObject.EWeaponType), typeof(int), typeof(bool) }, Prefix: nameof(RewardPrefix)),
+        new FeatureHook(typeof(WeaponsView), nameof(WeaponsView.GetWeapon), new[] { typeof(PixelWeaponObject.EWeaponType) }, Prefix: nameof(GetWeaponPrefix)),
+        new FeatureHook(typeof(WeaponsView), nameof(WeaponsView.FireWeapon), new[] { typeof(int), typeof(bool), typeof(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<int>), typeof(bool), typeof(int), typeof(int), typeof(int) }, Prefix: nameof(FirePrefix)),
+        new FeatureHook(typeof(MineBehavior), nameof(MineBehavior.OnTriggerStay), new[] { typeof(Collider) }, Prefix: nameof(TriggerPrefix)),
+        new FeatureHook(typeof(PlayerRaceLogic), nameof(PlayerRaceLogic.OnRaceResetted), Type.EmptyTypes, Postfix: nameof(Reset))
+    };
     private static bool Allowed(Ant_Player? owner) => Installed && Enabled.Value && Plugin.OfflineLabAllowed &&
         owner?.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL && MenuManager.Instance == null &&
         Ant_CurrentGameConfiguration.eCurrentRaceState == Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING;
@@ -85,6 +82,8 @@ internal static class MineTrapFeature
             if (Ammo.Value < 1) throw new ArgumentException("Mine ammo must be positive.");
             Plugin.Instance!.SessionModified = true;
             __0 = PixelWeaponObject.EWeaponType.MINA_09; __1 = Ammo.Value;
+            Status = $"Item-box reward selected: {Ammo.Value} mine(s)";
+            Plugin.Instance.Log.LogInfo(Status);
         } catch (Exception ex) { Fail(ex); }
     }
 
@@ -164,6 +163,7 @@ internal static class MineTrapFeature
         mine.gameObject.SetActive(true);
         Traps[mine.GetInstanceID()] = new Trap(mine, owner, Time.time + ArmDelay.Value, Time.time + Lifetime.Value, Radius.Value);
         LastDropFrame[id] = Time.frameCount; Status = "Mine dropped — arming";
+        Plugin.Instance.Log.LogInfo($"Mine trap placed at {mine.transform.position}; arming in {ArmDelay.Value:0.00}s.");
     }
 
     private static bool TriggerPrefix(MineBehavior __instance) => !Traps.ContainsKey(__instance.GetInstanceID());
@@ -195,8 +195,10 @@ internal static class MineTrapFeature
         } catch (Exception ex) { Fail(ex); }
     }
     internal static void DrawStatus() {
-        if (Installed && Enabled.Value && Plugin.OfflineLabAllowed && MenuManager.Instance == null)
-            GUI.Label(new Rect(18, Screen.height - 102, 950, 28), $"Mine traps: {Traps.Count} deployed — {Status}. {DropKey.Value}: test drop; inventory mines use the normal fire button.");
+        if (Enabled != null && Enabled.Value && Plugin.OfflineLabAllowed && MenuManager.Instance == null)
+            GUI.Label(new Rect(18, Screen.height - 102, 950, 28), Installed
+                ? $"Mine traps: {Traps.Count} deployed — {Status}. {DropKey.Value}: test drop; inventory mines use the normal fire button."
+                : "Mine traps: hook unavailable; check the plugin log");
     }
     private static void Fail(Exception ex) { Enabled.Value = false; Plugin.Instance?.Log.LogError($"Mine traps stopped after an actual error: {ex.Message}"); Reset(); }
     internal static void Reset()

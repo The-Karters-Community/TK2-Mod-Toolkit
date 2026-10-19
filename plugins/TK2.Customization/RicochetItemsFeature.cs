@@ -17,24 +17,54 @@ internal static class RicochetItemsFeature
     {
         Enabled = p.Config.Bind("RicochetItems", "Enabled", false, "Experimental: local straight non-homing missiles bounce once on static walls. Runtime validation pending.");
         StraightBazooka = p.Config.Bind("RicochetItems", "StraightBazooka", true, "Fire the local bazooka along the kart's heading instead of auto-aiming. Homing missiles are unchanged.");
-        var init = AccessTools.DeclaredMethod(typeof(StraightMissileController), "Init", new[] { typeof(MissileInitializeParams) })
-            ?? throw new MissingMethodException("StraightMissileController.Init(MissileInitializeParams)");
-        p.Harmony.Patch(init, prefix: new HarmonyMethod(typeof(RicochetItemsFeature), nameof(InitPrefix)),
-            postfix: new HarmonyMethod(typeof(RicochetItemsFeature), nameof(InitPostfix)));
-        p.Harmony.Patch(AccessTools.DeclaredMethod(typeof(RaycastCollisionDetector), "Hit", new[] { typeof(GameObject), typeof(Vector3), typeof(Vector3) })
-            ?? throw new MissingMethodException("RaycastCollisionDetector.Hit(GameObject, Vector3, Vector3)"),
-            prefix: new HarmonyMethod(typeof(RicochetItemsFeature), nameof(HitPrefix)));
-        p.Harmony.Patch(AccessTools.DeclaredMethod(typeof(VisualLogicMissileController), "RefreshBulletConstantMovementTowardsTarget", new[] { typeof(float) })
-            ?? throw new MissingMethodException("VisualLogicMissileController.RefreshBulletConstantMovementTowardsTarget(float)"),
-            prefix: new HarmonyMethod(typeof(RicochetItemsFeature), nameof(MovementPrefix)));
-        p.Harmony.Patch(AccessTools.DeclaredMethod(typeof(VisualLogicMissileController), "OnDestroy", Type.EmptyTypes)
-            ?? throw new MissingMethodException("VisualLogicMissileController.OnDestroy()"),
-            postfix: new HarmonyMethod(typeof(RicochetItemsFeature), nameof(DestroyPostfix)));
-        p.Harmony.Patch(AccessTools.DeclaredMethod(typeof(VisualLogicMissileController), "CheckIfPassedThrough", Type.EmptyTypes)
-            ?? throw new MissingMethodException("VisualLogicMissileController.CheckIfPassedThrough()"),
-            prefix: new HarmonyMethod(typeof(RicochetItemsFeature), nameof(PassedTargetPrefix)));
-        p.Harmony.Patch(AccessTools.DeclaredMethod(typeof(PlayerRaceLogic), "OnRaceResetted", Type.EmptyTypes)!,
-            postfix: new HarmonyMethod(typeof(RicochetItemsFeature), nameof(Reset)));
+        FeatureHook.Install(p.Harmony, typeof(RicochetItemsFeature), Hooks());
+    }
+
+    internal static FeatureHook[] Hooks() => new[] {
+        new FeatureHook(typeof(StraightMissileController), nameof(StraightMissileController.Init), new[] { typeof(MissileInitializeParams) }, Prefix: nameof(InitPrefix), Postfix: nameof(InitPostfix)),
+        new FeatureHook(typeof(RaycastCollisionDetector), nameof(RaycastCollisionDetector.Hit), new[] { typeof(GameObject), typeof(Vector3), typeof(Vector3) }, Prefix: nameof(HitPrefix)),
+        new FeatureHook(typeof(VisualLogicMissileController), nameof(VisualLogicMissileController.RefreshBulletConstantMovementTowardsTarget), new[] { typeof(float) }, Prefix: nameof(MovementPrefix)),
+        new FeatureHook(typeof(VisualLogicMissileController), nameof(VisualLogicMissileController.OnDestroy), Type.EmptyTypes, Postfix: nameof(DestroyPostfix)),
+        new FeatureHook(typeof(VisualLogicMissileController), nameof(VisualLogicMissileController.CheckIfPassedThrough), new[] { typeof(float) }, Prefix: nameof(PassedTargetPrefix)),
+        new FeatureHook(typeof(WeaponsController), nameof(WeaponsController.FireInput), new[] { typeof(bool) }, Prefix: nameof(FireInputPrefix), Finalizer: nameof(FireInputFinalizer)),
+        new FeatureHook(typeof(WeaponsController), nameof(WeaponsController.Shoot), Type.EmptyTypes, Prefix: nameof(FireInputPrefix), Finalizer: nameof(FireInputFinalizer)),
+        new FeatureHook(typeof(WeaponsController), nameof(WeaponsController.GetCurrentPlayerTargets), Type.EmptyTypes, Postfix: nameof(TargetsPostfix)),
+        new FeatureHook(typeof(PlayerRaceLogic), nameof(PlayerRaceLogic.OnRaceResetted), Type.EmptyTypes, Postfix: nameof(Reset))
+    };
+
+    private sealed record FireSettings(PixelWeaponObject Weapon, bool RequireTarget, PixelWeaponObject.EItemTargetType Target,
+        bool AutoBack);
+    private static bool StraightAllowed(WeaponsController controller) => Enabled.Value && StraightBazooka.Value &&
+        Plugin.OfflineLabAllowed && controller.player?.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL &&
+        controller.currentWeaponType == PixelWeaponObject.EWeaponType.BAZOOKA_00;
+
+    private static void FireInputPrefix(WeaponsController __instance, out FireSettings? __state)
+    {
+        __state = null;
+        if (!StraightAllowed(__instance)) return;
+        var weapon = __instance.GetCurrentWeapon();
+        if (weapon == null) return;
+        __state = new(weapon, weapon.bRequirePlayerTarget, weapon.targetType, __instance.bIsTargettingBackBecauseFrontTargetsAreEmpty);
+        // Both FireInput and Shoot reject an empty target list when this flag is set. Scope the
+        // override to the native firing call; preserve native ammo, cooldown, animation and other weapons.
+        Plugin.Instance!.SessionModified = true;
+        weapon.bRequirePlayerTarget = false; weapon.targetType = PixelWeaponObject.EItemTargetType.NONE;
+        __instance.bIsTargettingBackBecauseFrontTargetsAreEmpty = false;
+    }
+
+    private static void FireInputFinalizer(WeaponsController __instance, FireSettings? __state)
+    {
+        if (__state == null) return;
+        if (__state.Weapon != null) {
+            __state.Weapon.bRequirePlayerTarget = __state.RequireTarget; __state.Weapon.targetType = __state.Target;
+        }
+        __instance.bIsTargettingBackBecauseFrontTargetsAreEmpty = __state.AutoBack;
+    }
+
+    private static void TargetsPostfix(WeaponsController __instance,
+        ref Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<Ant_Player> __result)
+    {
+        if (StraightAllowed(__instance)) __result = WeaponsController.EmptyPlayerTargets;
     }
 
     private static void InitPrefix(StraightMissileController __instance, MissileInitializeParams __0)

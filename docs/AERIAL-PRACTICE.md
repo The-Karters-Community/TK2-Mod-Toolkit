@@ -7,6 +7,30 @@ of these revisions still needs validation.** No game is automatically launched.
 
 ## Compatibility policy
 
+### Startup failure correction, 2026-10-19
+
+User testing exposed three failed installs in `BepInEx/LogOutput.log`: the KCC
+explicit interface method is exported by interop with underscores, the missile
+passage check takes a float, and `WeaponsView.FireWeapon` takes an
+`Il2CppStructArray<int>` rather than managed `int[]`. The previous compile-only
+check missed all three reflection lookup failures. These signatures are now
+corrected. Each feature resolves all of its hooks before applying them, and
+rolls back its own patches if installation fails.
+
+`tests/RuntimeHooks` loads the built plugin and installed interop without calling
+game methods. It resolves the same 18 hook bindings used for installation and
+checks Harmony handler argument types. Run after building:
+
+```powershell
+dotnet run --project tests/RuntimeHooks -- plugins/TK2.Customization/bin/Release/net6.0/TK2.Customization.dll 'C:\Program Files (x86)\Steam\steamapps\common\The Karters 2 Turbo Charged'
+```
+
+This verifies lookups and argument types, not visible gameplay. Air Shift reports
+specific race/recovery/menu conditions instead of leaving an unchanged generic
+waiting message when its callbacks are running. Mine reward selection and actual
+trap placement are logged separately. Camera Setup's hotkey now requires its
+main enable switch; disabling the module also closes the camera panel.
+
 Following the user's 2026-10-19 instruction, there are no GameAssembly or
 UnityPlayer binary-hash/version allowlists for module execution. Each feature
 attempts its exact-signature hooks independently. A changed executable alone
@@ -42,7 +66,7 @@ remain compatible. Blank means None (disabled). Practice Snapshots' existing
 ## Air Shift
 
 The correction runs at the final
-`PixelEasyCharMoveKartController.KinematicCharacterController.ICharacterController.UpdateVelocity`
+`PixelEasyCharMoveKartController.KinematicCharacterController_ICharacterController_UpdateVelocity`
 postfix. The earlier implementation ran inside `PixelKartPhysics.UpdateVelocity`,
 before the controller finished its own velocity changes, and applied a one-tick
 impulse. The revised implementation maintains the selected lateral target across
@@ -88,7 +112,13 @@ The first implementation did **not** convert auto-aiming weapons to straight
 shots. It only accepted an already non-targeting straight missile.
 
 The revision adds **Straight-firing bazooka** (on by default within this
-otherwise disabled module). It clears only local bazooka target IDs, captures
+otherwise disabled module). The firing revision temporarily disables the local
+bazooka's target requirement in both native `WeaponsController.FireInput(bool)`
+and `Shoot()` calls, restoring the original settings in a finalizer. The native
+code checks `bRequirePlayerTarget` before creating the projectile, so changing
+missile initialization alone was insufficient. Local straight shots receive an
+empty player-target list and do not auto-fire backward when front targets are
+absent. Explicit backward fire remains available. It clears local bazooka target IDs, captures
 kart heading at launch, preserves backward-fire direction, and owns the shot's
 horizontal flight so target/muzzle tracking cannot bend it afterward. It does
 not alter the homing-missile class. Turn the option off to retain ordinary
@@ -136,7 +166,8 @@ without artificial upper ceilings. Turning off the module cleans up its traps.
 ## Evidence and validation
 
 Native evidence was read from the current installed binary, with exact interop
-signatures additionally checked by compilation. Local files are in
+hook signatures additionally checked by the runtime reflection probe. Compilation
+alone cannot validate reflection lookups. Local files are in
 `local/aerial-practice-evidence/`. These are metadata and native pseudocode,
 not recovered original C#. Relevant current RVAs include controller UpdateVelocity
 `0x5F0EE0`, PixelKartPhysics

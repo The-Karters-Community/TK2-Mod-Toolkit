@@ -18,8 +18,7 @@ internal static class CameraPanel
     {
         try
         {
-            // Turning overrides off restores the native view; the editor must stay usable.
-            if (!p.CameraPanelEnabled.Value || !CameraFeature.RaceAvailable)
+            if (!p.CameraEnabled.Value || !p.CameraPanelEnabled.Value || !CameraFeature.RaceAvailable)
             { if (_open) Close(p); return; }
             if (Enum.TryParse(p.CameraPanelKey.Value, out KeyCode key) && key != KeyCode.None && Input.GetKeyDown(key))
             {
@@ -59,7 +58,7 @@ internal static class CameraPanel
 
     internal static void Draw(Plugin p)
     {
-        if (!_open || _failed) return;
+        if (!_open || _failed || !p.CameraEnabled.Value || !p.CameraPanelEnabled.Value) return;
         Matrix4x4 matrix = GUI.matrix;
         Color color = GUI.color, background = GUI.backgroundColor, content = GUI.contentColor;
         int depth = GUI.depth;

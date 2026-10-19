@@ -20,7 +20,7 @@ internal static class AirShiftFeature
         internal Vector3 Right;
     }
     private static readonly Dictionary<int, Shift> States = new();
-    private static string Status = "Air Shift: waiting for a local kart";
+    private static string Status = "Air Shift: velocity hook unavailable; check the plugin log";
 
     internal static void Install(Plugin p)
     {
@@ -35,23 +35,32 @@ internal static class AirShiftFeature
         OncePerJump = p.Config.Bind("AirShift", "OncePerJump", true, "Disable to experiment with repeated shifts during the same jump.");
         LimitSpeed = p.Config.Bind("AirShift", "LimitHorizontalSpeed", true, "Apply the initial horizontal speed budget. Disable for unrestricted lateral additions.");
         ShowStatus = p.Config.Bind("AirShift", "ShowStatus", true, "Show ready/spent/active state and applied lateral speed while testing.");
-        Patch(p, typeof(Ant_KartInput), "ProcessRacingInput", Type.EmptyTypes, nameof(InputPostfix));
-        // Apply at the final KCC controller boundary, after the game's lateral damping and other velocity logic.
-        Patch(p, typeof(PixelEasyCharMoveKartController), "KinematicCharacterController.ICharacterController.UpdateVelocity",
-            new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, nameof(VelocityPostfix));
-        Patch(p, typeof(PlayerRaceLogic), "OnRaceResetted", Type.EmptyTypes, nameof(Reset));
+        FeatureHook.Install(p.Harmony, typeof(AirShiftFeature), Hooks());
+        Status = "Air Shift: waiting for a local kart";
     }
 
-    private static void Patch(Plugin p, Type type, string name, Type[] args, string hook) => p.Harmony.Patch(
-        AccessTools.DeclaredMethod(type, name, args) ?? throw new MissingMethodException(type.Name, name),
-        postfix: new HarmonyMethod(typeof(AirShiftFeature), hook));
+    internal static FeatureHook[] Hooks() => new[] {
+        new FeatureHook(typeof(Ant_KartInput), nameof(Ant_KartInput.ProcessRacingInput), Type.EmptyTypes, Postfix: nameof(InputPostfix)),
+        // Final KCC controller boundary, after native damping.
+        new FeatureHook(typeof(PixelEasyCharMoveKartController), nameof(PixelEasyCharMoveKartController.KinematicCharacterController_ICharacterController_UpdateVelocity),
+            new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, Postfix: nameof(VelocityPostfix)),
+        new FeatureHook(typeof(PlayerRaceLogic), nameof(PlayerRaceLogic.OnRaceResetted), Type.EmptyTypes, Postfix: nameof(Reset))
+    };
 
-    internal static bool Running(PixelEasyCharMoveKartController? kart) =>
-        Plugin.OfflineLabAllowed && Time.timeScale > 0 && MenuManager.Instance == null &&
-        Ant_CurrentGameConfiguration.eCurrentRaceState == Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING &&
-        kart?.parentPlayer?.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL && !kart.IsPlayingReplayData() &&
-        kart.outsideMapValidator != null && !kart.outsideMapValidator.bIsPlayerRespawning &&
-        !kart.kartPhysics.IsTeleportingFromAtoB() && !kart.bIsInTankForm;
+    internal static bool Running(PixelEasyCharMoveKartController? kart) => BlockReason(kart) == null;
+    private static string? BlockReason(PixelEasyCharMoveKartController? kart)
+    {
+        if (!Plugin.OfflineLabAllowed) return "offline mode required";
+        if (kart?.parentPlayer?.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL) return "waiting for a local kart";
+        if (Time.timeScale <= 0) return "paused";
+        if (MenuManager.Instance != null) return "menu open";
+        if (Ant_CurrentGameConfiguration.eCurrentRaceState != Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING) return "race not running";
+        if (kart.IsPlayingReplayData()) return "replay playback";
+        if (kart.outsideMapValidator == null || kart.outsideMapValidator.bIsPlayerRespawning) return "recovery in progress";
+        if (kart.kartPhysics.IsTeleportingFromAtoB()) return "teleport in progress";
+        if (kart.bIsInTankForm) return "tank form active";
+        return null;
+    }
 
     private static Shift State(PixelKartPhysics physics)
     {
@@ -62,10 +71,12 @@ internal static class AirShiftFeature
 
     private static void InputPostfix(Ant_KartInput __instance)
     {
-        if (!Enabled.Value) return;
+        if (!Enabled.Value) { if (States.Count > 0) Reset(); return; }
         try {
             var kart = __instance.boostManager?.kartController;
-            if (!Running(kart) || kart!.Motor.GroundingStatus.IsStableOnGround) return;
+            string? blocked = BlockReason(kart);
+            if (blocked != null) { Status = "Air Shift: " + blocked; return; }
+            if (kart!.Motor.GroundingStatus.IsStableOnGround) { Status = "Air Shift: grounded"; return; }
             var state = State(kart.kartPhysics);
             bool left = Input.GetKeyDown(Left.Value) || ShortcutInput.Read(__instance, LeftAction.Value);
             bool right = Input.GetKeyDown(Right.Value) || ShortcutInput.Read(__instance, RightAction.Value);
@@ -76,6 +87,7 @@ internal static class AirShiftFeature
 
     private static void VelocityPostfix(PixelEasyCharMoveKartController __instance, ref Vector3 __0)
     {
+        if (!Enabled.Value) return;
         try {
             var kart = __instance;
             if (kart.parentPlayer?.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL) return;
@@ -83,7 +95,8 @@ internal static class AirShiftFeature
             if (kart.Motor.GroundingStatus.IsStableOnGround) {
                 state.Used = state.Active = false; state.Pending = 0; Status = "Air Shift: grounded"; return;
             }
-            if (!Enabled.Value || !Running(kart)) { state.Active = false; state.Pending = 0; return; }
+            string? blocked = BlockReason(kart);
+            if (blocked != null) { state.Active = false; state.Pending = 0; Status = "Air Shift: " + blocked; return; }
             if (state.Pending != 0 && Time.unscaledTime <= state.Expires && (!OncePerJump.Value || !state.Used)) {
                 if (!float.IsFinite(Strength.Value) || Strength.Value < 0 || !float.IsFinite(Duration.Value) || Duration.Value < 0 ||
                     !float.IsFinite(Retention.Value) || Retention.Value < 0) throw new ArgumentException("Air Shift settings must be finite, non-negative numbers.");
