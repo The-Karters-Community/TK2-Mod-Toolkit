@@ -67,7 +67,7 @@ internal static class TrackBoundaries
         _key = p.Config.Bind("TrackBoundaries", "ToggleKey", "F10", "Toggle visibility during an offline race while this module is enabled.");
         _inspectKey = p.Config.Bind("TrackBoundaries", "InspectKey", "F8", "Pin one displayed collider under the screen center for inspection; press again to clear.");
     }
-    private static bool Allowed => Plugin.Instance?.GameplayReady == true && Plugin.OfflineLabAllowed && MenuManager.Instance == null &&
+    private static bool Allowed => Plugin.OfflineLabAllowed && MenuManager.Instance == null &&
         Ant_CurrentGameConfiguration.eCurrentRaceState == Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING;
     internal static void Tick()
     {

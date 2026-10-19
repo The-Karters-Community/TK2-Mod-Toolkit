@@ -4,12 +4,12 @@
 
 <p align="center"><img src="assets/Logo.png" alt="The Karters 2 Turbo Charged" width="260"></p>
 
-The 0.6.25 plugin is rebuilt against **0.1.4.24 (Windows x64)**. The validated loader is **BepInEx Unity IL2CPP x64 `6.0.0-be.788`**, commit `5b766a3`. Compatible game updates no longer block installation solely because the native game hash changed; individual hooks still need to work, and live Mirror Race rendering on the updated game remains unverified. Native fast-fall and performance replacements retain their specific build checks. This is a community project; gameplay-changing modules are intended for local/offline use. Online protection is mandatory and locked on.
+The 0.6.25 plugin is rebuilt against **0.1.4.24 (Windows x64)**. The validated loader is **BepInEx Unity IL2CPP x64 `6.0.0-be.788`**, commit `5b766a3`. Compatible game updates no longer block installation solely because the native game hash changed; individual hooks still need to work, and live Mirror Race rendering on the updated game remains unverified. Module hooks are attempted on updated builds without binary-hash or version allowlists; only actual hook/runtime failures stop the affected feature. This is a community project; gameplay-changing modules are intended for local/offline use. Online protection is mandatory and locked on.
 
 ## Standalone camera and inputs
 
 The source Studio also includes experimental **Air Shift**, **Rewind / Practice
-Scrubbing**, and **Ricochet Items** modules, plus expanded Practice Snapshots.
+Scrubbing**, and **Ricochet Items** and **Mine Traps** modules, plus expanded Practice Snapshots.
 They default off and still need in-game validation. See [controls, evidence and
 limitations](docs/AERIAL-PRACTICE.md).
 

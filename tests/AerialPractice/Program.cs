@@ -6,20 +6,23 @@ void Check(bool condition, string why) { assertions++; if (!condition) throw new
 var random = new Random(1942);
 for (int i = 0; i < 10000; i++) {
     float x = (float)(random.NextDouble() * 160 - 80), z = (float)(random.NextDouble() * 160 - 80);
-    float angle = (float)(random.NextDouble() * Math.PI * 2), impulse = (float)(random.NextDouble() * 30 - 15);
-    var shifted = AirShiftMath.Adjust(x, z, MathF.Cos(angle), MathF.Sin(angle), impulse, 1);
-    double speed = Math.Sqrt(x*x + z*z), after = Math.Sqrt(shifted.X*shifted.X + shifted.Z*shifted.Z);
-    Check(after <= speed + .00003, "shift must never increase horizontal speed");
-    double dx = shifted.X - x, dz = shifted.Z - z;
-    Check(Math.Sqrt(dx*dx + dz*dz) <= Math.Abs(impulse) + .00003, "sideways correction is bounded by configured impulse");
-    var reduced = AirShiftMath.Adjust(x, z, 1, 0, impulse, .9f);
-    Check(Math.Sqrt(reduced.X*reduced.X + reduced.Z*reduced.Z) <= speed * .9 + .00003, "retention caps horizontal speed");
+    float angle = (float)(random.NextDouble() * Math.PI * 2), target = (float)(random.NextDouble() * 300 - 150);
+    float budget = MathF.Sqrt(x*x + z*z);
+    var shifted = AirShiftMath.Hold(x, z, MathF.Cos(angle), MathF.Sin(angle), target, budget, true);
+    Check(Math.Sqrt(shifted.X*shifted.X + shifted.Z*shifted.Z) <= budget + .00003, "enabled speed budget is respected");
+    var unlimited = AirShiftMath.Hold(x, z, 1, 0, target, 0, false);
+    Check(Math.Abs(unlimited.X-target) < .00003 && unlimited.Z == z, "unlimited shift preserves forward speed and has no lateral ceiling");
 }
-Check(AirShiftMath.Adjust(0, 0, 1, 0, 6, 1) == (0, 0), "stationary shift cannot create speed");
-Check(AirShiftMath.Adjust(0, 30, 0, 0, 6, 1) == (0, 30), "vertical kart right vector cannot create a horizontal impulse");
-var left = AirShiftMath.Adjust(0, 30, 1, 0, -6, 1);
-var right = AirShiftMath.Adjust(0, 30, 1, 0, 6, 1);
-Check(left.X < 0 && right.X > 0 && Math.Abs(left.Z-right.Z) < .00001, "left and right are symmetric");
+Check(AirShiftMath.Hold(0, 30, 1, 0, 1000, 30, false) == (1000, 30), "values far above the former 15 limit work");
+Check(AirShiftMath.Hold(0, 0, 1, 0, 18, 0, false) == (18, 0), "unrestricted shifting works from rest");
+Check(AirShiftMath.Hold(0, 30, 0, 0, 18, 30, false) == (0, 30), "a vertical right vector produces no horizontal displacement");
+float lateral = 0, displacement = 0;
+for (int i = 0; i < 25; i++) {
+    lateral *= .1f; // Representative strong native air damping before our final-controller postfix.
+    lateral = AirShiftMath.Hold(lateral, 30, 1, 0, 18, 30, false).X;
+    displacement += lateral * .01f;
+}
+Check(Math.Abs(displacement-4.5f) < .0001f, "maintained velocity produces a visible 4.5m step over .25 seconds despite damping");
 
 var history = new PracticeHistory<string>();
 Check(!history.TryAt(3, out _, out _), "empty history cannot rewind");

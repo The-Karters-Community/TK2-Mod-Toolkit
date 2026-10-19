@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Reflection;
 using System.Collections.Generic;
-using System.Security.Cryptography;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Unity.IL2CPP;
@@ -23,13 +22,9 @@ public sealed partial class Plugin : BasePlugin
     internal ConfigEntry<bool> VignetteDisabled = null!;
     internal ConfigEntry<float> CameraDistance = null!, CameraHeight = null!;
     internal ConfigEntry<float> MusicVolume = null!, SfxVolume = null!, VoiceVolume = null!, UiVolume = null!;
-    // GameplayReady records native physics verification, not permission for all offline modules.
+    // GameplayReady records installation of the Fast Fall hook, not a binary-version allowlist.
     internal bool GameplayReady, PhysicsFaulted, SessionModified;
     private StudioBehaviour? _behaviour;
-
-    // Verified native builds. Current evidence is recorded in docs/AERIAL-PRACTICE.md.
-    private const string KnownGameHash = "e55fab2cdcbf3852160183504a847b1a1b7af61c24bc9619e3736e3753aee130";
-    private const string CurrentPhysicsGameHash = "55f5c88972fe1ccf4c9d5f3871b71bcfa261b3e42a379e18438e92623fc4d6a2";
 
     public override void Load()
     {
@@ -60,6 +55,7 @@ public sealed partial class Plugin : BasePlugin
         TryFeature("air shift", () => AirShiftFeature.Install(this));
         TryFeature("ricochet items", () => RicochetItemsFeature.Install(this));
         TryFeature("practice rewind", () => PracticeRewindFeature.Install(this));
+        TryFeature("mine traps", () => MineTrapFeature.Install(this));
         InstallPack();
         TryFeature("racing camera", () => CameraFeature.Install(this));
         LegacyMK.Install(this);
@@ -91,12 +87,6 @@ public sealed partial class Plugin : BasePlugin
 
     private void InstallPhysics()
     {
-        string binary = Path.Combine(Paths.GameRootPath, "GameAssembly.dll");
-        using var stream = File.OpenRead(binary);
-        using var algorithm = SHA256.Create();
-        string hash = Convert.ToHexString(algorithm.ComputeHash(stream)).ToLowerInvariant();
-        if (hash != KnownGameHash && hash != CurrentPhysicsGameHash)
-            throw new InvalidOperationException("Unverified game build; physics disabled.");
         PatchExact(typeof(PixelKartPhysics), "FixedUpdate", Type.EmptyTypes, nameof(PhysicsPostfix), prefix: false);
         GameplayReady = true;
     }
@@ -132,7 +122,7 @@ public sealed partial class Plugin : BasePlugin
         AudioFeature.Restore();
         RecipeHost.Restore();
         FastFallFeature.Restore();
-        AirShiftFeature.Reset(); PracticeRewindFeature.Reset(); RicochetItemsFeature.Reset();
+        AirShiftFeature.Reset(); PracticeRewindFeature.Reset(); RicochetItemsFeature.Reset(); MineTrapFeature.Reset();
         CommunityMods.Restore();
         NightmareAI.Restore();
         LegacyMK.Restore();

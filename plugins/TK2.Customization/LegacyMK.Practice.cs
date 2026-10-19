@@ -110,8 +110,8 @@ internal static partial class LegacyMK
             bool load = HoldLoad.Value ? Input.GetKey(LoadKey.Value) : Input.GetKeyDown(LoadKey.Value);
             if (ControllerShortcuts.Value && input.player != null)
             {
-                save |= input.player.GetButtonDown(SaveAction.Value);
-                load |= HoldLoad.Value ? input.player.GetButton(LoadAction.Value) : input.player.GetButtonDown(LoadAction.Value);
+                save |= ShortcutInput.Read(input, SaveAction.Value);
+                load |= HoldLoad.Value ? ShortcutInput.Read(input, LoadAction.Value, true) : ShortcutInput.Read(input, LoadAction.Value);
             }
             if (save && _lastSaveFrame != Time.frameCount)
             {

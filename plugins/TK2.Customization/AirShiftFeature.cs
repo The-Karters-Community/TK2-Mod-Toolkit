@@ -8,24 +8,37 @@ namespace TK2.Customization;
 
 internal static class AirShiftFeature
 {
-    private static ConfigEntry<bool> Enabled = null!;
+    private static ConfigEntry<bool> Enabled = null!, OncePerJump = null!, LimitSpeed = null!, ShowStatus = null!;
     private static ConfigEntry<KeyCode> Left = null!, Right = null!;
     private static ConfigEntry<string> LeftAction = null!, RightAction = null!;
-    private static ConfigEntry<float> Strength = null!, Retention = null!;
-    private sealed class Shift { internal bool Used; internal int Direction; internal float Expires; }
+    private static ConfigEntry<float> Strength = null!, Retention = null!, Duration = null!;
+    private sealed class Shift {
+        internal bool Used, Active;
+        internal int Pending;
+        internal float Expires, TargetLateral, Budget;
+        internal double Until;
+        internal Vector3 Right;
+    }
     private static readonly Dictionary<int, Shift> States = new();
+    private static string Status = "Air Shift: waiting for a local kart";
 
     internal static void Install(Plugin p)
     {
-        Enabled = p.Config.Bind("AirShift", "Enabled", false, "Experimental offline lateral air adjustment, once per jump. Runtime validation pending.");
+        Enabled = p.Config.Bind("AirShift", "Enabled", false, "Offline sustained lateral air shift. Runtime validation pending.");
         Left = p.Config.Bind("AirShift", "LeftKey", KeyCode.LeftBracket, "Shift left while airborne.");
         Right = p.Config.Bind("AirShift", "RightKey", KeyCode.RightBracket, "Shift right while airborne.");
-        LeftAction = p.Config.Bind("AirShift", "LeftAction", "", "Optional existing Rewired action; blank uses keyboard only.");
-        RightAction = p.Config.Bind("AirShift", "RightAction", "", "Optional existing Rewired action; blank uses keyboard only.");
-        Strength = p.Config.Bind("AirShift", "SidewaysImpulse", 6f, new ConfigDescription("Maximum lateral velocity impulse (m/s).", new AcceptableValueRange<float>(1, 15)));
-        Retention = p.Config.Bind("AirShift", "SpeedRetention", 1f, new ConfigDescription("Horizontal speed cap relative to speed before shifting.", new AcceptableValueRange<float>(.9f, 1)));
+        LeftAction = p.Config.Bind("AirShift", "LeftAction", "", "Selected physical gamepad button or existing Rewired action.");
+        RightAction = p.Config.Bind("AirShift", "RightAction", "", "Selected physical gamepad button or existing Rewired action.");
+        Strength = p.Config.Bind("AirShift", "SidewaysImpulse", 18f, "Lateral velocity change (m/s), maintained during the shift. Suggested 12-30; no upper limit.");
+        Duration = p.Config.Bind("AirShift", "ShiftDuration", .25f, "Seconds to maintain the lateral correction. Suggested 0.15-0.4; no upper limit. Zero is an impulse.");
+        Retention = p.Config.Bind("AirShift", "SpeedRetention", 1f, "Horizontal speed budget multiplier. 1 preserves initial speed, 0.9 slows slightly, above 1 permits more speed. No upper limit.");
+        OncePerJump = p.Config.Bind("AirShift", "OncePerJump", true, "Disable to experiment with repeated shifts during the same jump.");
+        LimitSpeed = p.Config.Bind("AirShift", "LimitHorizontalSpeed", true, "Apply the initial horizontal speed budget. Disable for unrestricted lateral additions.");
+        ShowStatus = p.Config.Bind("AirShift", "ShowStatus", true, "Show ready/spent/active state and applied lateral speed while testing.");
         Patch(p, typeof(Ant_KartInput), "ProcessRacingInput", Type.EmptyTypes, nameof(InputPostfix));
-        Patch(p, typeof(PixelKartPhysics), "UpdateVelocity", new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, nameof(VelocityPostfix));
+        // Apply at the final KCC controller boundary, after the game's lateral damping and other velocity logic.
+        Patch(p, typeof(PixelEasyCharMoveKartController), "KinematicCharacterController.ICharacterController.UpdateVelocity",
+            new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, nameof(VelocityPostfix));
         Patch(p, typeof(PlayerRaceLogic), "OnRaceResetted", Type.EmptyTypes, nameof(Reset));
     }
 
@@ -33,7 +46,7 @@ internal static class AirShiftFeature
         AccessTools.DeclaredMethod(type, name, args) ?? throw new MissingMethodException(type.Name, name),
         postfix: new HarmonyMethod(typeof(AirShiftFeature), hook));
 
-    internal static bool Running(PixelEasyCharMoveKartController? kart) => Plugin.Instance?.GameplayReady == true &&
+    internal static bool Running(PixelEasyCharMoveKartController? kart) =>
         Plugin.OfflineLabAllowed && Time.timeScale > 0 && MenuManager.Instance == null &&
         Ant_CurrentGameConfiguration.eCurrentRaceState == Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING &&
         kart?.parentPlayer?.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL && !kart.IsPlayingReplayData() &&
@@ -52,37 +65,62 @@ internal static class AirShiftFeature
         if (!Enabled.Value) return;
         try {
             var kart = __instance.boostManager?.kartController;
-            if (!Running(kart) || kart!.Motor.GroundingStatus.FoundAnyGround) return;
+            if (!Running(kart) || kart!.Motor.GroundingStatus.IsStableOnGround) return;
             var state = State(kart.kartPhysics);
-            bool left = Input.GetKeyDown(Left.Value) || ActionDown(__instance, LeftAction.Value);
-            bool right = Input.GetKeyDown(Right.Value) || ActionDown(__instance, RightAction.Value);
-            if (state.Used || left == right) return;
-            state.Direction = left ? -1 : 1; state.Expires = Time.unscaledTime + .15f;
+            bool left = Input.GetKeyDown(Left.Value) || ShortcutInput.Read(__instance, LeftAction.Value);
+            bool right = Input.GetKeyDown(Right.Value) || ShortcutInput.Read(__instance, RightAction.Value);
+            if ((OncePerJump.Value && state.Used) || left == right) return;
+            state.Pending = left ? -1 : 1; state.Expires = Time.unscaledTime + .2f;
         } catch (Exception ex) { Stop(ex); }
     }
 
-    private static bool ActionDown(Ant_KartInput input, string action) => action.Length > 0 && input.player != null && input.player.GetButtonDown(action);
-
-    private static void VelocityPostfix(PixelKartPhysics __instance, ref Vector3 __0)
+    private static void VelocityPostfix(PixelEasyCharMoveKartController __instance, ref Vector3 __0)
     {
         try {
-            var kart = __instance.kartController;
-            if (kart?.parentPlayer?.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL) return;
-            var state = State(__instance);
-            if (kart.Motor.GroundingStatus.FoundAnyGround) { state.Used = false; state.Direction = 0; return; }
-            if (!Enabled.Value || !Running(kart) || Time.unscaledTime > state.Expires) { state.Direction = 0; return; }
-            if (state.Used || state.Direction == 0) return;
-            var right = __instance.GetMainMotorSteeringOrientation() * Vector3.right;
-            var adjusted = AirShiftMath.Adjust(__0.x, __0.z, right.x, right.z, state.Direction * Strength.Value, Retention.Value);
+            var kart = __instance;
+            if (kart.parentPlayer?.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL) return;
+            var physics = kart.kartPhysics; var state = State(physics);
+            if (kart.Motor.GroundingStatus.IsStableOnGround) {
+                state.Used = state.Active = false; state.Pending = 0; Status = "Air Shift: grounded"; return;
+            }
+            if (!Enabled.Value || !Running(kart)) { state.Active = false; state.Pending = 0; return; }
+            if (state.Pending != 0 && Time.unscaledTime <= state.Expires && (!OncePerJump.Value || !state.Used)) {
+                if (!float.IsFinite(Strength.Value) || Strength.Value < 0 || !float.IsFinite(Duration.Value) || Duration.Value < 0 ||
+                    !float.IsFinite(Retention.Value) || Retention.Value < 0) throw new ArgumentException("Air Shift settings must be finite, non-negative numbers.");
+                state.Right = physics.GetMainMotorSteeringOrientation() * Vector3.right;
+                state.Right.y = 0; state.Right.Normalize();
+                state.TargetLateral = Vector3.Dot(__0, state.Right) + state.Pending * Strength.Value;
+                state.Budget = new Vector2(__0.x, __0.z).magnitude * Retention.Value;
+                state.Until = (double)Time.time + Duration.Value;
+                state.Active = state.Used = true; state.Pending = 0;
+                Plugin.Instance!.Log.LogInfo($"Air Shift accepted: lateral target {state.TargetLateral:0.0} m/s, duration {Duration.Value:0.00}s, speed budget {(LimitSpeed.Value ? state.Budget.ToString("0.0") : "unlimited")}.");
+            } else if (Time.unscaledTime > state.Expires) state.Pending = 0;
+            if (!state.Active) { Status = OncePerJump.Value && state.Used ? "Air Shift: spent until landing" : "Air Shift: ready"; return; }
+            var adjusted = AirShiftMath.Hold(__0.x, __0.z, state.Right.x, state.Right.z, state.TargetLateral, state.Budget, LimitSpeed.Value);
             Plugin.Instance!.SessionModified = true;
             __0 = new Vector3(adjusted.X, __0.y, adjusted.Z);
-            __instance.vLastVelocity = __0;
-            state.Used = true; state.Direction = 0;
+            physics.vLastVelocity = __0;
+            Status = $"Air Shift: active — lateral {Vector3.Dot(__0, state.Right):0.0} m/s";
+            if (Time.time >= state.Until) state.Active = false;
         } catch (Exception ex) { Stop(ex); }
     }
 
     internal static bool Used(PixelKartPhysics physics) => State(physics).Used;
-    internal static void RestoreUsed(PixelKartPhysics physics, bool used) { var state = State(physics); state.Used = used; state.Direction = 0; }
-    private static void Stop(Exception ex) { Enabled.Value = false; Reset(); Plugin.Instance?.Log.LogError($"Air Shift stopped: {ex.Message}"); }
+    internal sealed record SavedShift(bool Used, bool Active, double Remaining, Vector3 Right, float Target, float Budget);
+    internal static SavedShift Capture(PixelKartPhysics physics) {
+        var state = State(physics);
+        return new(state.Used, state.Active, Math.Max(0, state.Until - Time.time), state.Right, state.TargetLateral, state.Budget);
+    }
+    internal static void Restore(PixelKartPhysics physics, SavedShift saved) {
+        var state = State(physics); state.Used = saved.Used; state.Active = saved.Active && Enabled.Value;
+        state.Until = Time.time + saved.Remaining; state.Right = saved.Right;
+        state.TargetLateral = saved.Target; state.Budget = saved.Budget; state.Pending = 0;
+    }
+    internal static void RestoreUsed(PixelKartPhysics physics, bool used) { var state = State(physics); state.Used = used; state.Active = false; state.Pending = 0; }
+    internal static void DrawStatus() {
+        if (Enabled != null && Enabled.Value && ShowStatus.Value && Plugin.OfflineLabAllowed && MenuManager.Instance == null)
+            GUI.Label(new Rect(18, Screen.height - 72, 850, 28), Status);
+    }
+    private static void Stop(Exception ex) { Enabled.Value = false; Reset(); Plugin.Instance?.Log.LogError($"Air Shift stopped after an actual error: {ex.Message}"); }
     internal static void Reset() => States.Clear();
 }

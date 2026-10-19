@@ -86,6 +86,7 @@ public sealed class StudioBehaviour : MonoBehaviour
         PerformanceDiagnostics.Tick();
         TrackBoundaries.Tick();
         PracticeRewindFeature.Tick();
+        MineTrapFeature.Tick();
         RunFeature(ref _mkFaulted, "MK modules", LegacyMK.Tick);
         RunFeature(ref _communityFaulted, "community commands", CommunityMods.Tick);
         RunFeature(ref _nightmareFaulted, "Nightmare AI", NightmareAI.Tick);
@@ -201,6 +202,8 @@ public sealed class StudioBehaviour : MonoBehaviour
         GamepadOverlay.Draw();
         TrackBoundaries.Draw();
         PracticeRewindFeature.DrawStatus();
+        AirShiftFeature.DrawStatus();
+        MineTrapFeature.DrawStatus();
     }
 
     public void RestoreAll() { RestoreHud(); RestoreVisualPack(); TrackBoundaries.Restore(); }

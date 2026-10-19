@@ -30,7 +30,6 @@ internal static class PerformanceFeature
         LowerAi = p.Config.Bind("Performance", "LowerAIPhysics", false, "Opt in to the game's existing lower-quality AI physics. Offline races only; opponent movement and collision precision can change.");
         AiInterval = p.Config.Bind("Performance", "AIPhysicsInterval", 2,
             new ConfigDescription("Heavy AI motor updates every this many physics ticks. 1 retains full cadence; humans, ghosts and global timestep are unchanged.", new AcceptableValueRange<int>(1, 4)));
-        if (!p.GameplayReady) { p.Log.LogWarning("Performance module unavailable: current native build was not verified."); return; }
         // Exact parameterless methods verified against current interop; no stub-body transpilers.
         Patch(p, typeof(PTK_GraphicsDetailApplier), "LateUpdate", nameof(GraphicsPrefix), true);
         Patch(p, typeof(Ant_CurrentGameConfiguration), "PTK_GC_DisableForRace", nameof(GcPostfix), false);
@@ -48,7 +47,7 @@ internal static class PerformanceFeature
         if (prefix) p.Harmony.Patch(target, prefix: patch); else p.Harmony.Patch(target, postfix: patch);
     }
 
-    private static bool Active => _installed && !_faulted && Enabled != null && Enabled.Value && Plugin.Instance?.GameplayReady == true;
+    private static bool Active => _installed && !_faulted && Enabled != null && Enabled.Value;
     internal static object DiagnosticSettings() => new { active = Active, cacheDraw = CacheDraw?.Value,
         raceGc = RaceGc?.Value, lowerAi = LowerAi?.Value, aiInterval = AiInterval?.Value };
     private static bool Offline => Plugin.OfflineLabAllowed;

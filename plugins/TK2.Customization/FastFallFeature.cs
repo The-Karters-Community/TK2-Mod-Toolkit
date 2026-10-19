@@ -12,6 +12,7 @@ internal static class FastFallFeature
     private static ConfigEntry<bool> SinglePress = null!, Dodge = null!;
     private static ConfigEntry<float> DodgeDuration = null!, Deadzone = null!;
     private static ConfigEntry<string> Button = null!;
+    private static ConfigEntry<KeyCode> Keyboard = null!;
     private static readonly Dictionary<int, bool> Latched = new();
     private static readonly Dictionary<int, HpBarController> Immunity = new();
     // The current API combines independent flag sources. Reserve a mod-owned flag
@@ -25,6 +26,7 @@ internal static class FastFallFeature
         DodgeDuration = p.Config.Bind("Physics", "DodgeDurationAfterPress", .5f, new ConfigDescription("Dodge duration in seconds.", new AcceptableValueRange<float>(.1f, 1f)));
         Deadzone = p.Config.Bind("Physics", "MinimumJoystickInputBeforeFastFall", .1f, new ConfigDescription("Directional fast-fall deadzone.", new AcceptableValueRange<float>(0, 1)));
         Button = p.Config.Bind("Physics", "ControllerAction", "MenuTriangle", "Rewired controller action; Down Arrow is the keyboard shortcut.");
+        Keyboard = p.Config.Bind("Physics", "KeyboardKey", KeyCode.DownArrow, "Selected keyboard shortcut for Fast Fall.");
         var target = AccessTools.DeclaredMethod(typeof(Ant_KartInput), "ProcessRacingInput", Type.EmptyTypes)
             ?? throw new MissingMethodException("Ant_KartInput.ProcessRacingInput()");
         p.Harmony.Patch(target, postfix: new HarmonyMethod(typeof(FastFallFeature), nameof(InputPostfix)));
@@ -39,7 +41,7 @@ internal static class FastFallFeature
             if (player == null || player.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL) return;
             int id = player.GetInstanceID();
             if (!p.PhysicsEnabled.Value || !Plugin.OfflineLabAllowed || !SinglePress.Value) { Latched.Remove(id); return; }
-            if (Input.GetKeyDown(KeyCode.DownArrow) || (__instance.player != null && __instance.player.GetButtonDown(Button.Value)))
+            if (Input.GetKeyDown(Keyboard.Value) || (__instance.player != null && ShortcutInput.Read(__instance, Button.Value)))
                 Latched[id] = true;
         }
         catch (Exception ex) { p.PhysicsFaulted = true; p.Log.LogWarning($"Fast-fall input failed: {ex.Message}"); }
@@ -55,7 +57,7 @@ internal static class FastFallFeature
         if (!allowed) { Latched.Remove(id); ClearImmunity(id); return; }
         if (physics.bWasGrounded || physics.bIsDrifting || physics.fTimeInAir < p.AirTime.Value) { Latched.Remove(id); ClearImmunity(id); return; }
         float rate = SinglePress.Value ? (Latched.TryGetValue(id, out bool pressed) && pressed ? 1 : 0)
-            : (Input.GetKey(KeyCode.DownArrow) ? 1 : Mathf.Clamp01(-Input.GetAxis("Vertical")));
+            : (Input.GetKey(Keyboard.Value) ? 1 : Mathf.Clamp01(-Input.GetAxis("Vertical")));
         if (rate <= (SinglePress.Value ? 0 : Deadzone.Value)) return;
         p.SessionModified = true;
         ReadableGame.AddVelocity(physics, Vector3.down * Time.fixedDeltaTime * p.FallAcceleration.Value * rate);

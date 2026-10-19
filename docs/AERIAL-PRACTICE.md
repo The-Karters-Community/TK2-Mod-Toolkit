@@ -1,123 +1,158 @@
-# Air Shift, Practice Rewind and Ricochet Items
+# Aerial practice, shortcut selection, ricochet and mine traps
 
-Added to the source Studio's **Community Mods** pack on 2026-10-19. All three
-modules default off and are marked experimental. The plugin compiles against
-the installed interop; **none of these new mechanics has been verified in game**.
-No game launch, game-folder deployment, portable executable or release ZIP was
-performed for this change.
+All four gameplay modules are in the source Studio's **Community Mods** pack.
+They default off. The current source compiles against the installed BepInEx
+interop, and Studio controls are checked separately. **Visible in-game behavior
+of these revisions still needs validation.** No game is automatically launched.
 
-## Controls and scope
+## Compatibility policy
 
-| Module | Default control | Behavior |
+Following the user's 2026-10-19 instruction, there are no GameAssembly or
+UnityPlayer binary-hash/version allowlists for module execution. Each feature
+attempts its exact-signature hooks independently. A changed executable alone
+never disables a module or the native profiler bridge. Missing methods, missing
+internal calls and actual runtime exceptions are reported for the affected
+feature. Offline guards and mandatory online/submission protection remain.
+Hashes used in build receipts, backup integrity and config-change detection are
+not compatibility gates and remain in place.
+
+## Selecting controls
+
+Every built-in keyboard shortcut has a selection menu, including Air Shift left
+and right, Fast Fall, snapshot save/load, rewind and mine test-drop. The menu
+includes letters, digits, function keys, arrows, modifiers, keypad keys and None.
+
+Controller shortcut menus include named Xbox/PlayStation face buttons, bumpers,
+triggers, stick presses, D-pad directions, Back/Share and Start/Options. Rewired's
+`IGamepadTemplate` reads the assigned player's physical controller, independent
+of racing action bindings. Raw button indices 0-31 provide a fallback for other
+controllers. Existing Rewired action choices and saved custom action values
+remain compatible. Blank means None (disabled). Practice Snapshots' existing
+**Controller shortcuts** switch must also be enabled to use its controller menus.
+
+| Module | Default shortcut | Behavior |
 | --- | --- | --- |
-| Air Shift | `[` left, `]` right | One horizontal impulse per airborne period; grounded input does not queue a shift. |
-| Rewind / Practice Scrubbing | Tap Backspace; hold to move farther backward | Initially returns three seconds, then scrubs backward at two history seconds per real second. Release to resume on a new timeline. |
-| Practice snapshots (existing) | F5 save, F6 load | Retains manual snapshots and now shares the expanded driving-state restore. |
-| Ricochet Items | Fire a supported straight missile normally | One bounce on a static, near-vertical wall; the second impact uses the game's normal collision path. |
+| Air Shift | `[` / `]`, controller shortcuts off | Maintain a lateral correction for a chosen duration without changing heading or vertical velocity. |
+| Fast Fall | Down Arrow, legacy MenuTriangle action | Keyboard and controller button can now both be selected. |
+| Practice snapshots | F5 / F6 | Manual save/load with expanded driving/boost state. |
+| Rewind / Practice Scrubbing | Backspace | Tap to rewind three seconds; hold to scrub farther; release to resume on a new timeline. |
+| Ricochet Items | Normal weapon fire | Optional straight-firing bazooka and one wall bounce; homing missiles remain unchanged. |
+| Mine Traps | Normal fire for inventory mines; M for free test drop | Item-box mines and an optional independent testing shortcut. |
 
-Optional controller shortcuts use existing Rewired action names. They are blank
-by default to avoid taking over Fast Fall, boost or trick controls. Choose distinct
-actions in Studio. Air Shift changes only horizontal velocity, using the kart's
-steering orientation for left/right; it does not write heading, vertical velocity,
-reserves, trick or boost inputs. Its horizontal speed cap defaults to the speed
-immediately before the shift and can be reduced to 90%. Fast Fall remains a
-separate module and can be activated afterward.
+## Air Shift
 
-Rewind records at most 20 samples/second, with a hard 401-sample cap and a
-configurable 3–20 second window. The effective window is at least the selected
-initial rewind interval. It requires one local kart without AI racers; playing
-ghosts are excluded from the kart count. It clears history on checkpoint/lap
-changes, scene/kart changes, race reset, finish, pause, teleport, respawn or disable.
-It skips samples during unresolved jump/trick effects rather than trying to
-serialize coroutines. Consequently, some intervals have no eligible sample;
-rewind uses the last eligible sample at or before the requested time.
+The correction runs at the final
+`PixelEasyCharMoveKartController.KinematicCharacterController.ICharacterController.UpdateVelocity`
+postfix. The earlier implementation ran inside `PixelKartPhysics.UpdateVelocity`,
+before the controller finished its own velocity changes, and applied a one-tick
+impulse. The revised implementation maintains the selected lateral target across
+physics ticks for **Shift duration**, so subsequent native lateral damping does
+not immediately erase it. KCC still handles movement/collisions; this is not a
+position teleport. Vertical velocity, steering rotation and native trick/boost
+inputs are untouched, and Fast Fall remains independent.
 
-The shared snapshot restores KCC position, rotation, velocity and grounding;
-steering/drift state; reserve, instantaneous, continuous, triple and boostpad
-speed components; both boost-fill arrays; continuous-boost smoothing; air time;
-normal route/respawn tracking values and copied route collections. Relevant
-timestamps are rebased to preserve their age. Pending jump/boost input is cleared,
-and Air Shift's used-per-jump flag is restored. Fast Fall's input and dodge latch
-is cleared to avoid carrying an activation from the abandoned timeline.
+Suggested starting values: **18 m/s lateral change, 0.25 seconds**. A maintained
+18 m/s corresponds to 4.5 metres over 0.25 seconds before speed-budget effects and
+collisions; this is a calculation, not an observed in-game displacement. Existing
+saved strength values are preserved. Strength and duration have no upper limit
+in Studio validation, exported settings or BepInEx bindings. Zero duration gives
+an impulse. Suggested ranges are text hints rather than slider ceilings.
 
-This remains a **partial driving-state rewind**, not a world save. Rewind does
-not restore the shared race clock, inventory, health, spawned projectiles,
-temporary external item-effect coroutines, moving platforms, or battle-arena
-world/history. Use ordinary solo track practice without active item effects.
-It cannot rewind across a checkpoint or recover after the respawn system has
-already taken control. The older manual snapshots retain their health/item and
-experimental progress/clock options; those options do not make a full race rewind.
-Manual loads also refuse checkpoint/lap changes unless their existing experimental
-progress-restore option is enabled, and clear the rolling history after loading.
+**Once per jump** can be turned off for repeated shifts. **Use horizontal speed
+budget** can be turned off for unrestricted lateral additions. With the budget
+on, multiplier 1 preserves the horizontal speed measured at shift activation;
+0.9 reduces it, and values above 1 explicitly permit more speed. All tuning
+numbers must be finite and non-negative. A hideable status line reports ready,
+spent or active state and the applied lateral speed; accepted shifts are logged.
 
-Ricochet accepts only locally owned `StraightMissileController` objects with
-non-targeting visual logic, a static collider without a Rigidbody, and a wall
-normal with `abs(y) <= 0.35`. It excludes kart, item-box and physics-trigger
-objects. After a bounce it owns the projectile's horizontal movement and
-suppresses passing the old target position, retaining native visual height,
-damage and lifetime handling. Already-bounced missiles finish their path if the
-switch is turned off. Homing missiles are never redirected. A wall which is not
-marked static in Unity intentionally receives ordinary impact behavior.
+## Practice rewind and snapshots
 
-Enabling any of these modules blocks leaderboard uploads and online rooms.
-Once any gameplay mutation sets `SessionModified`, blocking persists until the
-game restarts, even if every module is subsequently turned off.
+Rewind retains its solo, current-checkpoint-segment scope. It records eligible
+states at 20 Hz into a bounded rolling history and discards the abandoned future
+when scrubbing ends. Scene/kart changes, checkpoint/lap changes, race reset,
+finish, pause, teleport, recovery and disable clear history. Unresolved jump/trick
+coroutines are not captured. The clock and other world objects are not rewound.
 
-## Evidence and compatibility
+The shared driving snapshot restores motor/grounding, steering/drift, reserves,
+boost-speed components, both fill arrays, boost smoothing and normal route/respawn
+tracking. Timestamps are rebased. Pending jump/boost input and Fast Fall's latch
+are cleared. Air Shift's used state, correction direction, target, budget and
+remaining active duration are restored together. Manual snapshots retain their
+health/item and experimental checkpoint/clock options. This is a partial driving
+rewind, not a full world save; temporary external item effects, moving platforms,
+battle-arena world/history and already-started recovery are not rewound.
 
-Current installed `GameAssembly.dll` SHA-256:
-`55f5c88972fe1ccf4c9d5f3871b71bcfa261b3e42a379e18438e92623fc4d6a2`.
-Current installed `BepInEx/interop/Assembly-CSharp.dll` SHA-256:
-`0c45b8ffb5e8975f2114ac44dcf6356c7f3ea599461614bd1a22750b990cc215`.
+## Ricochet behavior
 
-The earlier full Ghidra export targets a different game hash and was treated as
-historical reference. Current metadata was dumped from the installed game and
-the current binary was imported into a separate ignored Ghidra project. Relevant
-methods were disassembled and decompiled without changing the original project
-or installed binary. The final inspection used the full PE image, not truncated
-raw slices. Local evidence lives in `local/aerial-practice-evidence/` (ignored).
-It is native pseudocode and metadata declarations, **not recovered original C#**.
+The first implementation did **not** convert auto-aiming weapons to straight
+shots. It only accepted an already non-targeting straight missile.
 
-| Current native method | RVA | Finding supporting the implementation |
-| --- | --- | --- |
-| `PixelKartPhysics.UpdateVelocity(ref Vector3, float)` | `0x5FC1A0` | Consumes pending velocity additions and writes the final velocity/ground-history state; Air Shift uses a postfix. |
-| `PixelKartPhysics.AddVelocity(Vector3)` | `0x5F40B0` | Adds to the pending frame velocity vector, supporting the existing Fast Fall adapter on this build. |
-| `PixelKartPhysics.FixedUpdate()` | `0x5F5CA0` | Current existing Fast Fall hook location. |
-| `PixelKartPhysics.TriggerPhysicsJump(ref Vector3, float)` | `0x5F8F50` | Jump state has additional effects and buffers; unresolved effect samples are excluded. |
-| `Ant_KartInput.ProcessRacingInput()` | `0x6B5180` | Current input path; new actions are read in postfixes without rewriting normal actions. |
-| `Ant_BoostManager.GetCurrentBoostMaxSpeedIncrease()` | `0x67FB60` | Combines several independent reserve/instantaneous/continuous/power-up/boostpad values; reserve-only restores are insufficient. |
-| `PlayerRaceLogic.OnRaceResetted()` | `0x6274F0` | Lifecycle boundary used to clear per-race history and latches. |
-| `PTK_VehicleOutsideMapValidator.UpdateSequentialRoadpointTracking(...)` | `0x5E1C60` | Maintains confirmed/last grounded respawn points and sequential collections. |
-| `PTK_VehicleOutsideMapValidator.UpdateRespawnRoute(...)` | `0x5E1410` | Maintains route/rejoin state separately from checkpoint flags. |
-| `PTK_VehicleOutsideMapValidator.ResetRespawnHistory()` | `0x5DFB30` | Additional respawn history prevents claiming a full position-only rewind. |
-| `RaycastCollisionDetector.Hit(GameObject, Vector3, Vector3)` | `0x4AABB0` | Receives a normal and dispatches the impact/explosion event; interception happens before it. |
-| `AbstractMissileController.OnRaycastHit(GameObject, Vector3)` | `0x49D8D0` | Normal hit path starts explosion processing. |
-| `StraightMissileController.Init(MissileInitializeParams)` | `0x4ABD90` | Dedicated straight-missile path. |
-| `VisualLogicMissileController.RefreshBulletConstantMovementTowardsTarget(float)` | `0x4AE720` | Native movement uses target/muzzle-derived positions; changing rotation alone would not produce ricochet. |
-| `VisualLogicMissileController.Update()` / `CheckIfPassedThrough()` | `0x4AF6B0` / `0x4ADEB0` | Old-target passage has its own explosion path, suppressed only after an accepted bounce. |
+The revision adds **Straight-firing bazooka** (on by default within this
+otherwise disabled module). It clears only local bazooka target IDs, captures
+kart heading at launch, preserves backward-fire direction, and owns the shot's
+horizontal flight so target/muzzle tracking cannot bend it afterward. It does
+not alter the homing-missile class. Turn the option off to retain ordinary
+bazooka aiming; targeted shots then remain outside the bounce path.
 
-The current hash is now accepted by the existing physics build gate, alongside
-its historical supported hash. Unknown hashes still disable the physics features.
-Current interop signatures were additionally checked by a full plugin build.
+A qualifying static physics wall (non-trigger collider without a Rigidbody,
+excluding player/item/physics-trigger objects) reflects the projectile once.
+Near-horizontal floors are excluded. Unity's static-batching checkbox is not
+required. The old-target passage explosion is suppressed for owned straight or
+bounced shots; native damage, visual height handling and lifetime remain. The
+next impact follows the ordinary collision path. Existing owned shots finish
+their path if the module switch is turned off mid-flight.
 
-## Validation and remaining game checks
+## Mine trap revival
 
-Automated validation: full Python suite, UI tests/build, online-protection policy
-checks, and deterministic Air Shift speed/impulse invariants plus history
-expiration, branching, insufficient-history and memory-bound checks. These do
-not establish native-hook execution or visible in-game behavior.
+The supplied image matches the shipped **SM_Mine_01** mesh. Current asset evidence:
+`resources.assets`, mesh IDs 1427/1428, GameObject 11744; `MineEffect` GameObject
+444508, `MineBehavior` component 1995543. The game's ResourceManager maps
+**mineeffect** to that prefab. A local render of the shipped mesh confirmed the
+shape. Extracted assets/render evidence remain ignored local files and are not
+redistributed in the repository.
 
-Before calling these mechanics ready, manually validate a solo offline race:
+The native item enum is **MINA_09 = 9**. Current Ghidra inspection shows the
+`WeaponsView.InitMine` body is empty and `InitEffect` omits case 9. The module
+restores use through the normal `WeaponsView.FireWeapon` entry, using the real
+mine prefab and native `MineBehavior.ExplodeMine` damage/effect path.
 
-1. Shift once over a ramp; confirm unchanged heading, preserved vertical motion,
-   no horizontal speed gain, no second shift until landing, and no grounded input
-   carryover. Charge a mini-turbo, perform a trick, then Fast Fall on the same jump.
-2. Rewind before/after a drift boost and boostpad; compare velocity, engine speed,
-   reserve and fill values before capture and immediately after restore. Hold,
-   release, then drive a new branch. Confirm checkpoint, respawn, pause and race
-   reset boundaries clear history. Check the next natural respawn point afterward.
-3. Fire a non-homing straight missile into a static wall: visibly confirm one
-   bounce and normal second-impact damage/explosion. Test homing missiles, floors,
-   kart hits, moving colliders and lifetime expiry separately.
-4. Attempt a submission/online join with a new module enabled and again after
-   disabling it following a mutation; both must remain blocked.
+When enabled, **Include in item-box rewards** defaults on: each local reward has
+a configurable **20%** chance to replace its first item with one mine. The second
+reward remains intact. Mines use native inventory ammo and the normal item-fire
+button. If a character's weapon set lacks the dormant mine slot, a temporary
+local weapon shell supplies valid inventory/animation references and displays
+the shipped mine model. Original assets are never edited. Temporary slots and
+modified mine-targeting settings are restored/removed on cleanup.
+
+A mine is placed on a track surface behind the kart, remains stationary, arms
+after **0.6 seconds**, and expires after **45 seconds** by default. Trigger radius
+is **2 metres**; owner triggering defaults off. Zero damage override keeps the
+prefab's native damage. No track surface behind the kart means no placement.
+The extra **M** shortcut drops a free testing mine; select **None** to rely only
+on item-box inventory. Its controller shortcut is also selectable. Arming time,
+lifetime, radius, drop distance, reward ammo and damage have suggested values
+without artificial upper ceilings. Turning off the module cleans up its traps.
+
+## Evidence and validation
+
+Native evidence was read from the current installed binary, with exact interop
+signatures additionally checked by compilation. Local files are in
+`local/aerial-practice-evidence/`. These are metadata and native pseudocode,
+not recovered original C#. Relevant current RVAs include controller UpdateVelocity
+`0x5F0EE0`, PixelKartPhysics
+UpdateVelocity `0x5FC1A0`, StraightMissileController.Init `0x4ABD90`,
+RaycastCollisionDetector.Hit `0x4AABB0`, WeaponsView.InitEffect `0x9AC930`,
+InitMine `0x3FC4B0`, MineBehavior.ThrowMine `0xC37630`, Attach `0xC368D0`,
+OnTriggerStay `0xC37220`, and ExplodeMine `0xC36EC0`.
+
+Validation includes the full Python suite, UI tests/build and browser selection
+checks; compiled plugin checks; deterministic sustained-shift/speed-budget tests;
+history branching/expiry tests; and online-protection policy tests. These do not
+prove native hooks execute or that traps/bounces look correct in game.
+
+Manual acceptance still required: visible lateral displacement at saved 15 and
+suggested 18, repeated/unrestricted shifts, trick/boost/Fast Fall combinations,
+restoring an active shift, physical controller mappings, item-box mine pickup,
+normal ammo consumption, mine arming/contact damage/expiry, straight bazooka
+flight and one bounce, unchanged homing missiles, and blocked submissions after
+mutation even when modules are switched off.

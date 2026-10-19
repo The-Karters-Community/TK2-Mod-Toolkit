@@ -100,7 +100,7 @@ def _setting(value, definition):
         if isinstance(value, bool) or not isinstance(value, (float, int)) or not math.isfinite(value):
             raise ValueError("Expected a finite numeric package setting")
         low, high = definition.get("low"), definition.get("high")
-        if not isinstance(low, (int, float)) or not isinstance(high, (int, float)) or not low <= value <= high:
+        if (low is not None and (not isinstance(low, (int, float)) or value < low)) or (high is not None and (not isinstance(high, (int, float)) or value > high)):
             raise ValueError("Package setting is outside its allowed range")
         if kind == "int" and int(value) != value: raise ValueError("Expected an integer package setting")
     elif kind == "text":

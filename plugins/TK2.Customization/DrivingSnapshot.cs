@@ -9,7 +9,7 @@ internal sealed class DrivingSnapshot
 {
     private KinematicCharacterMotorState Motor = null!;
     private float CapturedTime;
-    private bool ShiftUsed;
+    private AirShiftFeature.SavedShift Shift = null!;
     private float RoadDistance, PlayerDistance, LastCheckpointReset, LastFinishDistance;
     private double LastFinishSampleAge;
     private PTK_RacePositionCalc_Point Closest = null!, ClosestUnlocked = null!;
@@ -144,7 +144,7 @@ internal sealed class DrivingSnapshot
     internal static DrivingSnapshot Capture(Ant_BoostManager b)
     {
         var c = b.kartController; var p = c.kartPhysics; var r = c.outsideMapValidator;
-        var s = new DrivingSnapshot { Motor = c.Motor.GetState(), CapturedTime = Time.time, ShiftUsed = AirShiftFeature.Used(p) };
+        var s = new DrivingSnapshot { Motor = c.Motor.GetState(), CapturedTime = Time.time, Shift = AirShiftFeature.Capture(p) };
         var race = c.parentPlayer.playerRaceLogic;
         s.RoadDistance = race.fPlayerCurrentRoadDistance; s.PlayerDistance = c.parentPlayer.fDistanceOnTrack;
         s.Closest = race.closestPosPointOnTrack; s.ClosestUnlocked = race.closestPosPointOnTrack_UnlockedRoadsOnly;
@@ -442,7 +442,7 @@ internal sealed class DrivingSnapshot
         r.recentlyVisitedRoadpoints.Clear(); foreach (var point in Visited) r.recentlyVisitedRoadpoints.Add(point);
         for (int i = 0; i < Math.Min(TankPositions.Length, r._recentTankProgressPositions.Length); i++) r._recentTankProgressPositions[i] = TankPositions[i];
         c.parentPlayer.playerRaceLogic.vPlayerLastPosition = Motor.Position;
-        AirShiftFeature.RestoreUsed(p, ShiftUsed);
+        AirShiftFeature.Restore(p, Shift);
         FastFallFeature.Restore();
     }
 

@@ -36,7 +36,7 @@ internal static class PracticeRewindFeature
     private static void InputPostfix(Ant_KartInput __instance)
     {
         if (!Enabled.Value || __instance.antPlayer?.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL) return;
-        try { ControllerHeld = Action.Value.Length > 0 && __instance.player != null && __instance.player.GetButton(Action.Value); }
+        try { ControllerHeld = Action.Value.Length > 0 && __instance.player != null && ShortcutInput.Read(__instance, Action.Value, true); }
         catch (Exception ex) { Fail(ex); }
     }
 

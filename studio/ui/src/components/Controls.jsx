@@ -145,7 +145,7 @@ export function Setting({
             )}
             {options.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {option === "" ? "None (disabled)" : option}
               </option>
             ))}
           </select>

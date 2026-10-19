@@ -2,6 +2,7 @@
 from pathlib import Path
 import json
 from . import core, recipe_catalog
+from .shortcut_choices import add_shortcut_choices
 
 PROJECT = core.ROOT / "plugins/TK2.Customization/TK2.Customization.csproj"
 ARTIFACT = core.ROOT / "artifacts/TK2.Customization"
@@ -42,7 +43,7 @@ FEATURES = [
         ("Scale", "Overlay scale", "float", 1, .25, 2),
         ("Opacity", "Background opacity", "float", .92, .45, 1),
     ]},
-    {"id": "Physics", "name": "Fast fall", "category": "Driving", "description": "Press Down Arrow or the mapped controller button after the minimum air time. Includes the legacy press, directional input and optional dodge modes.", "origin": "Community legacy port", "gameplay": True, "settings": [("FastFallAcceleration", "Downward acceleration", "float", 100, 0, 500), ("MinimumAirTime", "Air time before activation", "float", .4, 0, 3), ("UseSinglePressInput", "Press once per jump", "bool", True, None, None), ("ControllerAction", "Controller action", "text", "MenuTriangle", None, None), ("ShouldDodgeOnPress", "Dodge on fast fall", "bool", False, None, None), ("DodgeDurationAfterPress", "Dodge duration", "float", .5, .1, 1), ("MinimumJoystickInputBeforeFastFall", "Directional deadzone", "float", .1, 0, 1)]},
+    {"id": "Physics", "name": "Fast fall", "category": "Driving", "description": "Press Down Arrow or the mapped controller button after the minimum air time. Includes the legacy press, directional input and optional dodge modes.", "origin": "Community legacy port", "gameplay": True, "settings": [("FastFallAcceleration", "Downward acceleration", "float", 100, 0, 500), ("MinimumAirTime", "Air time before activation", "float", .4, 0, 3), ("UseSinglePressInput", "Press once per jump", "bool", True, None, None), ("ControllerAction", "Controller button", "text", "MenuTriangle", None, None), ("KeyboardKey", "Keyboard key", "text", "DownArrow", None, None), ("ShouldDodgeOnPress", "Dodge on fast fall", "bool", False, None, None), ("DodgeDurationAfterPress", "Dodge duration", "float", .5, .1, 1), ("MinimumJoystickInputBeforeFastFall", "Directional deadzone", "float", .1, 0, 1)]},
     {"id": "Laps", "name": "Custom lap count", "category": "Race rules", "description": "Choose how many laps an offline race requires. Port of the legacy custom-laps idea.", "origin": "Legacy port", "gameplay": True, "settings": [("Count", "Laps", "int", 3, 1, 99)]},
     {"id": "SimpleDriving", "name": "Driving challenge", "category": "Driving", "description": "Disable local jump and drift inputs. Fresh port of the legacy BoringMode idea.", "origin": "Legacy port", "gameplay": True, "settings": [("DisableJump", "Disable jumping", "bool", True, None, None), ("DisableDrift", "Disable drifting", "bool", True, None, None)]},
     {"id": "AutoBoost", "name": "Automatic drift boost", "category": "Driving", "description": "Automatically fire valid boosts; includes the legacy drift-release and early-press protection hooks.", "origin": "Legacy port", "gameplay": True, "settings": [("ThresholdPercent", "Auto-boost threshold", "float", 100, 1, 100), ("BoostOnDriftStop", "Boost when drift ends", "bool", True, None, None), ("SuppressEarlyBoost", "Ignore premature presses", "bool", True, None, None)]},
@@ -50,13 +51,30 @@ FEATURES = [
 ]
 
 FEATURES.extend([
-    {"id": "AirShift", "name": "Air Shift", "category": "Driving", "description": "Experimental: press [ or ] for one sideways adjustment per jump, without turning. Horizontal speed is capped; tricks, boost charging and Fast Fall keep their own inputs. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
+    {"id": "MineTraps", "name": "Mine Traps", "category": "Items", "description": "Revive the dormant spiked MINA_09 mine as an armed track trap. Mines can replace item-box rewards and use the normal item fire button. M is an additional free testing drop; choose None to disable it. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
+        ("ItemBoxRewards", "Include in item-box rewards", "bool", True, None, None),
+        ("ItemBoxChancePercent", "Item-box chance (%)", "float", 20, 0, 100, "Chance to replace an item box's first reward with mines."),
+        ("RewardAmmo", "Mines per reward", "int", 1, 1, None, "Suggested 1-3; no upper limit."),
+        ("DropKey", "Extra test drop key", "text", "M", None, None, "Free test drop independent of inventory ammo. Select None to use item boxes only."),
+        ("ControllerAction", "Extra test drop controller button", "text", "", None, None),
+        ("ArmDelay", "Arming delay (seconds)", "float", .6, 0, None, "Suggested 0.5-1.5; no upper limit."),
+        ("Lifetime", "Lifetime (seconds)", "float", 45, 0, None, "Suggested 20-60; no upper limit."),
+        ("TriggerRadius", "Trigger radius (metres)", "float", 2, 0, None, "Suggested 1-3; no upper limit."),
+        ("DropDistance", "Drop distance behind kart", "float", 4, 0, None, "Suggested 3-6 metres; no upper limit."),
+        ("Damage", "Damage override", "int", 0, 0, None, "Zero keeps native damage. Positive values override it, without an upper limit."),
+        ("OwnerCanTrigger", "Owner can trigger armed mines", "bool", False, None, None),
+    ]},
+    {"id": "AirShift", "name": "Air Shift", "category": "Driving", "description": "Experimental: sustained sideways air movement without turning. Choose keys and physical gamepad buttons below. Strength and duration have suggested ranges, with optional speed and once-per-jump limits. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
         ("LeftKey", "Shift left key", "text", "LeftBracket", None, None),
         ("RightKey", "Shift right key", "text", "RightBracket", None, None),
         ("LeftAction", "Controller left action", "text", "", None, None, "Optional existing Rewired action; blank disables this controller shortcut."),
         ("RightAction", "Controller right action", "text", "", None, None, "Choose actions that do not overlap your trick or Fast Fall controls."),
-        ("SidewaysImpulse", "Sideways impulse (m/s)", "float", 6, 1, 15),
-        ("SpeedRetention", "Horizontal speed retention", "float", 1, .9, 1),
+        ("SidewaysImpulse", "Lateral velocity change (m/s)", "float", 18, 0, None, "Suggested 12-30 m/s; unrestricted upper value. Maintained through the shift instead of lost to air damping."),
+        ("ShiftDuration", "Shift duration (seconds)", "float", .25, 0, None, "Suggested 0.15-0.4 seconds. Zero is a single impulse; no upper limit."),
+        ("OncePerJump", "Once per jump", "bool", True, None, None, "Turn off to allow repeated shifts before landing."),
+        ("LimitHorizontalSpeed", "Use horizontal speed budget", "bool", True, None, None, "Turn off to experiment without a horizontal speed cap."),
+        ("ShowStatus", "Show Air Shift status", "bool", True, None, None),
+        ("SpeedRetention", "Horizontal speed budget multiplier", "float", 1, 0, None, "1 preserves the speed before shifting. Suggested 0.9-1; values above 1 allow more speed."),
     ]},
     {"id": "PracticeRewind", "name": "Rewind / Practice Scrubbing", "category": "Training", "description": "Experimental solo training: Backspace rewinds 3 seconds; hold to scrub farther, release to resume. Restores driving, reserves and boost state within the current checkpoint segment. History clears on checkpoints, recovery and teleports. Race clock, items and other racers are not rewound. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
         ("RewindKey", "Rewind key", "text", "Backspace", None, None),
@@ -65,7 +83,7 @@ FEATURES.extend([
         ("HistorySeconds", "History seconds", "float", 10, 3, 20, "Recorded at 20 samples per second; automatically enlarged to cover the initial rewind interval."),
         ("ShowStatus", "Show practice status", "bool", True, None, None),
     ]},
-    {"id": "RicochetItems", "name": "Ricochet Items", "category": "Items", "description": "Experimental: locally fired straight, non-homing missiles bounce once from static walls. Floors, moving objects, homing missiles and the second impact use normal collision behavior. In-game validation pending.", "origin": "New", "gameplay": True, "settings": []},
+    {"id": "RicochetItems", "name": "Ricochet Items", "category": "Items", "description": "Experimental: bazooka shots can fire straight along the kart heading and bounce once off a static wall. Homing missiles remain homing. Floors, moving objects and the second impact use normal collision behavior. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [("StraightBazooka", "Straight-firing bazooka", "bool", True, None, None, "Remove bazooka auto-aim while this module is enabled. Homing missiles are unchanged.")]},
 ])
 
 # Static catalogs are generated from the actual typed C# bindings, so settings
@@ -76,6 +94,7 @@ for feature in _MK:
     feature["settings"] = [tuple(s.get(k) for k in ("key", "label", "kind", "default", "low", "high", "description", "choices", "requires", "allowCustom")) for s in feature["settings"]]
 _COMMUNITY = json.loads((_CATALOG_ROOT / "community_catalog.json").read_text(encoding="utf-8"))
 FEATURES.extend(_MK + _COMMUNITY)
+add_shortcut_choices(FEATURES)
 for feature in FEATURES:
     feature["name"] = {"UI": "HUD size", "HudOpacity": "HUD transparency", "Rendering": "Graphics"}.get(feature["id"], feature["name"])
 
@@ -140,14 +159,14 @@ def validate(values):
         elif kind in ("float", "int"):
             if isinstance(value, bool): raise ValueError("Expected a number, not a switch value")
             number = float(value)
-            if not math.isfinite(number) or not low <= number <= high or (kind == "int" and not number.is_integer()):
+            if not math.isfinite(number) or (low is not None and number < low) or (high is not None and number > high) or (kind == "int" and not number.is_integer()):
                 raise ValueError(f"{compound}: expected {kind} from {low} to {high}")
             result[(section, key)] = format(number, "g")
         else:
             if not isinstance(value, str) or any(c in value for c in "\r\n") or len(value) > 4096:
                 raise ValueError("Expected a single-line setting")
             definition = options[(section,key)]
-            if len(definition) > 7 and definition[7] and value not in definition[7]:
+            if len(definition) > 7 and definition[7] and not (len(definition) > 9 and definition[9]) and value not in definition[7]:
                 raise ValueError(f"{compound}: choose one of the listed values")
             result[(section, key)] = value
     return result
@@ -159,7 +178,7 @@ def defaults():
 
 PACKS = [
     {"id": "garage", "name": "Toolkit Essentials", "description": "Online protection, camera, interface, audio, graphics and race performance controls.", "features": ["OnlineProtection", "UI", "HudOpacity", "DisableVignette", "GamepadOverlay", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
-    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "AirShift", "PracticeRewind", "RicochetItems"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
+    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "AirShift", "PracticeRewind", "RicochetItems", "MineTraps"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
 
@@ -214,16 +233,17 @@ def module_sources():
         "GamepadOverlay": ["GamepadOverlay.cs", "InputOverlayModel.cs", "StudioBehaviour.cs", "Plugin.cs"],
         "Audio": ["AudioFeature.cs", "Plugin.cs"],
         "Camera": ["CameraFeature.cs", "CameraSettings.cs", "CameraPanel.cs"],
-        "Physics": ["FastFallFeature.cs", "Plugin.cs"],
-        "AirShift": ["AirShiftFeature.cs", "AirShiftMath.cs", "Plugin.cs"],
-        "PracticeRewind": ["PracticeRewindFeature.cs", "PracticeHistory.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "FastFallFeature.cs", "StudioBehaviour.cs", "Plugin.cs"],
-        "RicochetItems": ["RicochetItemsFeature.cs", "Plugin.cs"],
+        "Physics": ["FastFallFeature.cs", "ShortcutInput.cs", "Plugin.cs"],
+        "AirShift": ["AirShiftFeature.cs", "AirShiftMath.cs", "ShortcutInput.cs", "Plugin.cs"],
+        "PracticeRewind": ["PracticeRewindFeature.cs", "PracticeHistory.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "FastFallFeature.cs", "ShortcutInput.cs", "StudioBehaviour.cs", "Plugin.cs"],
+        "RicochetItems": ["RicochetItemsFeature.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "ShortcutInput.cs", "Plugin.cs"],
+        "MineTraps": ["MineTrapFeature.cs", "ShortcutInput.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "Plugin.cs", "StudioBehaviour.cs"],
         "CommunityCommands": ["CommunityMods.cs", "CommunityCommandParser.cs"],
         "NightmareAI": ["NightmareAI.cs"],
         "CNKBoostMeter": ["LegacyMK.Meter.cs", "LegacyMK.cs"],
         "KartParameters": ["LegacyMK.Parameters.cs", "LegacyMK.cs"],
         "BoostParameters": ["LegacyMK.Parameters.cs", "LegacyMK.cs"],
-        "SaveStates": ["LegacyMK.Practice.cs", "LegacyMK.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "FastFallFeature.cs"],
+        "SaveStates": ["LegacyMK.Practice.cs", "LegacyMK.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "FastFallFeature.cs", "ShortcutInput.cs"],
         "ReverseRace": ["LegacyMK.Practice.cs", "LegacyMK.cs"],
     }
     for name in ("Laps", "SimpleDriving", "AutoBoost", "Tuning"):

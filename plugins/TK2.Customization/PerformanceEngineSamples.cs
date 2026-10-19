@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using Il2CppInterop.Runtime;
 
 namespace TK2.Customization;
@@ -137,8 +136,6 @@ internal sealed class PerformanceEngineSamples : IDisposable
     }
     private sealed class NativeApi : IApi
     {
-        private const string PlayerHash = "5da2e6c1050924f370b8143256a1705ac3758bb78eb07013a268058edeb6709a";
-        private static bool _verified;
         // Observed Win64 icall ABI: ref category/handle, UTF-16 pointer, length,
         // explicit out return for structures. No object/string marshalling involved.
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void FindCall(ref ushort category, IntPtr name, int length, out ulong handle);
@@ -164,15 +161,7 @@ internal sealed class PerformanceEngineSamples : IDisposable
         }
         internal static NativeApi Bind()
         {
-            if (!_verified)
-            {
-                if (!OperatingSystem.IsWindows() || IntPtr.Size != 8) throw new NotSupportedException("Native profiler ABI requires verified Win64 player.");
-                using var file = File.OpenRead(Path.Combine(BepInEx.Paths.GameRootPath, "UnityPlayer.dll"));
-                using var sha = SHA256.Create();
-                if (!Convert.ToHexString(sha.ComputeHash(file)).Equals(PlayerHash, StringComparison.OrdinalIgnoreCase))
-                    throw new NotSupportedException("UnityPlayer binary changed; native profiler bridge disabled.");
-                _verified = true;
-            }
+            if (!OperatingSystem.IsWindows() || IntPtr.Size != 8) throw new NotSupportedException("Native profiler ABI requires Win64.");
             return new NativeApi();
         }
         private static T Resolve<T>(string name) where T : Delegate
