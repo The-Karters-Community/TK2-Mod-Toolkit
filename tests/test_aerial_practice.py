@@ -7,7 +7,8 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
         defaults = pack.defaults()
         self.assertNotIn('RicochetItems/Enabled', defaults)
         self.assertIn('RicochetItems', pack.RETIRED_MODULES)
-        self.assertIn(('MineTraps', 'TriggerRadius'), pack.RETIRED_SETTINGS)
+        self.assertIn(('AirShift', 'AllowGroundTesting'), pack.RETIRED_SETTINGS)
+        self.assertIn(('AirShift', 'SidewaysImpulse'), pack.RETIRED_SETTINGS)
         for identity in ('AirShift', 'PracticeRewind', 'MineTraps'):
             self.assertIs(defaults[identity + '/Enabled'], False)
             self.assertEqual(sum(p['features'].count(identity) for p in pack.catalog_packs()), 1)
@@ -20,7 +21,7 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
         for identity in ('PracticeRewind', 'SaveStates'):
             feature = next(f for f in pack.catalog_features() if f['id'] == identity)
             sources = module_packages._source_dependencies([feature])
-            for helper in ('DrivingSnapshot.cs', 'AirShiftFeature.cs', 'AirShiftMath.cs', 'FastFallFeature.cs'):
+            for helper in ('DrivingSnapshot.cs', 'AirShiftFeature.cs', 'AirDashMath.cs', 'FastFallFeature.cs'):
                 self.assertIn('plugins/TK2.Customization/' + helper, sources)
 
     def test_controls_survive_config_roundtrip(self):
@@ -31,10 +32,13 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
         self.assertEqual(values['PracticeRewind/RewindSeconds'], 3)
         self.assertEqual(values['PracticeRewind/RewindKey'], 'Backspace')
         self.assertEqual(values['AirShift/RightAction'], '')
-        self.assertEqual(values['AirShift/SidewaysImpulse'], 35)
-        self.assertEqual(values['AirShift/ShiftDuration'], .4)
-        self.assertIs(values['AirShift/AllowGroundTesting'], True)
-        self.assertIs(values['AirShift/LimitHorizontalSpeed'], False)
+        self.assertEqual(values['AirShift/DashDistance'], 3)
+        self.assertEqual(values['AirShift/DashDuration'], .12)
+        self.assertNotIn('AirShift/AllowGroundTesting', values)
+        self.assertNotIn('AirShift/SidewaysImpulse', values)
+        stale = b"[AirShift]\nAllowGroundTesting = true\nSidewaysImpulse = 65\n[MineTraps]\nTriggerRadius = 2.5\n"
+        read = settings.read(stale)
+        self.assertFalse(read['extraSettings'])
 
     def test_shortcuts_have_keyboard_and_physical_controller_menus(self):
         features = {f['id']: {s[0]: s for s in f['settings']} for f in pack.catalog_features()}
@@ -51,17 +55,16 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
             self.assertIn('', choices)
 
     def test_experimentation_values_have_no_former_upper_ceiling(self):
-        values = pack.validate({'AirShift/SidewaysImpulse': 1000, 'AirShift/ShiftDuration': 10,
-                                'AirShift/SpeedRetention': 3, 'AirShift/OncePerJump': False,
-                                'AirShift/LimitHorizontalSpeed': False, 'MineTraps/RewardAmmo': 100})
-        self.assertEqual(values[('AirShift', 'SidewaysImpulse')], '1000')
+        values = pack.validate({'AirShift/DashDistance': 1000, 'AirShift/OncePerJump': False,
+                                'MineTraps/RewardAmmo': 100, 'MineTraps/TriggerRadius': 1000})
+        self.assertEqual(values[('AirShift', 'DashDistance')], '1000')
         feature = next(f for f in pack.catalog_features() if f['id'] == 'AirShift')
-        impulse = module_packages._schema(feature)['SidewaysImpulse']
-        self.assertEqual(module_packages._setting(1000, impulse), 1000)
+        distance = module_packages._schema(feature)['DashDistance']
+        self.assertEqual(module_packages._setting(1000, distance), 1000)
         with self.assertRaises(ValueError):
-            pack.validate({'AirShift/SidewaysImpulse': float('inf')})
+            pack.validate({'AirShift/DashDistance': float('inf')})
         with self.assertRaises(ValueError):
-            module_packages._setting(-1, impulse)
+            module_packages._setting(0, distance)
 
     def test_each_shortcut_module_exports_the_input_reader(self):
         for identity in ('AirShift', 'SaveStates', 'PracticeRewind', 'Physics', 'MineTraps'):

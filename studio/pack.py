@@ -61,20 +61,18 @@ FEATURES.extend([
         ("Lifetime", "Lifetime (seconds)", "float", 45, 0, None, "Suggested 20-60; no upper limit."),
         ("DropDistance", "Drop distance behind kart", "float", 4, 0, None, "Suggested 3-6 metres; no upper limit."),
         ("Damage", "Damage override", "int", 0, 0, None, "Zero keeps native damage. Positive values override it, without an upper limit."),
-        ("OwnerCanTrigger", "Owner can trigger armed mines", "bool", False, None, None),
+        ("TriggerRadius", "Mine trigger radius", "float", 2.5, 0.1, None, "Kart-to-mine distance for the offline proximity fallback. Suggested 2-3 metres; no upper limit."),
+        ("OwnerCanTrigger", "Owner can trigger armed mines", "bool", True, None, None),
     ]},
-    {"id": "AirShift", "name": "Air Shift", "category": "Driving", "description": "Sustained lateral movement without steering rotation. Works in the air, with grounded testing enabled by default. Choose keys and physical gamepad buttons below; suggestions are not caps.", "origin": "New", "gameplay": True, "settings": [
-        ("LeftKey", "Shift left key", "text", "LeftBracket", None, None),
-        ("RightKey", "Shift right key", "text", "RightBracket", None, None),
+    {"id": "AirShift", "name": "Air Dash", "category": "Driving", "description": "A short, speed-conserving lateral burst while airborne. It preserves heading and vertical velocity and leaves a brief direction streak. One dash per jump by default; choose keys and gamepad buttons below.", "origin": "New", "gameplay": True, "settings": [
+        ("LeftKey", "Dash left key", "text", "LeftBracket", None, None),
+        ("RightKey", "Dash right key", "text", "RightBracket", None, None),
         ("LeftAction", "Controller left action", "text", "", None, None, "Optional existing Rewired action; blank disables this controller shortcut."),
         ("RightAction", "Controller right action", "text", "", None, None, "Choose actions that do not overlap your trick or Fast Fall controls."),
-        ("SidewaysImpulse", "Lateral velocity change (m/s)", "float", 35, 0, None, "Suggested 25-45 m/s; unrestricted upper value. Maintained through the shift instead of lost to air damping."),
-        ("ShiftDuration", "Shift duration (seconds)", "float", .4, 0, None, "Suggested 0.3-0.6 seconds. Zero is a single impulse; no upper limit."),
+        ("DashDistance", "Side dash distance (metres)", "float", 3, 0.1, None, "Suggested 2-4 metres; no upper limit. Horizontal speed is conserved."),
+        ("DashDuration", "Side dash duration (seconds)", "float", .12, 0.01, None, "Suggested 0.1-0.2 seconds; no upper limit."),
         ("OncePerJump", "Once per jump", "bool", True, None, None, "Turn off to allow repeated shifts before landing."),
-        ("AllowGroundTesting", "Allow ground testing", "bool", True, None, None, "Allow the same lateral shift while grounded for practice and tuning."),
-        ("LimitHorizontalSpeed", "Use horizontal speed budget", "bool", False, None, None, "Turn on to limit total horizontal speed to its pre-shift value."),
-        ("ShowStatus", "Show Air Shift status", "bool", True, None, None),
-        ("SpeedRetention", "Horizontal speed budget multiplier", "float", 1, 0, None, "1 preserves the speed before shifting. Suggested 0.9-1; values above 1 allow more speed."),
+        ("ShowStatus", "Show Air Dash status", "bool", True, None, None),
     ]},
     {"id": "PracticeRewind", "name": "Rewind / Practice Scrubbing", "category": "Training", "description": "Experimental solo training: Backspace rewinds 3 seconds; hold to scrub farther, release to resume. Restores driving, reserves and boost state within the current checkpoint segment. History clears on checkpoints, recovery and teleports. Race clock, items and other racers are not rewound. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
         ("RewindKey", "Rewind key", "text", "Backspace", None, None),
@@ -95,7 +93,7 @@ _COMMUNITY = json.loads((_CATALOG_ROOT / "community_catalog.json").read_text(enc
 FEATURES.extend(_MK + _COMMUNITY)
 add_shortcut_choices(FEATURES)
 for feature in FEATURES:
-    feature["name"] = {"UI": "HUD size", "HudOpacity": "HUD transparency", "Rendering": "Graphics"}.get(feature["id"], feature["name"])
+    feature["name"] = {"UI": "HUD size", "HudOpacity": "HUD transparency", "Rendering": "Graphics", "AirShift": "Air Dash"}.get(feature["id"], feature["name"])
 
 
 _CAMERA = next(f for f in FEATURES if f["id"] == "Camera")
@@ -123,7 +121,9 @@ _CAMERA["settingGroups"] = {"AimAtKart":"Aim & rotation", "TargetHeight":"Aim & 
 RETIRED_MODULES = frozenset({'MirrorMode', 'RicochetItems'} | {'Recipe.' + name for name in (
     'AirGlider','DriftCapacitor','EchoRewind','GravitySurf','LandingCombo',
     'RepulsorPulse','SlipstreamSling','CosmeticModel','TrackInspector')})
-RETIRED_SETTINGS = frozenset({('MineTraps', 'TriggerRadius')})
+RETIRED_SETTINGS = frozenset({('AirShift', key) for key in (
+    'AllowGroundTesting', 'SidewaysImpulse', 'ShiftDuration', 'LimitHorizontalSpeed', 'SpeedRetention'
+)})
 FORCED_TRUE_SETTINGS = frozenset({
     ("OnlineProtection", "Enabled"),
     ("OnlineProtection", "BlockLeaderboardUploads"),
@@ -233,15 +233,15 @@ def module_sources():
         "Audio": ["AudioFeature.cs", "Plugin.cs"],
         "Camera": ["CameraFeature.cs", "CameraSettings.cs", "CameraPanel.cs"],
         "Physics": ["FastFallFeature.cs", "ShortcutInput.cs", "Plugin.cs"],
-        "AirShift": ["FeatureHook.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "ShortcutInput.cs", "Plugin.cs"],
-        "PracticeRewind": ["FeatureHook.cs", "PracticeRewindFeature.cs", "PracticeHistory.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "FastFallFeature.cs", "ShortcutInput.cs", "StudioBehaviour.cs", "Plugin.cs"],
-        "MineTraps": ["FeatureHook.cs", "MineTrapFeature.cs", "ShortcutInput.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "Plugin.cs", "StudioBehaviour.cs"],
+        "AirShift": ["FeatureHook.cs", "AirShiftFeature.cs", "AirDashMath.cs", "ShortcutInput.cs", "Plugin.cs"],
+        "PracticeRewind": ["FeatureHook.cs", "PracticeRewindFeature.cs", "PracticeHistory.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirDashMath.cs", "FastFallFeature.cs", "ShortcutInput.cs", "StudioBehaviour.cs", "Plugin.cs"],
+        "MineTraps": ["FeatureHook.cs", "MineTrapFeature.cs", "ShortcutInput.cs", "AirShiftFeature.cs", "AirDashMath.cs", "Plugin.cs", "StudioBehaviour.cs"],
         "CommunityCommands": ["CommunityMods.cs", "CommunityCommandParser.cs"],
         "NightmareAI": ["NightmareAI.cs"],
         "CNKBoostMeter": ["LegacyMK.Meter.cs", "LegacyMK.cs"],
         "KartParameters": ["LegacyMK.Parameters.cs", "LegacyMK.cs"],
         "BoostParameters": ["LegacyMK.Parameters.cs", "LegacyMK.cs"],
-        "SaveStates": ["FeatureHook.cs", "LegacyMK.Practice.cs", "LegacyMK.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "FastFallFeature.cs", "ShortcutInput.cs"],
+        "SaveStates": ["FeatureHook.cs", "LegacyMK.Practice.cs", "LegacyMK.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirDashMath.cs", "FastFallFeature.cs", "ShortcutInput.cs"],
         "ReverseRace": ["LegacyMK.Practice.cs", "LegacyMK.cs"],
     }
     for name in ("Laps", "SimpleDriving", "AutoBoost", "Tuning"):

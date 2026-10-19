@@ -8,7 +8,7 @@ The 0.6.25 plugin is rebuilt against **0.1.4.24 (Windows x64)**. The validated l
 
 ## Standalone camera and inputs
 
-The source Studio also includes experimental **Air Shift**, **Rewind / Practice
+The source Studio also includes experimental **Air Dash**, **Rewind / Practice
 Scrubbing**, and **Mine Traps** modules, plus expanded Practice Snapshots.
 They default off and still need in-game validation. Ricochet Items was removed
 after its bazooka shots failed in play. See [controls, evidence and

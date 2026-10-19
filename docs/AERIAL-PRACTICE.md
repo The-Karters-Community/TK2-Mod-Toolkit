@@ -1,6 +1,6 @@
 # Aerial practice, shortcut selection and mine traps
 
-Air Shift, practice rewind and Mine Traps are in the source Studio's **Community Mods** pack.
+Air Dash, practice rewind and Mine Traps are in the source Studio's **Community Mods** pack.
 They default off. The current source compiles against the installed BepInEx
 interop, and Studio controls are checked separately. **Visible in-game behavior
 of these revisions still needs validation.** No game is automatically launched.
@@ -23,10 +23,9 @@ checks Harmony handler argument types. Run after building:
 dotnet run --project tests/RuntimeHooks -- plugins/TK2.Customization/bin/Release/net6.0/TK2.Customization.dll 'C:\Program Files (x86)\Steam\steamapps\common\The Karters 2 Turbo Charged'
 ```
 
-This verifies lookups and argument types, not visible gameplay. Air Shift reports
-specific race/recovery/menu conditions instead of leaving an unchanged generic
-waiting message when its callbacks are running. Mine reward selection and actual
-trap placement are logged separately. Camera Setup's hotkey now requires its
+This verifies lookups and argument types, not visible gameplay. Air Dash reports
+local input status without allowing bot callbacks to overwrite it. Mine reward
+selection, placement, arming and triggers are logged separately. Camera Setup's hotkey now requires its
 main enable switch; disabling the module also closes the camera panel.
 
 Following the user's 2026-10-19 instruction, there are no GameAssembly or
@@ -40,7 +39,7 @@ not compatibility gates and remain in place.
 
 ## Selecting controls
 
-Every built-in keyboard shortcut has a selection menu, including Air Shift left
+Every built-in keyboard shortcut has a selection menu, including Air Dash left
 and right, Fast Fall, snapshot save/load, rewind and mine test-drop. The menu
 includes letters, digits, function keys, arrows, modifiers, keypad keys and None.
 
@@ -54,40 +53,28 @@ remain compatible. Blank means None (disabled). Practice Snapshots' existing
 
 | Module | Default shortcut | Behavior |
 | --- | --- | --- |
-| Air Shift | `[` / `]`, controller shortcuts off | Maintain a lateral correction in the air and, for testing, on the ground without changing heading or vertical velocity. |
+| Air Dash | `[` / `]`, controller shortcuts off | One collision-aware lateral reposition per jump without steering or changing velocity. |
 | Fast Fall | Down Arrow, legacy MenuTriangle action | Keyboard and controller button can now both be selected. |
 | Practice snapshots | F5 / F6 | Manual save/load with expanded driving/boost state. |
 | Rewind / Practice Scrubbing | Backspace | Tap to rewind three seconds; hold to scrub farther; release to resume on a new timeline. |
 | Mine Traps | Normal fire for inventory mines; M for free test drop | Item-box mines and an optional independent testing shortcut. |
 
-## Air Shift
+## Air Dash
 
-The correction runs at the final
-`PixelEasyCharMoveKartController.KinematicCharacterController_ICharacterController_UpdateVelocity`
-postfix. The earlier implementation ran inside `PixelKartPhysics.UpdateVelocity`,
-before the controller finished its own velocity changes, and applied a one-tick
-impulse. The revised implementation maintains the selected lateral target across
-physics ticks for **Shift duration**, so subsequent native lateral damping does
-not immediately erase it. KCC still handles movement/collisions; this is not a
-position teleport. Vertical velocity, steering rotation and native trick/boost
-inputs are untouched, and Fast Fall remains independent.
+The ground-testing mode is removed. Air Dash applies a brief lateral target at
+the final `KinematicCharacterController_ICharacterController_UpdateVelocity`
+boundary, after native damping. It conserves the kart's original horizontal
+speed, keeps its heading and vertical velocity, and adds a brief cyan directional
+streak. It does not invoke the Teleport Dash item or its portals, reserves,
+immunity or target logic; it matches a quick lateral burst, not the item's full
+visual effect.
 
-Suggested starting values: **35 m/s lateral change, 0.4 seconds**. The grounded
-test is enabled by default so the direction and scale can be checked without
-jumping. A maintained 35 m/s corresponds to 14 metres over 0.4 seconds before
-collisions; this is a calculation, not an observed in-game displacement. Strength
-and duration have no upper limit
-in Studio validation, exported settings or BepInEx bindings. Zero duration gives
-an impulse. Suggested ranges are text hints rather than slider ceilings.
-
-Ground tests can be disabled independently. **Once per jump** can be turned off
-for repeated airborne shifts. **Use horizontal speed budget** is off by default
-to make the lateral correction visible; enable it to constrain total horizontal
-speed to the pre-shift budget. With the budget on, multiplier 1 preserves the
-horizontal speed measured at shift activation;
-0.9 reduces it, and values above 1 explicitly permit more speed. All tuning
-numbers must be finite and non-negative. A hideable status line reports ready,
-spent or active state and the applied lateral speed; accepted shifts are logged.
+Suggested starting values: **3 metres over 0.12 seconds** (try 2-4 m and
+0.1-0.2 s). Both settings have no upper ceiling. Speed conservation can reduce
+the forward component during the burst. Air Dash only works while airborne and
+allows one dash per jump by default; repeated dashes can be enabled. A hideable
+status line reports grounded, ready, spent and dash distance. Visible movement
+and streak rendering still need a fresh in-game test.
 
 ## Practice rewind and snapshots
 
@@ -100,8 +87,7 @@ coroutines are not captured. The clock and other world objects are not rewound.
 The shared driving snapshot restores motor/grounding, steering/drift, reserves,
 boost-speed components, both fill arrays, boost smoothing and normal route/respawn
 tracking. Timestamps are rebased. Pending jump/boost input and Fast Fall's latch
-are cleared. Air Shift's used state, correction direction, target, budget and
-remaining active duration are restored together. Manual snapshots retain their
+are cleared. Air Dash's once-per-jump state is restored. Manual snapshots retain their
 health/item and experimental checkpoint/clock options. This is a partial driving
 rewind, not a full world save; temporary external item effects, moving platforms,
 battle-arena world/history and already-started recovery are not rewound.
@@ -141,10 +127,12 @@ the shipped mine model. Original assets are never edited. Temporary slots and
 modified mine-targeting settings are restored/removed on cleanup.
 
 A mine is placed on a track surface behind the kart, remains stationary, arms
-after **0.6 seconds**, and expires after **45 seconds** by default. Its native
-mine trigger and explosion behavior remain enabled, and owner triggering defaults
-off. Zero damage override keeps the prefab's native damage. No track surface
-behind the kart means no placement.
+after **0.6 seconds**, and expires after **45 seconds** by default. Native trigger
+contacts remain enabled; an offline proximity scan also calls the native
+`ExplodeMine` method for karts inside the configurable **2.5 m** radius. Owner
+triggering defaults on for solo tests. Zero damage override keeps native damage.
+No track surface behind the kart means no placement. Visible damage and effects
+remain unverified until a new in-game test.
 The extra **M** shortcut drops a free testing mine; select **None** to rely only
 on item-box inventory. Its controller shortcut is also selectable. Arming time,
 lifetime, drop distance, reward ammo and damage have suggested values
@@ -164,12 +152,12 @@ InitMine `0x3FC4B0`, MineBehavior.ThrowMine `0xC37630`, Attach `0xC368D0`,
 OnTriggerStay `0xC37220`, and ExplodeMine `0xC36EC0`.
 
 Validation includes the full Python suite, UI tests/build and browser selection
-checks; compiled plugin checks; deterministic sustained-shift/speed-budget tests;
+checks; compiled plugin checks; deterministic side-dash distance tests;
 history branching/expiry tests; and online-protection policy tests. These do not
 prove native hooks execute or that traps look correct in game.
 
-Manual acceptance still required: visible lateral displacement using ground test
-and airborne shift, repeated/unrestricted shifts, trick/boost/Fast Fall
+Manual acceptance still required: visible airborne side dash and streak,
+repeated dashes, trick/boost/Fast Fall
 combinations, restoring an active shift, physical controller mappings, item-box
 mine pickup, normal ammo consumption, mine arming/contact damage/expiry, and blocked submissions after
 mutation even when modules are switched off.

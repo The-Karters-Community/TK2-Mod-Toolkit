@@ -6,23 +6,24 @@ void Check(bool condition, string why) { assertions++; if (!condition) throw new
 var random = new Random(1942);
 for (int i = 0; i < 10000; i++) {
     float x = (float)(random.NextDouble() * 160 - 80), z = (float)(random.NextDouble() * 160 - 80);
-    float angle = (float)(random.NextDouble() * Math.PI * 2), target = (float)(random.NextDouble() * 300 - 150);
-    float budget = MathF.Sqrt(x*x + z*z);
-    var shifted = AirShiftMath.Hold(x, z, MathF.Cos(angle), MathF.Sin(angle), target, budget, true);
-    Check(Math.Sqrt(shifted.X*shifted.X + shifted.Z*shifted.Z) <= budget + .00003, "enabled speed budget is respected");
-    var unlimited = AirShiftMath.Hold(x, z, 1, 0, target, 0, false);
-    Check(Math.Abs(unlimited.X-target) < .00003 && unlimited.Z == z, "unlimited shift preserves forward speed and has no lateral ceiling");
+    float angle = (float)(random.NextDouble() * Math.PI * 2), distance = (float)(random.NextDouble() * 1000);
+    var right = (X: MathF.Cos(angle), Z: MathF.Sin(angle));
+    var target = AirDashMath.TargetLateral(x * right.X + z * right.Z, 1, distance, .12f);
+    float speed = MathF.Sqrt(x*x + z*z);
+    var output = AirDashMath.Hold(x, z, right.X, right.Z, target, speed);
+    Check(Math.Sqrt(output.X*output.X + output.Z*output.Z) <= Math.Sqrt(x*x + z*z) + .00003,
+        "dash conserves the original horizontal speed");
+    var leftTarget = AirDashMath.TargetLateral(x * right.X + z * right.Z, -1, distance, .12f);
+    var left = AirDashMath.Hold(x, z, right.X, right.Z, leftTarget, speed);
+    Check(Math.Abs(AirDashMath.TargetLateral(0, 1, distance, .12f) + AirDashMath.TargetLateral(0, -1, distance, .12f)) < .0002,
+        "left and right dash targets are symmetric");
+    Check(Math.Sqrt(left.X*left.X + left.Z*left.Z) <= speed + .00003,
+        "left dash also conserves horizontal speed");
 }
-Check(AirShiftMath.Hold(0, 30, 1, 0, 1000, 30, false) == (1000, 30), "values far above the former 15 limit work");
-Check(AirShiftMath.Hold(0, 0, 1, 0, 18, 0, false) == (18, 0), "unrestricted shifting works from rest");
-Check(AirShiftMath.Hold(0, 30, 0, 0, 18, 30, false) == (0, 30), "a vertical right vector produces no horizontal displacement");
-float lateral = 0, displacement = 0;
-for (int i = 0; i < 25; i++) {
-    lateral *= .1f; // Representative strong native air damping before our final-controller postfix.
-    lateral = AirShiftMath.Hold(lateral, 30, 1, 0, 18, 30, false).X;
-    displacement += lateral * .01f;
-}
-Check(Math.Abs(displacement-4.5f) < .0001f, "maintained velocity produces a visible 4.5m step over .25 seconds despite damping");
+Check(Math.Abs(AirDashMath.TargetLateral(5, 1, 3, .12f) - 30) < .0001, "distance and duration define the lateral dash target");
+Check(Math.Abs(AirDashMath.TargetLateral(5, 1, 1000, .12f) - 8338.333f) < .01, "dash distance has no artificial ceiling");
+try { AirDashMath.TargetLateral(0, 0, 2, .12f); Check(false, "zero direction is rejected"); }
+catch (ArgumentOutOfRangeException) { Check(true, "zero direction is rejected"); }
 
 var history = new PracticeHistory<string>();
 Check(!history.TryAt(3, out _, out _), "empty history cannot rewind");

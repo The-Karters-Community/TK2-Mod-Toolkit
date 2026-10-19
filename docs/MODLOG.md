@@ -190,3 +190,27 @@
   existing Air Shift values remain; only `LimitHorizontalSpeed` was switched
   off, with the prior config copied to
   `local/backups/1792441949483888900/airshift-config-before.cfg`.
+
+# Air Dash and mine trigger retry (2026-10-19)
+
+- Replaced the ground-test shift with an airborne-only lateral burst at the
+  final KCC velocity boundary, preserving heading and total horizontal speed.
+  A short cyan streak marks the direction. Suggested start: 3 m over 0.12 s;
+  distance and duration are freely tunable. Teleport Dash portals and item
+  logic are not invoked.
+- Added an offline proximity fallback around armed mines that calls the native
+  `MineBehavior.ExplodeMine` entry, while keeping native trigger contacts. The
+  UI now reports and logs placement, arming and trigger attempts separately.
+  Owner triggering is enabled for offline practice.
+- Filtered retired config entries before producing the UI's extra-settings
+  cards. This prevents the old MineTraps `TriggerRadius` value from creating a
+  second non-collapsible module card. Retired Air Shift tuning fields are also
+  hidden; the new Air Dash distance replaces them.
+- Preserved the user's settings and changed only the saved `OwnerCanTrigger`
+  value to true. Config backup: `local/backups/airdash-mine-config-before-20261019.cfg`.
+- Validation: 143 Python tests, 23 UI tests, UI production build, 30,012
+  deterministic math/history assertions, and all 9 current runtime hook
+  signatures passed. Plugin build has zero warnings. The plugin was redeployed
+  with final backup transaction `local/backups/1792443636185269700`. The game was not
+  launched; mine damage/effects and the Air Dash streak still need in-game
+  confirmation.

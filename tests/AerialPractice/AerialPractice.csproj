@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework><Nullable>enable</Nullable><NuGetAudit>false</NuGetAudit></PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../plugins/TK2.Customization/AirShiftMath.cs" Link="AirShiftMath.cs" />
+    <Compile Include="../../plugins/TK2.Customization/AirDashMath.cs" Link="AirDashMath.cs" />
     <Compile Include="../../plugins/TK2.Customization/PracticeHistory.cs" Link="PracticeHistory.cs" />
   </ItemGroup>
 </Project>
