@@ -51,26 +51,33 @@ FEATURES = [
 ]
 
 FEATURES.extend([
-    {"id": "MineTraps", "name": "Mine Traps", "category": "Items", "description": "Revive the dormant spiked MINA_09 mine as an armed track trap. Mines can replace item-box rewards and use the normal item fire button. M is an additional free testing drop; choose None to disable it. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
+    {"id": "MineTraps", "name": "Mine Traps", "category": "Items", "description": "Use the dormant MINA_09 as a large local trap. Choose a forward physics throw or a surface placement behind the kart; mines can also replace item-box rewards. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
         ("ItemBoxRewards", "Include in item-box rewards", "bool", True, None, None),
         ("ItemBoxChancePercent", "Item-box chance (%)", "float", 20, 0, 100, "Chance to replace an item box's first reward with mines."),
         ("RewardAmmo", "Mines per reward", "int", 1, 1, None, "Suggested 1-3; no upper limit."),
         ("DropKey", "Extra test drop key", "text", "M", None, None, "Free test drop independent of inventory ammo. Select None to use item boxes only."),
         ("ControllerAction", "Extra test drop controller button", "text", "", None, None),
-        ("ArmDelay", "Arming delay (seconds)", "float", .6, 0, None, "Suggested 0.5-1.5; no upper limit."),
-        ("Lifetime", "Lifetime (seconds)", "float", 45, 0, None, "Suggested 20-60; no upper limit."),
-        ("DropDistance", "Drop distance behind kart", "float", 4, 0, None, "Suggested 3-6 metres; no upper limit."),
-        ("Damage", "Damage override", "int", 0, 0, None, "Zero keeps native damage. Positive values override it, without an upper limit."),
-        ("TriggerRadius", "Mine trigger radius", "float", 2.5, 0.1, None, "Kart-to-mine distance for the offline proximity fallback. Suggested 2-3 metres; no upper limit."),
-        ("OwnerCanTrigger", "Owner can trigger armed mines", "bool", True, None, None),
-    ]},
-    {"id": "AirShift", "name": "Air Dash", "category": "Driving", "description": "A short, speed-conserving lateral burst while airborne. It preserves heading and vertical velocity and leaves a brief direction streak. One dash per jump by default; choose keys and gamepad buttons below.", "origin": "New", "gameplay": True, "settings": [
+        ("PlacementMode", "Mine placement", "text", "Forward throw", None, None, "Throw forward with Rigidbody physics or place a stationary mine on the track behind you.", ["Forward throw", "Drop behind"]),
+        ("TimedDetonationDelay", "Timed detonation (seconds)", "float", 45, 0, None, "The mine detonates after this delay. No upper limit."),
+        ("ForwardThrowSpeed", "Forward throw speed (m/s)", "float", 30, 0, None, "Used by Forward throw mode. Suggested 30 m/s; no upper limit."),
+        ("RearDropDistance", "Distance behind kart", "float", 4, 0, None, "Used by Drop behind mode. Suggested 3-6 metres; no upper limit."),
+        ("MineSizeMultiplier", "Mine size multiplier", "float", 5, 0.1, None, "Scales the whole visible mine model; the native trigger sphere is kept at its original size. No upper limit."),
+        ("Damage", "Mine damage", "int", 80, 0, None, "Damage dealt when a mine explodes. No upper limit."),
+        ("TriggerRadius", "Mine trigger radius", "float", 4, 0.1, None, "Kart-to-mine distance for the offline proximity fallback. Suggested 4 metres; no upper limit."),
+        ("TimedBlastRadius", "Timed blast radius (m)", "float", 10, 0.1, None, "At timer expiry, spawn the mine explosion at its location and apply native HP damage to every kart within this radius. No remote-owner fallback."),
+    ], "settingGroups": {
+        "ItemBoxRewards": "Item boxes", "ItemBoxChancePercent": "Item boxes", "RewardAmmo": "Item boxes",
+        "DropKey": "Placement controls", "ControllerAction": "Placement controls", "PlacementMode": "Placement controls",
+        "ForwardThrowSpeed": "Placement controls", "RearDropDistance": "Placement controls", "MineSizeMultiplier": "Placement controls",
+        "TimedDetonationDelay": "Trap behavior", "TriggerRadius": "Trap behavior", "TimedBlastRadius": "Trap behavior", "Damage": "Trap behavior",
+    }},
+    {"id": "AirShift", "name": "Air Dash", "category": "Driving", "description": "A lateral velocity burst while airborne. It preserves kart heading, vertical velocity and total horizontal speed. One dash per jump by default; choose keys and gamepad buttons below.", "origin": "New", "gameplay": True, "settings": [
         ("LeftKey", "Dash left key", "text", "LeftBracket", None, None),
         ("RightKey", "Dash right key", "text", "RightBracket", None, None),
         ("LeftAction", "Controller left action", "text", "", None, None, "Optional existing Rewired action; blank disables this controller shortcut."),
         ("RightAction", "Controller right action", "text", "", None, None, "Choose actions that do not overlap your trick or Fast Fall controls."),
-        ("DashDistance", "Side dash distance (metres)", "float", 3, 0.1, None, "Suggested 2-4 metres; no upper limit. Horizontal speed is conserved."),
-        ("DashDuration", "Side dash duration (seconds)", "float", .12, 0.01, None, "Suggested 0.1-0.2 seconds; no upper limit."),
+        ("SidewaysImpulse", "Lateral speed impulse (m/s)", "float", 65, 0.1, None, "Suggested 65 m/s; total horizontal speed is conserved. No upper limit."),
+        ("ShiftDuration", "Burst duration (seconds)", "float", .25, 0.01, None, "Suggested 0.25 seconds; no upper limit."),
         ("OncePerJump", "Once per jump", "bool", True, None, None, "Turn off to allow repeated shifts before landing."),
         ("ShowStatus", "Show Air Dash status", "bool", True, None, None),
     ]},
@@ -122,8 +129,8 @@ RETIRED_MODULES = frozenset({'MirrorMode', 'RicochetItems'} | {'Recipe.' + name 
     'AirGlider','DriftCapacitor','EchoRewind','GravitySurf','LandingCombo',
     'RepulsorPulse','SlipstreamSling','CosmeticModel','TrackInspector')})
 RETIRED_SETTINGS = frozenset({('AirShift', key) for key in (
-    'AllowGroundTesting', 'SidewaysImpulse', 'ShiftDuration', 'LimitHorizontalSpeed', 'SpeedRetention'
-)})
+    'AllowGroundTesting', 'DashDistance', 'DashDuration', 'LimitHorizontalSpeed', 'SpeedRetention'
+)} | {('MineTraps', key) for key in ('DropDistance', 'OwnerCanTrigger', 'ArmDelay', 'Lifetime', 'ThrowForceMultiplier')})
 FORCED_TRUE_SETTINGS = frozenset({
     ("OnlineProtection", "Enabled"),
     ("OnlineProtection", "BlockLeaderboardUploads"),

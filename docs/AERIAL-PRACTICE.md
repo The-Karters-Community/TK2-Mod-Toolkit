@@ -53,7 +53,7 @@ remain compatible. Blank means None (disabled). Practice Snapshots' existing
 
 | Module | Default shortcut | Behavior |
 | --- | --- | --- |
-| Air Dash | `[` / `]`, controller shortcuts off | One collision-aware lateral reposition per jump without steering or changing velocity. |
+| Air Dash | `[` / `]`, controller shortcuts off | One lateral velocity burst per jump without turning the kart. |
 | Fast Fall | Down Arrow, legacy MenuTriangle action | Keyboard and controller button can now both be selected. |
 | Practice snapshots | F5 / F6 | Manual save/load with expanded driving/boost state. |
 | Rewind / Practice Scrubbing | Backspace | Tap to rewind three seconds; hold to scrub farther; release to resume on a new timeline. |
@@ -61,20 +61,17 @@ remain compatible. Blank means None (disabled). Practice Snapshots' existing
 
 ## Air Dash
 
-The ground-testing mode is removed. Air Dash applies a brief lateral target at
-the final `KinematicCharacterController_ICharacterController_UpdateVelocity`
-boundary, after native damping. It conserves the kart's original horizontal
-speed, keeps its heading and vertical velocity, and adds a brief cyan directional
-streak. It does not invoke the Teleport Dash item or its portals, reserves,
-immunity or target logic; it matches a quick lateral burst, not the item's full
-visual effect.
+Air Dash adds a configurable lateral velocity impulse at the final
+`KinematicCharacterController_ICharacterController_UpdateVelocity` boundary,
+after native damping. The burst is held for its configured duration, preserves
+kart heading and vertical velocity, and caps total horizontal speed at the
+pre-dash value. It has no added streak or Teleport Dash effects.
 
-Suggested starting values: **3 metres over 0.12 seconds** (try 2-4 m and
-0.1-0.2 s). Both settings have no upper ceiling. Speed conservation can reduce
-the forward component during the burst. Air Dash only works while airborne and
-allows one dash per jump by default; repeated dashes can be enabled. A hideable
-status line reports grounded, ready, spent and dash distance. Visible movement
-and streak rendering still need a fresh in-game test.
+Suggested starting values: **65 m/s for 0.25 seconds**. Both settings have no
+upper ceiling. Air Dash only works while airborne and allows one dash per jump
+by default; repeated dashes can be enabled. A hideable status line reports
+grounded, ready, spent and current burst state. Visible movement still needs a
+fresh in-game test.
 
 ## Practice rewind and snapshots
 
@@ -112,11 +109,10 @@ The native item enum is **MINA_09 = 9**. Current Ghidra inspection shows the
 `WeaponsView.InitMine` body is empty and `InitEffect` omits case 9. The module
 restores use through the normal `WeaponsView.FireWeapon` entry, using the real
 mine prefab and native `MineBehavior.ExplodeMine` damage/effect path. The
-current fix leaves the spawned prefab's `MineBehavior`, trigger callbacks and
-animation enabled, disables only its throw-to-ground attachment, arms it via
-`ActivateMine`, and does not destroy the object when it explodes so its native
-effect cleanup can finish. The test drop and inventory fire path use this same
-trap behavior.
+fixes leave the spawned prefab's `MineBehavior`, trigger callbacks and animation
+enabled, use its native `ThrowMine()` forward toss and `ActivateMine()` arming,
+and do not destroy the object when it explodes so native effect cleanup can
+finish. The test drop and inventory fire path use this same trap behavior.
 
 When enabled, **Include in item-box rewards** defaults on: each local reward has
 a configurable **20%** chance to replace its first item with one mine. The second
@@ -126,17 +122,32 @@ local weapon shell supplies valid inventory/animation references and displays
 the shipped mine model. Original assets are never edited. Temporary slots and
 modified mine-targeting settings are restored/removed on cleanup.
 
-A mine is placed on a track surface behind the kart, remains stationary, arms
-after **0.6 seconds**, and expires after **45 seconds** by default. Native trigger
-contacts remain enabled; an offline proximity scan also calls the native
-`ExplodeMine` method for karts inside the configurable **2.5 m** radius. Owner
-triggering defaults on for solo tests. Zero damage override keeps native damage.
-No track surface behind the kart means no placement. Visible damage and effects
-remain unverified until a new in-game test.
+The **Mine size multiplier** defaults to **5x**. It scales the MineEffect model
+while compensating its native sphere collider, so the visible trap is larger
+without making the game's contact volume five times larger. **Forward throw**
+(default) launches a mine from ahead of the kart using Rigidbody velocity; it
+then raycasts to the track and settles there. This bypasses native `ThrowMine()`,
+whose prefab vector sent the mine backward in the user's build. **Drop behind**
+does a stationary track-surface placement at the selected rear distance. Both
+controls use the same trap lifetime and trigger behavior.
+
+The fixed arming delay is **0.6 seconds**. At **45 seconds** the mine spawns its
+explosion prefab at the mine's position and uses the game's native HP hit path
+for every kart inside the configurable **10 m** damage radius. The remote owner
+is never used as a fallback target; the native `ExplodeMine(target)` method is
+avoided for timed detonations because it anchors the effect to the supplied
+kart. An offline proximity scan triggers armed mines for karts inside the separate
+**4 m** trigger radius. Owner triggering is always enabled. Damage defaults to
+**80**. Visual throw, detonation and damage still need fresh in-game validation.
+
+Mine settings are grouped into **Item boxes**, **Placement controls** and **Trap
+behavior**. These groups keep reward odds/ammo, keyboard/controller shortcuts,
+placement/size, and damage/timer/radii together without an arming-delay or owner
+toggle that does not need player tuning.
 The extra **M** shortcut drops a free testing mine; select **None** to rely only
 on item-box inventory. Its controller shortcut is also selectable. Arming time,
-lifetime, drop distance, reward ammo and damage have suggested values
-without artificial upper ceilings. Turning off the module cleans up its traps.
+lifetime, throw force, rear distance, reward ammo, trigger radii and damage have suggested
+values without artificial upper ceilings. Turning off the module cleans up its traps.
 
 ## Evidence and validation
 
@@ -152,11 +163,11 @@ InitMine `0x3FC4B0`, MineBehavior.ThrowMine `0xC37630`, Attach `0xC368D0`,
 OnTriggerStay `0xC37220`, and ExplodeMine `0xC36EC0`.
 
 Validation includes the full Python suite, UI tests/build and browser selection
-checks; compiled plugin checks; deterministic side-dash distance tests;
+checks; compiled plugin checks; deterministic lateral-impulse tests;
 history branching/expiry tests; and online-protection policy tests. These do not
 prove native hooks execute or that traps look correct in game.
 
-Manual acceptance still required: visible airborne side dash and streak,
+Manual acceptance still required: visible airborne side dash,
 repeated dashes, trick/boost/Fast Fall
 combinations, restoring an active shift, physical controller mappings, item-box
 mine pickup, normal ammo consumption, mine arming/contact damage/expiry, and blocked submissions after

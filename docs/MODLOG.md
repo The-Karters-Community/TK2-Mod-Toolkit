@@ -214,3 +214,71 @@
   with final backup transaction `local/backups/1792443636185269700`. The game was not
   launched; mine damage/effects and the Air Dash streak still need in-game
   confirmation.
+
+# Mine throw and Air Dash tuning (2026-10-20)
+
+- Mine test drops now offer both native `MineBehavior.ThrowMine()` from in front
+  of the kart and stationary surface placement behind it. The trap scales to
+  1.8x, with separate forward-force and rear-distance controls.
+- Mine damage defaults to 80, proximity trigger radius to 4 m, and owner contact
+  is always enabled. At 45 seconds, the native explosion targets the nearest
+  kart within a configurable 10 m timed blast radius; without a nearby kart, the
+  native target-requiring method cannot detonate and the trap is removed. The
+  obsolete behind-distance and owner-toggle settings are retired.
+- Replaced Air Dash's distance target and cyan LineRenderer streak with the
+  requested 65 m/s lateral impulse held for 0.25 seconds. The velocity hook
+  keeps kart heading and vertical velocity and caps total horizontal speed.
+  Suggested values remain editable without an upper ceiling.
+- Build, UI, math/history and exact hook-signature checks passed. The plugin was
+  installed after the game process exited; visible mine and Air Dash behavior
+  still needs a fresh in-game validation.
+
+# Mine throw, scale and timer correction (2026-10-20)
+
+- Replaced the native backward-directed throw path with a Rigidbody launch from
+  four metres ahead of the kart. The mine now raycasts for the track while
+  descending and settles as a stationary armed trap; rear surface placement
+  remains available. The mesh root scales to 5x and primitive colliders are
+  inversely scaled to preserve native collider size.
+- Removed the tunable arming delay (fixed at 0.6 s), grouped remaining controls
+  into item-box, placement and trap-behavior sections, and retained the 45 s
+  timer, 10 m timer target radius, 4 m proximity radius and 80 damage defaults.
+  The shipped explosion prefab has no `EffectSettings` component, so the native
+  splash-damage radius cannot be changed through that field.
+- Optimized the mine scan to reuse a kart list refreshed twice per second rather
+  than searching the whole scene once per mine. The forward flight uses one
+  lightweight surface raycast per tracked mine every 0.05 s.
+- Validation: 143 Python tests, 30,012 deterministic math/history assertions,
+  23 UI tests, UI production build, C# build with 0 warnings/errors, and all 9
+  runtime hook signatures passed. Deployment completed with TheKarters2.exe
+  closed. Artifact and installed DLL SHA-256 match
+  `4C73A4C466816DCBB2ACBC9156034CF1CF5FDE246984AEC316C184449B73BA78`; final
+  backup transaction: `local/backups/1792446359041903300` (the prior build is
+  also recoverable from `local/backups/1792446283786536200`). These checks do not
+  validate mine appearance, landing, area damage or timer detonation in game.
+
+# Mine placement, size and timeout fallback correction (2026-10-20)
+
+- User testing and the current BepInEx log showed the timeout fallback passed the
+  owner's kart to `ExplodeMine`; that native method anchors the effect to the
+  supplied kart, so a remote player appeared to explode. The empty-radius path
+  now spawns the mine explosion prefab at the mine and never targets the owner.
+  Timed detonation applies the game's native HP hit to every kart within the
+  configured radius.
+- User logs also confirmed that forward mines spawned but never reported a track
+  landing. The launch now starts six metres ahead, corrects a reversed kart
+  forward vector against horizontal motor velocity, and falls back to all normal
+  raycast layers if the game's environment mask misses the track. Mine scale is
+  re-applied during the runtime scan in case native startup resets the root
+  transform. A one-time flight diagnostic records position and velocity if it
+  still has not settled.
+- Timed detonation plays the mine prefab at its position and calls native
+  `HpBarController.Hit` for all karts within 10 m. This avoids native
+  `ExplodeMine(target)`'s target-anchored effect. The prefab itself still has no
+  `EffectSettings` radius; the configured damage radius is applied by the module.
+- Validation: 143 Python tests, 30,012 math/history assertions, plugin build
+  with 0 warnings/errors and all 9 Harmony hooks passed. Deployment completed
+  with the game closed; artifact and installed DLL hashes match
+  `08652BB01D5F9D737C20419F60501F13C07EFA9D0982DD6FB1CD0A54B2D61DFF`.
+  Backup: `local/backups/1792446930281748800`. In-game forward movement, model
+  size, mine-position VFX and damage still need confirmation.

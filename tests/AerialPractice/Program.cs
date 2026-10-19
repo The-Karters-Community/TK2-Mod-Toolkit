@@ -8,21 +8,22 @@ for (int i = 0; i < 10000; i++) {
     float x = (float)(random.NextDouble() * 160 - 80), z = (float)(random.NextDouble() * 160 - 80);
     float angle = (float)(random.NextDouble() * Math.PI * 2), distance = (float)(random.NextDouble() * 1000);
     var right = (X: MathF.Cos(angle), Z: MathF.Sin(angle));
-    var target = AirDashMath.TargetLateral(x * right.X + z * right.Z, 1, distance, .12f);
+    var impulse = distance;
+    var target = AirDashMath.TargetLateral(x * right.X + z * right.Z, 1, impulse);
     float speed = MathF.Sqrt(x*x + z*z);
     var output = AirDashMath.Hold(x, z, right.X, right.Z, target, speed);
     Check(Math.Sqrt(output.X*output.X + output.Z*output.Z) <= Math.Sqrt(x*x + z*z) + .00003,
         "dash conserves the original horizontal speed");
-    var leftTarget = AirDashMath.TargetLateral(x * right.X + z * right.Z, -1, distance, .12f);
+    var leftTarget = AirDashMath.TargetLateral(x * right.X + z * right.Z, -1, impulse);
     var left = AirDashMath.Hold(x, z, right.X, right.Z, leftTarget, speed);
-    Check(Math.Abs(AirDashMath.TargetLateral(0, 1, distance, .12f) + AirDashMath.TargetLateral(0, -1, distance, .12f)) < .0002,
+    Check(Math.Abs(AirDashMath.TargetLateral(0, 1, impulse) + AirDashMath.TargetLateral(0, -1, impulse)) < .0002,
         "left and right dash targets are symmetric");
     Check(Math.Sqrt(left.X*left.X + left.Z*left.Z) <= speed + .00003,
         "left dash also conserves horizontal speed");
 }
-Check(Math.Abs(AirDashMath.TargetLateral(5, 1, 3, .12f) - 30) < .0001, "distance and duration define the lateral dash target");
-Check(Math.Abs(AirDashMath.TargetLateral(5, 1, 1000, .12f) - 8338.333f) < .01, "dash distance has no artificial ceiling");
-try { AirDashMath.TargetLateral(0, 0, 2, .12f); Check(false, "zero direction is rejected"); }
+Check(Math.Abs(AirDashMath.TargetLateral(5, 1, 65) - 70) < .0001, "dash adds the requested lateral speed");
+Check(Math.Abs(AirDashMath.TargetLateral(5, 1, 1000) - 1005) < .01, "lateral impulse has no artificial ceiling");
+try { AirDashMath.TargetLateral(0, 0, 2); Check(false, "zero direction is rejected"); }
 catch (ArgumentOutOfRangeException) { Check(true, "zero direction is rejected"); }
 
 var history = new PracticeHistory<string>();

@@ -4,12 +4,12 @@ namespace TK2.Customization;
 
 internal static class AirDashMath
 {
-    internal static float TargetLateral(float current, int direction, float distance, float duration)
+    internal static float TargetLateral(float current, int direction, float impulse)
     {
         if (direction is not (-1 or 1)) throw new ArgumentOutOfRangeException(nameof(direction));
-        if (!float.IsFinite(distance) || distance < 0 || !float.IsFinite(duration) || duration <= 0)
-            throw new ArgumentOutOfRangeException(nameof(distance));
-        return current + direction * distance / duration;
+        if (!float.IsFinite(impulse) || impulse < 0)
+            throw new ArgumentOutOfRangeException(nameof(impulse));
+        return current + direction * impulse;
     }
 
     internal static (float X, float Z) Hold(float x, float z, float rightX, float rightZ, float target, float speedBudget)

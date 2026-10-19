@@ -11,7 +11,7 @@ internal static class AirShiftFeature
     private static ConfigEntry<bool> Enabled = null!, OncePerJump = null!, ShowStatus = null!;
     private static ConfigEntry<KeyCode> Left = null!, Right = null!;
     private static ConfigEntry<string> LeftAction = null!, RightAction = null!;
-    private static ConfigEntry<float> Distance = null!, Duration = null!;
+    private static ConfigEntry<float> Impulse = null!, Duration = null!;
     private sealed class Dash {
         internal bool Used, Active;
         internal double Until;
@@ -28,8 +28,8 @@ internal static class AirShiftFeature
         Right = p.Config.Bind("AirShift", "RightKey", KeyCode.RightBracket, "Dash right while airborne.");
         LeftAction = p.Config.Bind("AirShift", "LeftAction", "", "Selected physical gamepad button or existing Rewired action.");
         RightAction = p.Config.Bind("AirShift", "RightAction", "", "Selected physical gamepad button or existing Rewired action.");
-        Distance = p.Config.Bind("AirShift", "DashDistance", 3f, "Suggested 2-4 metres; no upper limit. Horizontal speed is conserved.");
-        Duration = p.Config.Bind("AirShift", "DashDuration", .12f, "Suggested 0.1-0.2 seconds; no upper limit.");
+        Impulse = p.Config.Bind("AirShift", "SidewaysImpulse", 65f, "Added lateral velocity in metres per second before total horizontal speed is conserved. Suggested 65; no upper limit.");
+        Duration = p.Config.Bind("AirShift", "ShiftDuration", .25f, "How long the lateral burst is held. Suggested 0.25 seconds; no upper limit.");
         OncePerJump = p.Config.Bind("AirShift", "OncePerJump", true, "Disable to allow repeated dashes before landing.");
         ShowStatus = p.Config.Bind("AirShift", "ShowStatus", true, "Show grounded/ready/spent/dash status while testing.");
         FeatureHook.Install(p.Harmony, typeof(AirShiftFeature), Hooks());
@@ -82,9 +82,9 @@ internal static class AirShiftFeature
             bool right = Input.GetKeyDown(Right.Value) || ShortcutInput.Read(__instance, RightAction.Value);
             if (left == right) return;
             if (OncePerJump.Value && state.Used) { Status = "Air Dash: spent until landing"; return; }
-            if (!float.IsFinite(Distance.Value) || Distance.Value < .1f ||
+            if (!float.IsFinite(Impulse.Value) || Impulse.Value <= 0 ||
                 !float.IsFinite(Duration.Value) || Duration.Value <= 0)
-                throw new ArgumentException("Air Dash distance and duration must be finite and positive.");
+                throw new ArgumentException("Air Dash lateral impulse and duration must be finite and positive.");
 
             Vector3 axis = kart.kartPhysics.GetMainMotorSteeringOrientation() * Vector3.right;
             axis.y = 0;
@@ -92,17 +92,14 @@ internal static class AirShiftFeature
             axis.Normalize();
             Vector3 velocity = kart.Motor.Velocity;
             state.Right = axis;
-            state.TargetLateral = AirDashMath.TargetLateral(Vector3.Dot(velocity, axis), left ? -1 : 1, Distance.Value, Duration.Value);
+            state.TargetLateral = AirDashMath.TargetLateral(Vector3.Dot(velocity, axis), left ? -1 : 1, Impulse.Value);
             state.SpeedBudget = new Vector2(velocity.x, velocity.z).magnitude;
             state.Until = Time.time + Duration.Value;
             state.Active = true; state.Used = true;
 
-            Vector3 from = kart.Motor.TransientPosition + Vector3.up * .35f;
-            Vector3 to = from + axis * (left ? -Distance.Value : Distance.Value);
-            MakeStreak(from, to);
             Plugin.Instance!.SessionModified = true;
-            Status = $"Air Dash: {(left ? "left" : "right")} — {Distance.Value:0.0} m in {Duration.Value:0.00}s";
-            Plugin.Instance.Log.LogInfo(Status + "; heading and horizontal speed preserved.");
+            Status = $"Air Dash: {(left ? "left" : "right")} — {Impulse.Value:0.0} m/s for {Duration.Value:0.00}s";
+            Plugin.Instance.Log.LogInfo(Status + "; heading unchanged and horizontal speed capped at its pre-dash value.");
         } catch (Exception ex) { Stop(ex); }
     }
 
@@ -127,21 +124,6 @@ internal static class AirShiftFeature
             physics.vLastVelocity = __0;
             Plugin.Instance!.SessionModified = true;
         } catch (Exception ex) { Stop(ex); }
-    }
-
-    private static void MakeStreak(Vector3 from, Vector3 to)
-    {
-        var shader = Shader.Find("Sprites/Default");
-        if (shader == null) return;
-        var go = new GameObject("TK2 Air Dash streak");
-        var line = go.AddComponent<LineRenderer>();
-        var material = new Material(shader);
-        line.material = material; line.useWorldSpace = true; line.positionCount = 2;
-        line.SetPosition(0, from); line.SetPosition(1, to);
-        line.startWidth = .22f; line.endWidth = .015f;
-        line.startColor = new Color(.45f, .95f, 1f, .95f);
-        line.endColor = new Color(.45f, .95f, 1f, .05f);
-        UnityEngine.Object.Destroy(go, .16f); UnityEngine.Object.Destroy(material, .2f);
     }
 
     internal static bool Used(PixelKartPhysics physics) => State(physics).Used;
