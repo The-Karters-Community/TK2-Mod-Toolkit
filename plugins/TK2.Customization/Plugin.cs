@@ -53,7 +53,6 @@ public sealed partial class Plugin : BasePlugin
         TryFeature("offline fast fall", InstallPhysics);
         TryFeature("fast-fall controller input", () => FastFallFeature.Install(this));
         TryFeature("air shift", () => AirShiftFeature.Install(this));
-        TryFeature("ricochet items", () => RicochetItemsFeature.Install(this));
         TryFeature("practice rewind", () => PracticeRewindFeature.Install(this));
         TryFeature("mine traps", () => MineTrapFeature.Install(this));
         InstallPack();
@@ -122,7 +121,7 @@ public sealed partial class Plugin : BasePlugin
         AudioFeature.Restore();
         RecipeHost.Restore();
         FastFallFeature.Restore();
-        AirShiftFeature.Reset(); PracticeRewindFeature.Reset(); RicochetItemsFeature.Reset(); MineTrapFeature.Reset();
+        AirShiftFeature.Reset(); PracticeRewindFeature.Reset(); MineTrapFeature.Reset();
         CommunityMods.Restore();
         NightmareAI.Restore();
         LegacyMK.Restore();

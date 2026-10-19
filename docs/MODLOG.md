@@ -165,3 +165,28 @@
 - Added default-on global Online protection with independent upload and online-room switches. The allowlist is limited to HUD size and HUD transparency. All other active Toolkit modules/recipes and non-Toolkit BepInEx plugins are treated as unapproved.
 - Read-only Ghidra evidence from the matching current `GameAssembly.dll` hash identifies leaderboard submission at `0x180529170` and Photon lobby/room API entrypoints at `0x182589580`, `0x18258d580`, `0x18258d660`, `0x18258d720`, `0x18258dc40`, `0x18258e180`, `0x18258e670`, `0x18258e6e0`, `0x18258e740`, and `0x182596180`. The plugin resolves and patches complete current interop `MethodInfo`s for the target method names and all overloads.
 - Runtime lobby and leaderboard behavior remains unverified; install/test manually after the plugin and Toolkit update. The user has explicitly superseded the prior test-build policy against upload blocking.
+# Mine trigger, Air Shift and ricochet follow-up (2026-10-19)
+
+- Restored the mine prefab's enabled `MineBehavior`, trigger and animator. The
+  prior custom overlap scan missed the kart damage owner in practice and the
+  immediate `Destroy` after `ExplodeMine` could cancel the native effect. Traps
+  now arm with `ActivateMine`, route actual Unity trigger contacts through the
+  native explosion/damage method, and leave its effect object alive to clean up.
+- Air Shift now defaults to a more visible 35 m/s lateral correction for 0.4 s,
+  with the total-speed budget off. Ground testing is enabled and repeatable;
+  airborne one-shift-per-jump behavior is retained. Suggestions remain uncapped.
+- Removed Ricochet Items and its UI/catalog bindings after the reported bazooka
+  ground explosion and failed wall bounce. The normal bazooka remains unchanged.
+- The user-provided gameplay clip could not be opened by the desktop browser's
+  local-file policy; diagnosis used the attached gameplay screenshot and current
+  native mine evidence. Visible acceptance of the new collision path still needs
+  a fresh offline game test.
+- Validation: 143 Python tests passed; plugin build completed with zero warnings
+  and errors; all 9 current Air Shift and Mine Trap Harmony signatures and
+  handler arguments resolve against installed interop. DLL installed after the
+  game closed; artifact and installed SHA-256 match
+  `ED5E19C00BD9ACCD1CE76392DFE10FB8D49203BF0992D6CA30F7E7A0235C8590`.
+  DLL backup transaction: `local/backups/1792442040843668100`. The user's
+  existing Air Shift values remain; only `LimitHorizontalSpeed` was switched
+  off, with the prior config copied to
+  `local/backups/1792441949483888900/airshift-config-before.cfg`.

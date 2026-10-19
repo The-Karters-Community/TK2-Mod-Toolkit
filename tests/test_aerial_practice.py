@@ -5,12 +5,16 @@ from studio import pack, module_packages
 class AerialPracticeIntegrationTests(unittest.TestCase):
     def test_modules_are_opt_in_and_in_exactly_one_pack(self):
         defaults = pack.defaults()
-        for identity in ('AirShift', 'PracticeRewind', 'RicochetItems', 'MineTraps'):
+        self.assertNotIn('RicochetItems/Enabled', defaults)
+        self.assertIn('RicochetItems', pack.RETIRED_MODULES)
+        self.assertIn(('MineTraps', 'TriggerRadius'), pack.RETIRED_SETTINGS)
+        for identity in ('AirShift', 'PracticeRewind', 'MineTraps'):
             self.assertIs(defaults[identity + '/Enabled'], False)
             self.assertEqual(sum(p['features'].count(identity) for p in pack.catalog_packs()), 1)
             feature = next(f for f in pack.catalog_features() if f['id'] == identity)
             self.assertTrue(feature['gameplay'])
-            self.assertIn('validation pending', feature['description'])
+            if identity != 'AirShift':
+                self.assertIn('In-game validation pending', feature['description'])
 
     def test_rewind_export_includes_shared_snapshot_and_movement_helpers(self):
         for identity in ('PracticeRewind', 'SaveStates'):
@@ -27,6 +31,10 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
         self.assertEqual(values['PracticeRewind/RewindSeconds'], 3)
         self.assertEqual(values['PracticeRewind/RewindKey'], 'Backspace')
         self.assertEqual(values['AirShift/RightAction'], '')
+        self.assertEqual(values['AirShift/SidewaysImpulse'], 35)
+        self.assertEqual(values['AirShift/ShiftDuration'], .4)
+        self.assertIs(values['AirShift/AllowGroundTesting'], True)
+        self.assertIs(values['AirShift/LimitHorizontalSpeed'], False)
 
     def test_shortcuts_have_keyboard_and_physical_controller_menus(self):
         features = {f['id']: {s[0]: s for s in f['settings']} for f in pack.catalog_features()}
@@ -62,7 +70,7 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
             self.assertIn('plugins/TK2.Customization/ShortcutInput.cs', sources)
 
     def test_aerial_exports_include_shared_hook_installer(self):
-        for identity in ('AirShift', 'RicochetItems', 'MineTraps', 'PracticeRewind', 'SaveStates'):
+        for identity in ('AirShift', 'MineTraps', 'PracticeRewind', 'SaveStates'):
             feature = next(f for f in pack.catalog_features() if f['id'] == identity)
             self.assertIn('plugins/TK2.Customization/FeatureHook.cs', module_packages._source_dependencies([feature]))
 

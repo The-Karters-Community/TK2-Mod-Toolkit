@@ -1,6 +1,6 @@
-# Aerial practice, shortcut selection, ricochet and mine traps
+# Aerial practice, shortcut selection and mine traps
 
-All four gameplay modules are in the source Studio's **Community Mods** pack.
+Air Shift, practice rewind and Mine Traps are in the source Studio's **Community Mods** pack.
 They default off. The current source compiles against the installed BepInEx
 interop, and Studio controls are checked separately. **Visible in-game behavior
 of these revisions still needs validation.** No game is automatically launched.
@@ -9,16 +9,14 @@ of these revisions still needs validation.** No game is automatically launched.
 
 ### Startup failure correction, 2026-10-19
 
-User testing exposed three failed installs in `BepInEx/LogOutput.log`: the KCC
-explicit interface method is exported by interop with underscores, the missile
-passage check takes a float, and `WeaponsView.FireWeapon` takes an
-`Il2CppStructArray<int>` rather than managed `int[]`. The previous compile-only
-check missed all three reflection lookup failures. These signatures are now
-corrected. Each feature resolves all of its hooks before applying them, and
-rolls back its own patches if installation fails.
+Earlier testing exposed failed hook lookups: the KCC explicit interface method
+is exported by interop with underscores, and `WeaponsView.FireWeapon` takes an
+`Il2CppStructArray<int>` rather than managed `int[]`. These signatures were
+corrected. Each feature resolves its hooks before applying them and rolls back
+its own patches if installation fails.
 
 `tests/RuntimeHooks` loads the built plugin and installed interop without calling
-game methods. It resolves the same 18 hook bindings used for installation and
+game methods. It resolves the same hook bindings used for installation and
 checks Harmony handler argument types. Run after building:
 
 ```powershell
@@ -56,11 +54,10 @@ remain compatible. Blank means None (disabled). Practice Snapshots' existing
 
 | Module | Default shortcut | Behavior |
 | --- | --- | --- |
-| Air Shift | `[` / `]`, controller shortcuts off | Maintain a lateral correction for a chosen duration without changing heading or vertical velocity. |
+| Air Shift | `[` / `]`, controller shortcuts off | Maintain a lateral correction in the air and, for testing, on the ground without changing heading or vertical velocity. |
 | Fast Fall | Down Arrow, legacy MenuTriangle action | Keyboard and controller button can now both be selected. |
 | Practice snapshots | F5 / F6 | Manual save/load with expanded driving/boost state. |
 | Rewind / Practice Scrubbing | Backspace | Tap to rewind three seconds; hold to scrub farther; release to resume on a new timeline. |
-| Ricochet Items | Normal weapon fire | Optional straight-firing bazooka and one wall bounce; homing missiles remain unchanged. |
 | Mine Traps | Normal fire for inventory mines; M for free test drop | Item-box mines and an optional independent testing shortcut. |
 
 ## Air Shift
@@ -75,16 +72,19 @@ not immediately erase it. KCC still handles movement/collisions; this is not a
 position teleport. Vertical velocity, steering rotation and native trick/boost
 inputs are untouched, and Fast Fall remains independent.
 
-Suggested starting values: **18 m/s lateral change, 0.25 seconds**. A maintained
-18 m/s corresponds to 4.5 metres over 0.25 seconds before speed-budget effects and
-collisions; this is a calculation, not an observed in-game displacement. Existing
-saved strength values are preserved. Strength and duration have no upper limit
+Suggested starting values: **35 m/s lateral change, 0.4 seconds**. The grounded
+test is enabled by default so the direction and scale can be checked without
+jumping. A maintained 35 m/s corresponds to 14 metres over 0.4 seconds before
+collisions; this is a calculation, not an observed in-game displacement. Strength
+and duration have no upper limit
 in Studio validation, exported settings or BepInEx bindings. Zero duration gives
 an impulse. Suggested ranges are text hints rather than slider ceilings.
 
-**Once per jump** can be turned off for repeated shifts. **Use horizontal speed
-budget** can be turned off for unrestricted lateral additions. With the budget
-on, multiplier 1 preserves the horizontal speed measured at shift activation;
+Ground tests can be disabled independently. **Once per jump** can be turned off
+for repeated airborne shifts. **Use horizontal speed budget** is off by default
+to make the lateral correction visible; enable it to constrain total horizontal
+speed to the pre-shift budget. With the budget on, multiplier 1 preserves the
+horizontal speed measured at shift activation;
 0.9 reduces it, and values above 1 explicitly permit more speed. All tuning
 numbers must be finite and non-negative. A hideable status line reports ready,
 spent or active state and the applied lateral speed; accepted shifts are logged.
@@ -106,31 +106,12 @@ health/item and experimental checkpoint/clock options. This is a partial driving
 rewind, not a full world save; temporary external item effects, moving platforms,
 battle-arena world/history and already-started recovery are not rewound.
 
-## Ricochet behavior
+## Ricochet Items removed
 
-The first implementation did **not** convert auto-aiming weapons to straight
-shots. It only accepted an already non-targeting straight missile.
-
-The revision adds **Straight-firing bazooka** (on by default within this
-otherwise disabled module). The firing revision temporarily disables the local
-bazooka's target requirement in both native `WeaponsController.FireInput(bool)`
-and `Shoot()` calls, restoring the original settings in a finalizer. The native
-code checks `bRequirePlayerTarget` before creating the projectile, so changing
-missile initialization alone was insufficient. Local straight shots receive an
-empty player-target list and do not auto-fire backward when front targets are
-absent. Explicit backward fire remains available. It clears local bazooka target IDs, captures
-kart heading at launch, preserves backward-fire direction, and owns the shot's
-horizontal flight so target/muzzle tracking cannot bend it afterward. It does
-not alter the homing-missile class. Turn the option off to retain ordinary
-bazooka aiming; targeted shots then remain outside the bounce path.
-
-A qualifying static physics wall (non-trigger collider without a Rigidbody,
-excluding player/item/physics-trigger objects) reflects the projectile once.
-Near-horizontal floors are excluded. Unity's static-batching checkbox is not
-required. The old-target passage explosion is suppressed for owned straight or
-bounced shots; native damage, visual height handling and lifetime remain. The
-next impact follows the ordinary collision path. Existing owned shots finish
-their path if the module switch is turned off mid-flight.
+The bazooka shot exploded on the ground and did not bounce reliably during
+in-game testing. The feature and its controls have been removed; it is not
+presented as usable until its projectile movement and collision path can be
+verified in the game.
 
 ## Mine trap revival
 
@@ -144,7 +125,12 @@ redistributed in the repository.
 The native item enum is **MINA_09 = 9**. Current Ghidra inspection shows the
 `WeaponsView.InitMine` body is empty and `InitEffect` omits case 9. The module
 restores use through the normal `WeaponsView.FireWeapon` entry, using the real
-mine prefab and native `MineBehavior.ExplodeMine` damage/effect path.
+mine prefab and native `MineBehavior.ExplodeMine` damage/effect path. The
+current fix leaves the spawned prefab's `MineBehavior`, trigger callbacks and
+animation enabled, disables only its throw-to-ground attachment, arms it via
+`ActivateMine`, and does not destroy the object when it explodes so its native
+effect cleanup can finish. The test drop and inventory fire path use this same
+trap behavior.
 
 When enabled, **Include in item-box rewards** defaults on: each local reward has
 a configurable **20%** chance to replace its first item with one mine. The second
@@ -155,12 +141,13 @@ the shipped mine model. Original assets are never edited. Temporary slots and
 modified mine-targeting settings are restored/removed on cleanup.
 
 A mine is placed on a track surface behind the kart, remains stationary, arms
-after **0.6 seconds**, and expires after **45 seconds** by default. Trigger radius
-is **2 metres**; owner triggering defaults off. Zero damage override keeps the
-prefab's native damage. No track surface behind the kart means no placement.
+after **0.6 seconds**, and expires after **45 seconds** by default. Its native
+mine trigger and explosion behavior remain enabled, and owner triggering defaults
+off. Zero damage override keeps the prefab's native damage. No track surface
+behind the kart means no placement.
 The extra **M** shortcut drops a free testing mine; select **None** to rely only
 on item-box inventory. Its controller shortcut is also selectable. Arming time,
-lifetime, radius, drop distance, reward ammo and damage have suggested values
+lifetime, drop distance, reward ammo and damage have suggested values
 without artificial upper ceilings. Turning off the module cleans up its traps.
 
 ## Evidence and validation
@@ -179,11 +166,10 @@ OnTriggerStay `0xC37220`, and ExplodeMine `0xC36EC0`.
 Validation includes the full Python suite, UI tests/build and browser selection
 checks; compiled plugin checks; deterministic sustained-shift/speed-budget tests;
 history branching/expiry tests; and online-protection policy tests. These do not
-prove native hooks execute or that traps/bounces look correct in game.
+prove native hooks execute or that traps look correct in game.
 
-Manual acceptance still required: visible lateral displacement at saved 15 and
-suggested 18, repeated/unrestricted shifts, trick/boost/Fast Fall combinations,
-restoring an active shift, physical controller mappings, item-box mine pickup,
-normal ammo consumption, mine arming/contact damage/expiry, straight bazooka
-flight and one bounce, unchanged homing missiles, and blocked submissions after
+Manual acceptance still required: visible lateral displacement using ground test
+and airborne shift, repeated/unrestricted shifts, trick/boost/Fast Fall
+combinations, restoring an active shift, physical controller mappings, item-box
+mine pickup, normal ammo consumption, mine arming/contact damage/expiry, and blocked submissions after
 mutation even when modules are switched off.

@@ -13,14 +13,21 @@ internal static class MineTrapFeature
     private static ConfigEntry<bool> Enabled = null!, ItemBoxes = null!, OwnerCanTrigger = null!;
     private static ConfigEntry<KeyCode> DropKey = null!;
     private static ConfigEntry<string> Controller = null!;
-    private static ConfigEntry<float> Chance = null!, ArmDelay = null!, Lifetime = null!, Radius = null!, Behind = null!;
+    private static ConfigEntry<float> Chance = null!, ArmDelay = null!, Lifetime = null!, Behind = null!;
     private static ConfigEntry<int> Ammo = null!, Damage = null!;
-    private sealed record Trap(MineBehavior Mine, Ant_Player Owner, float ArmAt, float Expires, float Radius);
+    private sealed class Trap
+    {
+        internal readonly MineBehavior Mine;
+        internal readonly Ant_Player Owner;
+        internal readonly float ArmAt, Expires;
+        internal bool Armed;
+        internal Trap(MineBehavior mine, Ant_Player owner, float armAt, float expires)
+        { Mine = mine; Owner = owner; ArmAt = armAt; Expires = expires; }
+    }
     private sealed record WeaponCopy(WeaponsView View, PixelWeaponObject Weapon);
     private static readonly Dictionary<int, Trap> Traps = new();
     private static readonly List<WeaponCopy> Copies = new();
     private static readonly Dictionary<int, (PixelWeaponObject Weapon, bool RequireTarget, PixelWeaponObject.EItemTargetType Target)> Originals = new();
-    private static readonly Collider[] Hits = new Collider[128];
     private static readonly Dictionary<int, int> LastDropFrame = new();
     private static MineBehavior? Prefab;
     private static int Scene;
@@ -38,7 +45,6 @@ internal static class MineTrapFeature
         Controller = p.Config.Bind("MineTraps", "ControllerAction", "", "Optional physical controller button for the extra drop shortcut.");
         ArmDelay = p.Config.Bind("MineTraps", "ArmDelay", .6f, "Arming delay in seconds; suggested 0.5-1.5. No upper limit.");
         Lifetime = p.Config.Bind("MineTraps", "Lifetime", 45f, "Lifetime in seconds; suggested 20-60. No upper limit.");
-        Radius = p.Config.Bind("MineTraps", "TriggerRadius", 2f, "Trigger radius in metres; suggested 1-3. No upper limit.");
         Behind = p.Config.Bind("MineTraps", "DropDistance", 4f, "Distance behind the kart in metres; suggested 3-6. No upper limit.");
         Damage = p.Config.Bind("MineTraps", "Damage", 0, "Zero keeps the native mine damage; positive values override it. No upper limit.");
         OwnerCanTrigger = p.Config.Bind("MineTraps", "OwnerCanTrigger", false, "Allow a mine to hit its owner after arming.");
@@ -143,7 +149,7 @@ internal static class MineTrapFeature
     {
         int id = owner.GetInstanceID();
         if (!AirShiftFeature.Running(kart) || LastDropFrame.TryGetValue(id, out int frame) && frame == Time.frameCount) return;
-        foreach (float value in new[] { ArmDelay.Value, Lifetime.Value, Radius.Value, Behind.Value })
+        foreach (float value in new[] { ArmDelay.Value, Lifetime.Value, Behind.Value })
             if (!float.IsFinite(value) || value < 0) throw new ArgumentException("Mine settings must be finite, non-negative numbers.");
         var forward = kart.kartPhysics.GetMainMotorSteeringOrientation() * Vector3.forward;
         forward.y = 0; forward.Normalize();
@@ -156,17 +162,36 @@ internal static class MineTrapFeature
         Plugin.Instance!.SessionModified = true;
         var mine = UnityEngine.Object.Instantiate(prefab, ground.point + ground.normal * Mathf.Max(.1f, prefab.bounds), Quaternion.identity);
         mine.name = "Toolkit Mine Trap"; mine.SetParentPlayer(owner); mine.customPropParentNo = (int)owner.eAntPlayerNr;
-        mine.enabled = false; mine.tryToAttach = false; mine.isActivated = false; mine.exploded = false;
+        // Keep the real MineBehavior, trigger collider and animator alive. Only its
+        // throw-to-surface attachment is disabled because this instance is already placed.
+        mine.enabled = true; mine.tryToAttach = false; mine.isActivated = false; mine.exploded = false;
         if (Damage.Value > 0) mine.damage = Damage.Value;
         if (mine.rb != null) { mine.rb.isKinematic = true; mine.rb.useGravity = false; }
-        if (mine.mineAnimator != null) mine.mineAnimator.enabled = false;
         mine.gameObject.SetActive(true);
-        Traps[mine.GetInstanceID()] = new Trap(mine, owner, Time.time + ArmDelay.Value, Time.time + Lifetime.Value, Radius.Value);
+        Traps[mine.GetInstanceID()] = new Trap(mine, owner, Time.time + ArmDelay.Value, Time.time + Lifetime.Value);
         LastDropFrame[id] = Time.frameCount; Status = "Mine dropped — arming";
         Plugin.Instance.Log.LogInfo($"Mine trap placed at {mine.transform.position}; arming in {ArmDelay.Value:0.00}s.");
     }
 
-    private static bool TriggerPrefix(MineBehavior __instance) => !Traps.ContainsKey(__instance.GetInstanceID());
+    private static bool TriggerPrefix(MineBehavior __instance, Collider __0)
+    {
+        if (!Traps.TryGetValue(__instance.GetInstanceID(), out var trap)) return true;
+        if (!trap.Armed || !__instance.CanExplode()) return false;
+        try {
+            // Unity trigger callbacks identify the kart reliably even when its damage
+            // controller is not a parent of the broad overlap-sphere query.
+            var target = __0.GetComponentInParent<Ant_Player>() ??
+                __0.GetComponentInParent<PixelEasyCharMoveKartController>()?.parentPlayer;
+            if (target == null || target.hpBarController == null || target.hpBarController.currentHp <= 0 ||
+                !OwnerCanTrigger.Value && target == trap.Owner) return false;
+            Traps.Remove(__instance.GetInstanceID());
+            __instance.ExplodeMine(target);
+            Status = "Mine triggered — native explosion and damage fired";
+            Plugin.Instance?.Log.LogInfo(Status);
+            // Keep the object alive: MineBehavior owns its explosion animation/effect cleanup.
+            return false;
+        } catch (Exception ex) { Fail(ex); return false; }
+    }
     internal static void Tick()
     {
         if (!Installed) return;
@@ -181,15 +206,9 @@ internal static class MineTrapFeature
                 var trap = pair.Value; var mine = trap.Mine;
                 if (mine == null) { Traps.Remove(pair.Key); continue; }
                 if (Time.time >= trap.Expires) { Traps.Remove(pair.Key); UnityEngine.Object.Destroy(mine.gameObject); continue; }
-                if (Time.time < trap.ArmAt) continue;
-                mine.isActivated = true;
-                int count = Physics.OverlapSphereNonAlloc(mine.transform.position, trap.Radius, Hits, ~0, QueryTriggerInteraction.Collide);
-                for (int i = 0; i < count; i++) {
-                    var hit = Hits[i]; if (hit == null) continue;
-                    var target = hit.GetComponentInParent<Ant_Player>() ?? hit.GetComponentInParent<PixelEasyCharMoveKartController>()?.parentPlayer;
-                    if (target == null || target.hpBarController == null || target.hpBarController.currentHp <= 0 || !OwnerCanTrigger.Value && target == trap.Owner) continue;
-                    Traps.Remove(pair.Key); mine.ExplodeMine(target);
-                    UnityEngine.Object.Destroy(mine.gameObject); Status = "Mine triggered"; break;
+                if (!trap.Armed && Time.time >= trap.ArmAt) {
+                    mine.ActivateMine(); trap.Armed = true;
+                    Status = "Mine armed — native kart collision enabled";
                 }
             }
         } catch (Exception ex) { Fail(ex); }

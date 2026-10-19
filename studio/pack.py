@@ -59,20 +59,20 @@ FEATURES.extend([
         ("ControllerAction", "Extra test drop controller button", "text", "", None, None),
         ("ArmDelay", "Arming delay (seconds)", "float", .6, 0, None, "Suggested 0.5-1.5; no upper limit."),
         ("Lifetime", "Lifetime (seconds)", "float", 45, 0, None, "Suggested 20-60; no upper limit."),
-        ("TriggerRadius", "Trigger radius (metres)", "float", 2, 0, None, "Suggested 1-3; no upper limit."),
         ("DropDistance", "Drop distance behind kart", "float", 4, 0, None, "Suggested 3-6 metres; no upper limit."),
         ("Damage", "Damage override", "int", 0, 0, None, "Zero keeps native damage. Positive values override it, without an upper limit."),
         ("OwnerCanTrigger", "Owner can trigger armed mines", "bool", False, None, None),
     ]},
-    {"id": "AirShift", "name": "Air Shift", "category": "Driving", "description": "Experimental: sustained sideways air movement without turning. Choose keys and physical gamepad buttons below. Strength and duration have suggested ranges, with optional speed and once-per-jump limits. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
+    {"id": "AirShift", "name": "Air Shift", "category": "Driving", "description": "Sustained lateral movement without steering rotation. Works in the air, with grounded testing enabled by default. Choose keys and physical gamepad buttons below; suggestions are not caps.", "origin": "New", "gameplay": True, "settings": [
         ("LeftKey", "Shift left key", "text", "LeftBracket", None, None),
         ("RightKey", "Shift right key", "text", "RightBracket", None, None),
         ("LeftAction", "Controller left action", "text", "", None, None, "Optional existing Rewired action; blank disables this controller shortcut."),
         ("RightAction", "Controller right action", "text", "", None, None, "Choose actions that do not overlap your trick or Fast Fall controls."),
-        ("SidewaysImpulse", "Lateral velocity change (m/s)", "float", 18, 0, None, "Suggested 12-30 m/s; unrestricted upper value. Maintained through the shift instead of lost to air damping."),
-        ("ShiftDuration", "Shift duration (seconds)", "float", .25, 0, None, "Suggested 0.15-0.4 seconds. Zero is a single impulse; no upper limit."),
+        ("SidewaysImpulse", "Lateral velocity change (m/s)", "float", 35, 0, None, "Suggested 25-45 m/s; unrestricted upper value. Maintained through the shift instead of lost to air damping."),
+        ("ShiftDuration", "Shift duration (seconds)", "float", .4, 0, None, "Suggested 0.3-0.6 seconds. Zero is a single impulse; no upper limit."),
         ("OncePerJump", "Once per jump", "bool", True, None, None, "Turn off to allow repeated shifts before landing."),
-        ("LimitHorizontalSpeed", "Use horizontal speed budget", "bool", True, None, None, "Turn off to experiment without a horizontal speed cap."),
+        ("AllowGroundTesting", "Allow ground testing", "bool", True, None, None, "Allow the same lateral shift while grounded for practice and tuning."),
+        ("LimitHorizontalSpeed", "Use horizontal speed budget", "bool", False, None, None, "Turn on to limit total horizontal speed to its pre-shift value."),
         ("ShowStatus", "Show Air Shift status", "bool", True, None, None),
         ("SpeedRetention", "Horizontal speed budget multiplier", "float", 1, 0, None, "1 preserves the speed before shifting. Suggested 0.9-1; values above 1 allow more speed."),
     ]},
@@ -83,7 +83,6 @@ FEATURES.extend([
         ("HistorySeconds", "History seconds", "float", 10, 3, 20, "Recorded at 20 samples per second; automatically enlarged to cover the initial rewind interval."),
         ("ShowStatus", "Show practice status", "bool", True, None, None),
     ]},
-    {"id": "RicochetItems", "name": "Ricochet Items", "category": "Items", "description": "Experimental: bazooka shots can fire straight along the kart heading and bounce once off a static wall. Homing missiles remain homing. Floors, moving objects and the second impact use normal collision behavior. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [("StraightBazooka", "Straight-firing bazooka", "bool", True, None, None, "Remove bazooka auto-aim while this module is enabled. Homing missiles are unchanged.")]},
 ])
 
 # Static catalogs are generated from the actual typed C# bindings, so settings
@@ -121,10 +120,10 @@ _CAMERA["settings"] = [
 _CAMERA["settingGroups"] = {"AimAtKart":"Aim & rotation", "TargetHeight":"Aim & rotation", "PitchOffset":"Aim & rotation", "YawOffset":"Aim & rotation", "RollOffset":"Aim & rotation", "SmoothingSeconds":"Transitions", "PanelEnabled":"In-race panel", "PanelHotkey":"In-race panel", "PanelScale":"In-race panel"}
 
 
-RETIRED_MODULES = frozenset({'MirrorMode'} | {'Recipe.' + name for name in (
+RETIRED_MODULES = frozenset({'MirrorMode', 'RicochetItems'} | {'Recipe.' + name for name in (
     'AirGlider','DriftCapacitor','EchoRewind','GravitySurf','LandingCombo',
     'RepulsorPulse','SlipstreamSling','CosmeticModel','TrackInspector')})
-RETIRED_SETTINGS = frozenset()
+RETIRED_SETTINGS = frozenset({('MineTraps', 'TriggerRadius')})
 FORCED_TRUE_SETTINGS = frozenset({
     ("OnlineProtection", "Enabled"),
     ("OnlineProtection", "BlockLeaderboardUploads"),
@@ -178,7 +177,7 @@ def defaults():
 
 PACKS = [
     {"id": "garage", "name": "Toolkit Essentials", "description": "Online protection, camera, interface, audio, graphics and race performance controls.", "features": ["OnlineProtection", "UI", "HudOpacity", "DisableVignette", "GamepadOverlay", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
-    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "AirShift", "PracticeRewind", "RicochetItems", "MineTraps"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
+    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "AirShift", "PracticeRewind", "MineTraps"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
 
@@ -236,7 +235,6 @@ def module_sources():
         "Physics": ["FastFallFeature.cs", "ShortcutInput.cs", "Plugin.cs"],
         "AirShift": ["FeatureHook.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "ShortcutInput.cs", "Plugin.cs"],
         "PracticeRewind": ["FeatureHook.cs", "PracticeRewindFeature.cs", "PracticeHistory.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "FastFallFeature.cs", "ShortcutInput.cs", "StudioBehaviour.cs", "Plugin.cs"],
-        "RicochetItems": ["FeatureHook.cs", "RicochetItemsFeature.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "ShortcutInput.cs", "Plugin.cs"],
         "MineTraps": ["FeatureHook.cs", "MineTrapFeature.cs", "ShortcutInput.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "Plugin.cs", "StudioBehaviour.cs"],
         "CommunityCommands": ["CommunityMods.cs", "CommunityCommandParser.cs"],
         "NightmareAI": ["NightmareAI.cs"],
