@@ -27,8 +27,9 @@ internal static class OnlineProtectionPolicy
 
     internal static bool RequiresBlocking(
         IEnumerable<(string Section, string Key, bool Enabled)> settings,
-        IEnumerable<string> pluginGuids)
+        IEnumerable<string> pluginGuids, bool sessionModified = false)
     {
+        if (sessionModified) return true;
         var snapshot = settings.ToArray();
         foreach (var setting in snapshot)
         {

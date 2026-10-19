@@ -27,8 +27,9 @@ public sealed partial class Plugin : BasePlugin
     internal bool GameplayReady, PhysicsFaulted, SessionModified;
     private StudioBehaviour? _behaviour;
 
-    // Evidence: Ghidra database and installed GameAssembly SHA-256 agree on this build.
+    // Verified native builds. Current evidence is recorded in docs/AERIAL-PRACTICE.md.
     private const string KnownGameHash = "e55fab2cdcbf3852160183504a847b1a1b7af61c24bc9619e3736e3753aee130";
+    private const string CurrentPhysicsGameHash = "55f5c88972fe1ccf4c9d5f3871b71bcfa261b3e42a379e18438e92623fc4d6a2";
 
     public override void Load()
     {
@@ -47,7 +48,7 @@ public sealed partial class Plugin : BasePlugin
         VoiceVolume = Config.Bind("Audio", "VoiceVolume", 1f, new ConfigDescription("Voice-over bus multiplier.", new AcceptableValueRange<float>(0,1)));
         UiVolume = Config.Bind("Audio", "UiVolume", 1f, new ConfigDescription("Interface sounds bus multiplier.", new AcceptableValueRange<float>(0,1)));
         BindCamera();
-        PhysicsEnabled = Config.Bind("Physics", "Enabled", false, "Offline fast fall for testing. Leaderboard uploads are unchanged.");
+        PhysicsEnabled = Config.Bind("Physics", "Enabled", false, "Offline fast fall for testing. Mandatory online protection blocks submissions.");
         FallAcceleration = Config.Bind("Physics", "FastFallAcceleration", 100f, new ConfigDescription("Extra downwards acceleration.", new AcceptableValueRange<float>(0f, 500f)));
         AirTime = Config.Bind("Physics", "MinimumAirTime", 0.4f, new ConfigDescription("Minimum airborne seconds.", new AcceptableValueRange<float>(0f, 3f)));
         BindPack();
@@ -56,6 +57,9 @@ public sealed partial class Plugin : BasePlugin
             new[] { typeof(string), typeof(int) }, nameof(AudioPrefix), prefix: true));
         TryFeature("offline fast fall", InstallPhysics);
         TryFeature("fast-fall controller input", () => FastFallFeature.Install(this));
+        TryFeature("air shift", () => AirShiftFeature.Install(this));
+        TryFeature("ricochet items", () => RicochetItemsFeature.Install(this));
+        TryFeature("practice rewind", () => PracticeRewindFeature.Install(this));
         InstallPack();
         TryFeature("racing camera", () => CameraFeature.Install(this));
         LegacyMK.Install(this);
@@ -91,7 +95,8 @@ public sealed partial class Plugin : BasePlugin
         using var stream = File.OpenRead(binary);
         using var algorithm = SHA256.Create();
         string hash = Convert.ToHexString(algorithm.ComputeHash(stream)).ToLowerInvariant();
-        if (hash != KnownGameHash) throw new InvalidOperationException("Unverified game build; physics disabled.");
+        if (hash != KnownGameHash && hash != CurrentPhysicsGameHash)
+            throw new InvalidOperationException("Unverified game build; physics disabled.");
         PatchExact(typeof(PixelKartPhysics), "FixedUpdate", Type.EmptyTypes, nameof(PhysicsPostfix), prefix: false);
         GameplayReady = true;
     }
@@ -127,6 +132,7 @@ public sealed partial class Plugin : BasePlugin
         AudioFeature.Restore();
         RecipeHost.Restore();
         FastFallFeature.Restore();
+        AirShiftFeature.Reset(); PracticeRewindFeature.Reset(); RicochetItemsFeature.Reset();
         CommunityMods.Restore();
         NightmareAI.Restore();
         LegacyMK.Restore();

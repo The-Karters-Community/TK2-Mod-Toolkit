@@ -49,6 +49,25 @@ FEATURES = [
     {"id": "Tuning", "name": "Kart tuning", "category": "Driving", "description": "Scale local forward speed and jump strength from captured originals.", "origin": "Legacy port", "gameplay": True, "settings": [("SpeedMultiplier", "Speed multiplier", "float", 1, .25, 3), ("JumpMultiplier", "Jump multiplier", "float", 1, .25, 3)]},
 ]
 
+FEATURES.extend([
+    {"id": "AirShift", "name": "Air Shift", "category": "Driving", "description": "Experimental: press [ or ] for one sideways adjustment per jump, without turning. Horizontal speed is capped; tricks, boost charging and Fast Fall keep their own inputs. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
+        ("LeftKey", "Shift left key", "text", "LeftBracket", None, None),
+        ("RightKey", "Shift right key", "text", "RightBracket", None, None),
+        ("LeftAction", "Controller left action", "text", "", None, None, "Optional existing Rewired action; blank disables this controller shortcut."),
+        ("RightAction", "Controller right action", "text", "", None, None, "Choose actions that do not overlap your trick or Fast Fall controls."),
+        ("SidewaysImpulse", "Sideways impulse (m/s)", "float", 6, 1, 15),
+        ("SpeedRetention", "Horizontal speed retention", "float", 1, .9, 1),
+    ]},
+    {"id": "PracticeRewind", "name": "Rewind / Practice Scrubbing", "category": "Training", "description": "Experimental solo training: Backspace rewinds 3 seconds; hold to scrub farther, release to resume. Restores driving, reserves and boost state within the current checkpoint segment. History clears on checkpoints, recovery and teleports. Race clock, items and other racers are not rewound. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
+        ("RewindKey", "Rewind key", "text", "Backspace", None, None),
+        ("ControllerAction", "Controller action", "text", "", None, None, "Optional existing Rewired action; blank uses keyboard only."),
+        ("RewindSeconds", "Initial rewind seconds", "float", 3, .5, 10),
+        ("HistorySeconds", "History seconds", "float", 10, 3, 20, "Recorded at 20 samples per second; automatically enlarged to cover the initial rewind interval."),
+        ("ShowStatus", "Show practice status", "bool", True, None, None),
+    ]},
+    {"id": "RicochetItems", "name": "Ricochet Items", "category": "Items", "description": "Experimental: locally fired straight, non-homing missiles bounce once from static walls. Floors, moving objects, homing missiles and the second impact use normal collision behavior. In-game validation pending.", "origin": "New", "gameplay": True, "settings": []},
+])
+
 # Static catalogs are generated from the actual typed C# bindings, so settings
 # are available before the player's first game launch.
 _CATALOG_ROOT = Path(__file__).resolve().parent
@@ -140,7 +159,7 @@ def defaults():
 
 PACKS = [
     {"id": "garage", "name": "Toolkit Essentials", "description": "Online protection, camera, interface, audio, graphics and race performance controls.", "features": ["OnlineProtection", "UI", "HudOpacity", "DisableVignette", "GamepadOverlay", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
-    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
+    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "AirShift", "PracticeRewind", "RicochetItems"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
 
@@ -196,12 +215,15 @@ def module_sources():
         "Audio": ["AudioFeature.cs", "Plugin.cs"],
         "Camera": ["CameraFeature.cs", "CameraSettings.cs", "CameraPanel.cs"],
         "Physics": ["FastFallFeature.cs", "Plugin.cs"],
+        "AirShift": ["AirShiftFeature.cs", "AirShiftMath.cs", "Plugin.cs"],
+        "PracticeRewind": ["PracticeRewindFeature.cs", "PracticeHistory.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "FastFallFeature.cs", "StudioBehaviour.cs", "Plugin.cs"],
+        "RicochetItems": ["RicochetItemsFeature.cs", "Plugin.cs"],
         "CommunityCommands": ["CommunityMods.cs", "CommunityCommandParser.cs"],
         "NightmareAI": ["NightmareAI.cs"],
         "CNKBoostMeter": ["LegacyMK.Meter.cs", "LegacyMK.cs"],
         "KartParameters": ["LegacyMK.Parameters.cs", "LegacyMK.cs"],
         "BoostParameters": ["LegacyMK.Parameters.cs", "LegacyMK.cs"],
-        "SaveStates": ["LegacyMK.Practice.cs", "LegacyMK.cs"],
+        "SaveStates": ["LegacyMK.Practice.cs", "LegacyMK.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirShiftMath.cs", "FastFallFeature.cs"],
         "ReverseRace": ["LegacyMK.Practice.cs", "LegacyMK.cs"],
     }
     for name in ("Laps", "SimpleDriving", "AutoBoost", "Tuning"):

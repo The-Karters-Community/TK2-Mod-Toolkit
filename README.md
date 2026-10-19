@@ -8,6 +8,11 @@ The 0.6.25 plugin is rebuilt against **0.1.4.24 (Windows x64)**. The validated l
 
 ## Standalone camera and inputs
 
+The source Studio also includes experimental **Air Shift**, **Rewind / Practice
+Scrubbing**, and **Ricochet Items** modules, plus expanded Practice Snapshots.
+They default off and still need in-game validation. See [controls, evidence and
+limitations](docs/AERIAL-PRACTICE.md).
+
 [Bobby's Race Tools](standalone/README.md) separates Camera setup and the Gamepad
 viewer into a small Windows executable that runs without BepInEx. Build it with
 `python standalone/build.py`; the rest of this README describes the full Toolkit.

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
-using KinematicCharacterController;
 using UnityEngine;
 
 namespace TK2.Customization;
@@ -16,10 +15,11 @@ internal static partial class LegacyMK
     private static float _savedClock;
     private static int _lastSaveFrame = -1, _lastLoadFrame = -1;
     private static string _savedScene = "";
+    private static float _lastPracticeWarning = -10;
 
     private sealed class PracticeState
     {
-        internal KinematicCharacterMotorState Motor = null!;
+        internal DrivingSnapshot Driving = null!;
         internal float Reserves, AirTime;
         internal int BoostIndex, Laps, Health, Ammo;
         internal PixelWeaponObject.EWeaponType Weapon;
@@ -32,7 +32,7 @@ internal static partial class LegacyMK
             var player = kart.parentPlayer;
             var race = player.playerRaceLogic;
             var state = new PracticeState {
-                Motor = kart.Motor.GetState(), Reserves = boost.fBoostingReserves,
+                Driving = DrivingSnapshot.Capture(boost), Reserves = boost.fBoostingReserves,
                 AirTime = boost.fCurrentAirTime, BoostIndex = boost.iCurrentBoosterNumberCount,
                 Laps = race.iPlayerMovedThroughFinishLineCount_LocalOnly, Health = player.hpBarController.currentHp,
                 Weapon = player.weaponsController.currentWeaponType,
@@ -51,8 +51,21 @@ internal static partial class LegacyMK
             var kart = boost.kartController;
             var player = kart.parentPlayer;
             // Restore complete KCC motor state, including velocity and grounded status.
-            kart.Motor.ApplyState(Motor, true);
-            kart.kartPhysics.SetSteeringPhysicsRotation(Motor.Rotation, false);
+            if (!AirShiftFeature.Running(kart)) return;
+            if (!RestoreProgress.Value) {
+                var current = player.playerRaceLogic;
+                bool same = Laps == (int)current.iPlayerMovedThroughFinishLineCount_LocalOnly && Checkpoints.Length == current.bCheckpoints.Length;
+                for (int i = 0; same && i < Checkpoints.Length; i++) same = Checkpoints[i] == (bool)current.bCheckpoints[i];
+                if (!same) {
+                    if (Time.unscaledTime - _lastPracticeWarning > 2) {
+                        _lastPracticeWarning = Time.unscaledTime;
+                        _plugin.Log.LogWarning("Practice snapshot refused across a checkpoint/lap boundary. Save a new snapshot in the current segment.");
+                    }
+                    return;
+                }
+            }
+            PracticeRewindFeature.Reset();
+            Driving.Apply(boost);
             boost.fBoostingReserves = Reserves;
             boost.fCurrentAirTime = AirTime;
             boost.iCurrentBoosterNumberCount = BoostIndex;
@@ -88,7 +101,7 @@ internal static partial class LegacyMK
 
     private static void PracticeInput(Ant_KartInput input)
     {
-        if (!SaveStates.Value || !Allowed(input.antPlayer)) return;
+        if (!SaveStates.Value || !Allowed(input.antPlayer) || !AirShiftFeature.Running(input.boostManager?.kartController)) return;
         try
         {
             string scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
@@ -106,7 +119,7 @@ internal static partial class LegacyMK
                 foreach (var boost in UnityEngine.Object.FindObjectsByType<Ant_BoostManager>(FindObjectsSortMode.None))
                 {
                     var kart = boost.kartController;
-                    if (kart != null && Local(kart.parentPlayer)) PracticeStates[kart.parentPlayer.GetInstanceID()] = PracticeState.Capture(boost);
+                    if (kart != null && Local(kart.parentPlayer) && DrivingSnapshot.Stable(kart)) PracticeStates[kart.parentPlayer.GetInstanceID()] = PracticeState.Capture(boost);
                 }
                 _lastSaveFrame = Time.frameCount;
                 _plugin.Log.LogInfo($"Saved {PracticeStates.Count} local kart practice snapshots.");

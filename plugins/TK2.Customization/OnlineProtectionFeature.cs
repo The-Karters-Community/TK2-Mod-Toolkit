@@ -60,7 +60,7 @@ public sealed partial class Plugin
             string[] pluginGuids = IL2CPPChainloader.Instance.Plugins
                 .Select(plugin => plugin.Key)
                 .ToArray();
-            if (!OnlineProtectionPolicy.RequiresBlocking(activeSettings, pluginGuids)) return false;
+            if (!OnlineProtectionPolicy.RequiresBlocking(activeSettings, pluginGuids, SessionModified)) return false;
         }
         catch (Exception ex)
         {
@@ -71,12 +71,12 @@ public sealed partial class Plugin
         if (leaderboardUpload && !_warnedLeaderboardBlock)
         {
             _warnedLeaderboardBlock = true;
-            Log.LogWarning("Online protection blocked a leaderboard upload because an unapproved mod/plugin is active.");
+            Log.LogWarning("Online protection blocked a leaderboard upload: an unapproved mod/plugin is active or this session was modified.");
         }
         else if (!leaderboardUpload && !_warnedLobbyBlock)
         {
             _warnedLobbyBlock = true;
-            Log.LogWarning("Online protection blocked an online room action because an unapproved mod/plugin is active.");
+            Log.LogWarning("Online protection blocked an online room action: an unapproved mod/plugin is active or this session was modified.");
         }
         return true;
     }
