@@ -9,6 +9,7 @@ namespace BepInEx.Configuration
     public sealed class AcceptableValueRange<T> { public AcceptableValueRange(T min, T max) { } }
     public sealed class ConfigFile
     {
+        public void Save() { }
         public readonly Dictionary<string, object> Entries = new();
         public ConfigEntry<T> Bind<T>(string section, string name, T value, object description)
         {
@@ -95,7 +96,8 @@ namespace UnityEngine
     public static class Time { public static float unscaledTime, timeScale = 1, fixedDeltaTime = .00833f; }
     public static class Application { public static bool isFocused = true; public static int targetFrameRate = -1; public static string unityVersion = "stub"; }
     public static class Screen { public static int width = 1920, height = 1080; }
-    public static class QualitySettings { public static int vSyncCount = 0; }
+    public static class QualitySettings { public static int vSyncCount = 0; public static int globalTextureMipmapLimit; }
+    public static class Texture { public static ulong currentTextureMemory = 1024; }
     public static class SystemInfo { public static string graphicsDeviceType = "stub", graphicsDeviceName = "stub"; }
 }
 namespace Il2CppInterop.Runtime
@@ -137,6 +139,7 @@ namespace KinematicCharacterController
 public sealed class MenuManager : UnityEngine.MonoBehaviour { public static MenuManager? Instance; }
 public sealed class Ant_Player : UnityEngine.MonoBehaviour
 {
+    public void Update() { }
     public enum EPlayerType { E_HUMAN_LOCAL, E_NETWORK, E_AI_LOCAL, E_DISABLED, E_GHOST_TIME_TRIAL }
     public EPlayerType ePlayerType;
 }
@@ -156,7 +159,13 @@ public sealed class AILogicController { public void Update() { } }
 public sealed class AIWeaponLogicController { public void Update() { } }
 public sealed class AIDistToTargetBehavController { public void Update() { } }
 public sealed class PlayerBezierFollower { public void Update() { } }
-public sealed class PixelKartPhysics { public void Update() { } }
+public sealed class PixelKartPhysics { public void Update() { } public void FixedUpdate() { } }
+public sealed class PixelKartAIInput { public void FixedUpdate() { } public void ProcessRacingInput() { } }
+public sealed class WeaponProjectileCollision { public void Update() { } }
+public sealed class WeaponSceneController { public void Update() { } }
+public sealed class FollowMissileController { public void Update() { } }
+public sealed class TrajectoryProjectile { public void Update() { } }
+public sealed class VisualLogicMissileController { public void Update() { } }
 public sealed class MapConfig { public int iConfigID = 1; }
 public sealed class ModeConfig { public bool bDisablePlayerPlayerCollisionForTT; }
 public static class Ant_CurrentGameConfiguration
@@ -192,6 +201,7 @@ public sealed class PTK_GraphicsDetailApplier : UnityEngine.MonoBehaviour
 }
 namespace TK2.Customization
 {
+    internal static class MemoryCensus { internal static int Captures; internal static void Capture() { Captures++; } }
     internal static class TrackBoundaries { public static bool Visible { get; set; } }
     public sealed class LogStub
     {

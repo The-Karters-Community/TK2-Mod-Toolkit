@@ -15,7 +15,7 @@ internal sealed class EngineApiStub : PerformanceEngineSamples.IApi
         if (ThrowFind && name == "Physics.Simulate") throw new InvalidOperationException("find failed");
         return Names.TryGetValue(name, out var id) ? id : 0;
     }
-    public PerformanceEngineSamples.Description Describe(ref ulong handle) => new() { DataType = 4, Unit = (byte)(handle == 2 ? 3 : 1) };
+    public PerformanceEngineSamples.Description Describe(ref ulong handle) => new() { DataType = (byte)(handle == 1 ? 7 : handle == 2 ? 2 : 4), Unit = (byte)(handle == 2 ? 3 : 1) };
     public ulong Create(ref ulong handle) => handle;
     public int Copy(ref ulong recorder, IntPtr buffer)
     {

@@ -1,5 +1,7 @@
 # Engine and GPU capture, runtime 0.6.11
 
+Current follow-up: [25 October allocation fix and native verification](PERFORMANCE-FIX-2026-10-25.md). The historical limitations below are superseded for the four frame-time counters: native CopyTo returns numeric Int64 nanoseconds for their Double descriptors, verified against the typed native getter. Integer counters are also admitted. Binding now uses icall availability rather than a game-binary hash allowlist. The new one-shot memory census is separate from race timing and changes no quality or GC settings.
+
 The next capture adds Unity frame, render, physics, animation, skinning, wait and draw-count metrics to the existing ten game-method timers. This is observation, not an FPS fix. Use the same track, resolution and graphics settings for a CPU race and time trial, with **Race performance** and **Track boundaries** off. Enable **Performance diagnostics** before entering each mode and drive through its bounded capture. The JSONL uses schema 2 and includes resolution, VSync, frame cap, graphics API/device, Unity version and whether the boundary overlay was visible. `trackBoundaryViewObservedDuringWindow` records visibility observed on any diagnostic tick, including mid-window toggles; reject such windows from an ordinary performance comparison.
 
 ## Current binary evidence

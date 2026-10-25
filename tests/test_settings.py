@@ -105,7 +105,8 @@ class SettingsMergeTests(unittest.TestCase):
         self.assertIn("PerformanceDiagnostics", next(p for p in pack.catalog_packs() if p["id"] == "garage")["features"])
         self.assertEqual(set(pack.module_sources()["PerformanceDiagnostics"]), {
             "plugins/TK2.Customization/PerformanceDiagnostics.cs", "plugins/TK2.Customization/PerformanceSamples.cs",
-            "plugins/TK2.Customization/PerformanceFeature.cs", "plugins/TK2.Customization/PerformanceEngineSamples.cs"})
+            "plugins/TK2.Customization/PerformanceFeature.cs", "plugins/TK2.Customization/PerformanceEngineSamples.cs",
+            "plugins/TK2.Customization/MemoryCensus.cs"})
 
     def test_track_boundaries_settings_and_export_ownership(self):
         self.assertFalse(pack.defaults()["TrackBoundaries/Enabled"])

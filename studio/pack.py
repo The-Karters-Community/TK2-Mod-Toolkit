@@ -22,7 +22,7 @@ FEATURES = [
         ("LowerAIPhysics", "Lower AI physics", "bool", False, None, None, "Use the game's existing lower-accuracy AI physics path. May affect movement and collisions; offline only."),
         ("AIPhysicsInterval", "AI physics interval", "int", 2, 1, 4, "Physics ticks between selected AI motor updates. 1 updates every tick; higher values lower accuracy.", None, "LowerAIPhysics"),
     ]},
-    {"id": "PerformanceDiagnostics", "name": "Performance diagnostics", "category": "Graphics", "description": "Record game, engine, rendering and memory measurements during offline races. Available counters depend on the shipped player; capture stops automatically.", "origin": "New", "settings": [("CaptureSeconds", "Capture seconds", "int", 60, 10, 180, "Capture per race after a 5-second warmup; results are saved in BepInEx/diagnostics.")]},
+    {"id": "PerformanceDiagnostics", "name": "Performance diagnostics", "category": "Graphics", "description": "Record game, engine, rendering and memory measurements during offline races. Available counters depend on the shipped player; capture stops automatically.", "origin": "New", "settings": [("CaptureSeconds", "Capture seconds", "int", 60, 10, 180, "Capture per race after a 5-second warmup; results are saved in BepInEx/diagnostics."), ("CaptureMemorySnapshot", "Capture memory snapshot", "bool", False, None, None, "One-time main-menu census of loaded textures, meshes, thumbnails and cameras. No image or simulation changes; resets after capture.")]},
     {"id": "TrackBoundaries", "name": "Track boundaries", "category": "Graphics", "description": "Inspect nearby invisible walls and kart-mask respawn colliders with optional translucent surfaces and pin-to-inspect details. Press F10 to open or close the in-race inspector; offline only.", "origin": "New", "settings": [
         ("ShowWalls", "Invisible walls", "bool", True, None, None),
         ("ShowRespawn", "Respawn colliders", "bool", True, None, None),
@@ -234,7 +234,7 @@ def module_sources():
         "DisableVignette": ["PackModules.cs", "Plugin.cs"],
         "Rendering": ["StudioBehaviour.cs", "PackModules.cs"],
         "Performance": ["PerformanceFeature.cs"],
-        "PerformanceDiagnostics": ["PerformanceDiagnostics.cs", "PerformanceSamples.cs", "PerformanceEngineSamples.cs", "PerformanceFeature.cs"],
+        "PerformanceDiagnostics": ["PerformanceDiagnostics.cs", "PerformanceSamples.cs", "PerformanceEngineSamples.cs", "PerformanceFeature.cs", "MemoryCensus.cs"],
         "TrackBoundaries": ["TrackBoundaries.cs", "BoundarySelection.cs", "BoundaryGeometry.cs", "StudioBehaviour.cs"],
         "GamepadOverlay": ["GamepadOverlay.cs", "InputOverlayModel.cs", "StudioBehaviour.cs", "Plugin.cs"],
         "Audio": ["AudioFeature.cs", "Plugin.cs"],

@@ -16,7 +16,7 @@ namespace TK2.Customization;
 // Observation only. Current native exports/signatures: docs/PERFORMANCE-DIAGNOSTICS.md.
 internal static class PerformanceDiagnostics
 {
-    private static ConfigEntry<bool> _enabled = null!;
+    private static ConfigEntry<bool> _enabled = null!, _snapshot = null!;
     private static ConfigEntry<int> _seconds = null!;
     private static readonly Harmony Hooks = new("local.tk2.performance.diagnostics");
     private static readonly (Type Type, string Name)[] Targets = {
@@ -26,7 +26,12 @@ internal static class PerformanceDiagnostics
         (typeof(AILogicController), "Update"), (typeof(AIWeaponLogicController), "Update"),
         (typeof(AIDistToTargetBehavController), "Update"), (typeof(PlayerBezierFollower), "Update"),
         (typeof(PixelKartPhysics), "Update"), (typeof(PixelEasyCharMoveKartController), "Update"),
-        (typeof(PTK_GraphicsDetailApplier), "LateUpdate") };
+        (typeof(PTK_GraphicsDetailApplier), "LateUpdate"),
+        (typeof(Ant_Player), "Update"), (typeof(PixelKartPhysics), "FixedUpdate"),
+        (typeof(PixelKartAIInput), "FixedUpdate"), (typeof(PixelKartAIInput), "ProcessRacingInput"),
+        (typeof(WeaponProjectileCollision), "Update"), (typeof(WeaponSceneController), "Update"),
+        (typeof(FollowMissileController), "Update"), (typeof(TrajectoryProjectile), "Update"),
+        (typeof(VisualLogicMissileController), "Update") };
     private static readonly Dictionary<MethodBase, int> Slots = new();
     private static readonly PerformanceSamples Samples = new(Targets.Length);
     private static readonly PerformanceEngineSamples Engine = new();
@@ -45,6 +50,8 @@ internal static class PerformanceDiagnostics
             "Record bounded offline race timing/memory samples. Diagnostic overhead can lower FPS; this is not an optimization.");
         _seconds = p.Config.Bind("PerformanceDiagnostics", "CaptureSeconds", 60,
             new ConfigDescription("Seconds captured per race after a 5-second warmup. Reports every 10 seconds; hooks are removed afterward.", new AcceptableValueRange<int>(10, 180)));
+        _snapshot = p.Config.Bind("PerformanceDiagnostics", "CaptureMemorySnapshot", false,
+            "Capture texture/mesh/thumbnail/camera metadata once in the main menu. No pixels or settings are changed. Resets after capture.");
     }
     private static void StartHooks()
     {
@@ -87,6 +94,13 @@ internal static class PerformanceDiagnostics
     internal static void Tick()
     {
         if (_enabled == null) return;
+        if (_snapshot.Value && MenuManager.Instance != null)
+        {
+            _snapshot.Value = false;
+            Plugin.Instance!.Config.Save();
+            try { MemoryCensus.Capture(); }
+            catch (Exception ex) { Plugin.Instance?.Log.LogWarning("Memory census failed: " + ex.Message); }
+        }
         if (_faulted)
         {
             if (_hooked) { try { RemoveHooks(); } catch (Exception ex) { Plugin.Instance?.Log.LogWarning(ex.Message); } }
@@ -140,6 +154,7 @@ internal static class PerformanceDiagnostics
             performance = PerformanceFeature.DiagnosticSettings(), trackBoundariesVisible = TrackBoundaries.Visible,
             screenWidth = Screen.width, screenHeight = Screen.height, vSyncCount = QualitySettings.vSyncCount,
             targetFrameRate = Application.targetFrameRate, graphicsApi = SystemInfo.graphicsDeviceType.ToString(),
+            textureCurrentBytes = Texture.currentTextureMemory, textureMipLimit = QualitySettings.globalTextureMipmapLimit,
             graphicsDevice = SystemInfo.graphicsDeviceName, unityVersion = Application.unityVersion };
     }
     private static double ProcessCpu() { using var process = Process.GetCurrentProcess(); return process.TotalProcessorTime.TotalMilliseconds; }
@@ -166,7 +181,7 @@ internal static class PerformanceDiagnostics
             processCpuMs = cpu - _processCpu, observedAiMotorSamples = _aiSamples, observedLowerAiMotorSamples = _lowerAiSamples,
             lastObservedAiMotorInterval = _aiSamples == 0 ? (int?)null : _observedInterval, methods, engine = Engine.Report(),
             trackBoundaryViewObservedDuringWindow = _boundaryVisibleThisWindow,
-            limitation = "Instrumented inclusive wall times overlap; do not sum nested spans. Engine counters expose only registered release metrics; availability and units are reported individually. Hooks and recorders add overhead. Unity memory values can be unavailable/zero in release builds." };
+            limitation = "Instrumented inclusive wall times overlap; do not sum nested spans. Item timers cover selected projectile/weapon update paths, not all effects, collision callbacks or Unity physics. Engine counters expose only registered release metrics; availability and units are reported individually. Hooks and recorders add overhead. Unity memory values can be unavailable/zero in release builds." };
         File.AppendAllText(_file!, JsonSerializer.Serialize(record) + Environment.NewLine);
         Plugin.Instance?.Log.LogInfo($"Performance sample: {record.averageFps:F1} FPS, p95 {record.p95FrameMsUpperBound?.ToString("F2") ?? ">=200"} ms, private {record.privateBytes / 1073741824d:F2} GiB; {_file}");
         Samples.Reset(); Engine.ResetWindow(); _boundaryVisibleThisWindow = false; _aiSamples = _lowerAiSamples = _observedInterval = 0; _processCpu = cpu; _recording = true;

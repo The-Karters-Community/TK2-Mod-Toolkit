@@ -70,9 +70,11 @@ internal sealed class PerformanceEngineSamples : IDisposable
                 ulong handle = _api.Find(m.Name);
                 if (handle == 0 || handle == ulong.MaxValue) { m.Status = "metric_not_registered"; continue; }
                 m.Description = _api.Describe(ref handle);
-                // Last sample storage is a signed 64-bit integer. Preserve its unit;
-                // float/double or unknown metrics must not be reinterpreted as integers.
-                if (m.Description.DataType != 4 || m.Description.Unit is not (1 or 2 or 3))
+                // CopyTo normalizes these four Double time counters to numeric Int64
+                // nanoseconds. Verified against native GetLastValueAsDouble on this
+                // player; they are not IEEE-754 bits. Other floating metrics stay unsupported.
+                bool copiedDoubleTime = m.PositiveOnly && m.Description.DataType == 7 && m.Description.Unit == 1;
+                if ((!copiedDoubleTime && m.Description.DataType is not (2 or 3 or 4 or 5)) || m.Description.Unit is not (1 or 2 or 3))
                 { m.Status = "unsupported_data_type_or_unit"; continue; }
                 m.Recorder = _api.Create(ref handle);
                 m.Status = m.Recorder == 0 ? "recorder_unavailable" : "recording";

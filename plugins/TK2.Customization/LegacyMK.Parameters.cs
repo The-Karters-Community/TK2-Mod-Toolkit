@@ -38,6 +38,9 @@ internal static partial class LegacyMK
         }
         internal void Apply(T target, bool active)
         {
+            // GetInstanceID crosses IL2CPP and boxes an Int32. Untouched disabled
+            // fields have nothing to restore: avoid that call on every physics tick.
+            if ((!active || !_enabled.Value) && _originals.Count == 0) return;
             int id = target.GetInstanceID();
             if (!active || !_enabled.Value)
             {

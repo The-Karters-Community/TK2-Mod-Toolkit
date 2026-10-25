@@ -254,8 +254,13 @@ void BeginCapture(Plugin plugin)
 p = ResetDiagnostic(); PerformanceDiagnostics.Tick();
 Check(hooks.Targets.Count == 0, "disabled diagnostics have no timing detours");
 Check(!p.Config.Entry<bool>("PerformanceDiagnostics", "Enabled").Value, "diagnostics default off");
+MenuManager.Instance = new(); p.Config.Entry<bool>("PerformanceDiagnostics", "CaptureMemorySnapshot").Value = true;
+PerformanceDiagnostics.Tick(); PerformanceDiagnostics.Tick();
+Check(MemoryCensus.Captures == 1 && hooks.Targets.Count == 0 && !p.Config.Entry<bool>("PerformanceDiagnostics", "CaptureMemorySnapshot").Value,
+    "one-shot menu census works with timing hooks disabled and resets its request");
+MenuManager.Instance = null;
 BeginCapture(p);
-Check(hooks.Targets.Count == 10 && (bool)DField("_recording")!, "capture arms all exact native targets after warmup");
+Check(hooks.Targets.Count == 19 && (bool)DField("_recording")!, "capture arms all exact native targets after warmup");
 Check(!p.Config.Entry<bool>("Enabled").Value && !p.SessionModified && !Ant_CurrentGameConfiguration.bLowerPhysicsQualityOnAIVehicles, "diagnostics do not enable optimization or change simulation");
 var target = typeof(PixelEasyCharMoveKartController).GetMethod("FixedUpdate")!;
 object?[] state = { 0L }; DCall("Before", state);
@@ -273,7 +278,7 @@ string output = (string)DField("_file")!;
 using (var json = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadLines(output).First()))
 {
     var root = json.RootElement;
-    Check(root.GetProperty("methods").GetArrayLength() == 10 && root.GetProperty("frames").GetInt32() >= 2, "report is parseable and contains method and frame evidence");
+    Check(root.GetProperty("methods").GetArrayLength() == 19 && root.GetProperty("frames").GetInt32() >= 2, "report is parseable and contains method and frame evidence");
     Check(root.GetProperty("observedLowerAiMotorSamples").GetInt32() == 1 && root.GetProperty("lastObservedAiMotorInterval").GetInt32() == 4, "report includes observed cadence rather than selected setting only");
     Check(!root.GetProperty("context").GetProperty("trackBoundariesVisible").GetBoolean() && root.GetProperty("trackBoundaryViewObservedDuringWindow").GetBoolean(),
         "mid-window overlay use is recorded even when hidden at both window endpoints");
@@ -283,7 +288,7 @@ Check(hooks.Targets.Count == 0 && (bool)DField("_completed")!, "bounded capture 
 PerformanceDiagnostics.Tick(); Check(hooks.Targets.Count == 0, "completed race does not rearm every frame");
 MenuManager.Instance = new(); PerformanceDiagnostics.Tick(); MenuManager.Instance = null;
 PerformanceDiagnostics.Tick(); DSet("_warmUntil", -1d); PerformanceDiagnostics.Tick();
-Check(hooks.Targets.Count == 10, "next race can capture without relaunch");
+Check(hooks.Targets.Count == 19, "next race can capture without relaunch");
 Plugin.OfflineLabAllowed = false; PerformanceDiagnostics.Tick();
 Check(hooks.Targets.Count == 0 && !(bool)DField("_recording")!, "online transition stops capture and detours");
 p = ResetDiagnostic(); BeginCapture(p); Application.isFocused = false; PerformanceDiagnostics.Tick();

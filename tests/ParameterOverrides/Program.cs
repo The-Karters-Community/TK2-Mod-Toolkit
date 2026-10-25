@@ -1,0 +1,33 @@
+using System.Reflection;
+using TK2.Customization;
+
+const BindingFlags hidden = BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+var parameterType=typeof(LegacyMK).GetNestedType("Parameter`1",hidden)!.MakeGenericType(typeof(PixelKartPhysics));
+int reads=0,writes=0,checks=0;
+void Check(bool condition,string text) { checks++; if(!condition) throw new Exception(text); }
+Func<PixelKartPhysics,float> read=k=>{reads++;return k.fMass;};
+Action<PixelKartPhysics,float> write=(k,v)=>{writes++;k.fMass=v;};
+var parameter=Activator.CreateInstance(parameterType,hidden,null,new object[]{"Test","Mass",15f,read,write},null)!;
+void Apply(PixelKartPhysics kart,bool active)=>parameterType.GetMethod("Apply",hidden)!.Invoke(parameter,new object[]{kart,active});
+void Restore()=>parameterType.GetMethod("Restore",hidden)!.Invoke(parameter,null);
+var config=LegacyMK.TestConfig;
+var kart=new PixelKartPhysics{Id=42,fMass=19,ForbidIdRead=true};
+for(int i=0;i<1000;i++) Apply(kart,false);
+Check(kart.IdReads==0&&reads==0&&writes==0,"inactive untouched parameters must make no native identity or field calls");
+for(int i=0;i<1000;i++) Apply(kart,true);
+Check(kart.IdReads==0,"disabled individual override must also avoid native calls when master is on");
+kart.ForbidIdRead=false;config.Entry<bool>("Test/OverrideMass").Value=true;
+Apply(kart,true);Apply(kart,true);
+Check(kart.fMass==15&&reads==1&&writes==2,"active override captures baseline once and continues applying current value");
+config.Entry<float>("Test/Mass").Value=12;Apply(kart,true);
+Check(kart.fMass==12&&reads==1,"value edits preserve the original baseline");
+config.Entry<bool>("Test/OverrideMass").Value=false;Apply(kart,true);
+Check(kart.fMass==19,"disabling an individual override restores its native value");
+int ids=kart.IdReads;Apply(kart,true);Apply(kart,false);
+Check(kart.IdReads==ids,"completed restoration returns to the no-interop path");
+config.Entry<bool>("Test/OverrideMass").Value=true;Apply(kart,true);Apply(kart,false);
+Check(kart.fMass==19,"master disable still restores a previously changed field");
+var other=new PixelKartPhysics{Id=43,fMass=27};Apply(kart,true);Apply(other,true);Restore();
+Check(kart.fMass==19&&other.fMass==27,"bulk restoration preserves every target's captured baseline");
+ids=kart.IdReads;Apply(kart,false);Check(kart.IdReads==ids,"bulk restoration releases identity lookup requirement");
+Console.WriteLine($"Parameter overrides: {checks} regression assertions passed against production source (stub native boundary).");
