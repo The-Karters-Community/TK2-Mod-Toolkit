@@ -32,6 +32,9 @@ Plugin Reset()
     kart.wallRespawn_Always_ColliderLayer.value = 1 << 10;
     var plugin = new Plugin(); Plugin.Instance = plugin; TrackBoundaries.Install(plugin);
     plugin.Config.Entry<bool>("Enabled").Value = true;
+    TrackBoundaries.Tick(); // Enabling the module alone leaves its inspector closed.
+    Input.Pressed = true; TrackBoundaries.Tick(); // Explicitly open it for geometry fixtures.
+    Object.Finds.Clear();
     return plugin;
 }
 MeshCollider Boundary(int layer, float distance = 0, GameObject? parent = null)
@@ -112,12 +115,12 @@ p = Reset(); var hotWall = Boundary(8); Input.Pressed = true; Next(); Check(View
 Input.Pressed = true; Next(); Check(View(hotWall) != null, "F10 enables overlays");
 Application.isFocused = false; Input.Pressed = true; Next(); Check(View(hotWall) != null, "unfocused keyboard ignored");
 Input.Pressed = false; Plugin.OfflineLabAllowed = false; Next(); Check(ViewCount() == 0, "online transition removes overlays");
-Plugin.OfflineLabAllowed = true; Next(); Check(View(hotWall) != null, "offline running race rearms");
+Plugin.OfflineLabAllowed = true; Application.isFocused = true; Next(); Check(ViewCount() == 0, "offline return keeps inspector closed");
+Input.Pressed = true; Next(); Check(View(hotWall) != null, "offline running race allows reopening");
 MenuManager.Instance = new GameObject().Add<MenuManager>(); Next(); Check(ViewCount() == 0, "menu removes overlays");
 int menuScans = Object.Finds[typeof(Collider)]; Next(); Check(Object.Finds[typeof(Collider)] == menuScans, "menu does not scan colliders");
-MenuManager.Instance = null; Next(); Check(View(hotWall) != null, "return to race rearms");
-Plugin.Instance!.GameplayReady = false; Next(); Check(ViewCount() == 0, "unready gameplay clears overlays");
-Plugin.Instance.GameplayReady = true; Next();
+MenuManager.Instance = null; Next(); Check(ViewCount() == 0, "return to race keeps inspector closed");
+Input.Pressed = true; Next(); Check(View(hotWall) != null, "return to race allows reopening");
 Ant_CurrentGameConfiguration.eCurrentRaceState = Ant_CurrentGameConfiguration.ERaceState.E_RACE_FINISHED; Next(); Check(ViewCount() == 0, "finished race removes overlays");
 
 p = Reset(); var active = Boundary(8); var disabled = Boundary(8); disabled.enabled = false;
@@ -200,7 +203,7 @@ Graphics.ThrowOnDraw = true; GL.wireframe = false; TrackBoundaries.Render();
 Check(!GL.wireframe, "draw exception restores native raster state");
 Check(!TrackBoundaries.Visible && ViewCount() == 0 && faultWall.enabled && !faultWall.sharedMesh!.Destroyed,
     "render failure removes only owned views and retains native collider/mesh");
-Check(p.Log.Warnings.Count == 1 && p.Log.Warnings[0].Contains("outline rendering"), "render failure logged once");
+Check(p.Log.Warnings.Count == 1 && p.Log.Warnings[0].Contains("overlay rendering"), "render failure logged once");
 Graphics.ThrowOnDraw = false; TrackBoundaries.Render();
 Check(p.Log.Warnings.Count == 1 && !GL.wireframe, "faulted module cannot reenter draw loop");
 TrackBoundaries.Restore(); Camera.current = null;

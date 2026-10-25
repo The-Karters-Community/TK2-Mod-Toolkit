@@ -30,6 +30,8 @@ namespace Il2CppInterop.Runtime.InteropTypes.Arrays
 }
 namespace UnityEngine
 {
+    public enum CursorLockMode { None, Locked, Confined }
+    public static class Cursor { public static bool visible; public static CursorLockMode lockState; }
     public class Object
     {
         static int next; public readonly int Id = ++next; public bool Destroyed;
@@ -89,6 +91,7 @@ namespace UnityEngine
     }
     public struct Vector3
     {
+        public float magnitude => MathF.Sqrt(x*x + y*y + z*z);
         public float x, y, z; public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
         public static Vector3 zero => new(0, 0, 0); public static Vector3 one => new(1, 1, 1);
         public static Vector3 operator *(Vector3 v, float f) => new(v.x*f, v.y*f, v.z*f);
@@ -104,7 +107,7 @@ namespace UnityEngine
         public Vector3 Rotate(Vector3 p) { var v = System.Numerics.Vector3.Transform(new(p.x,p.y,p.z), Value); return new(v.X,v.Y,v.Z); }
     }
     public struct Bounds
-    { public Vector3 center; public float SqrDistance(Vector3 p) => (center.x - p.x) * (center.x - p.x) + (center.y - p.y) * (center.y - p.y) + (center.z - p.z) * (center.z - p.z); }
+    { public Vector3 center, extents; public Vector3 size => extents * 2; public bool IntersectRay(Ray ray, out float distance) { distance = 0; return false; } public float SqrDistance(Vector3 p) => (center.x - p.x) * (center.x - p.x) + (center.y - p.y) * (center.y - p.y) + (center.z - p.z) * (center.z - p.z); }
     public class Collider : Component
     {
         public Collider? NativeSubtype; private bool _enabled = true; private Bounds _bounds;
@@ -130,7 +133,7 @@ namespace UnityEngine
         public Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<Material> sharedMaterials = new(Array.Empty<Material>());
         public Material? sharedMaterial { get => sharedMaterials.Length == 0 ? null : sharedMaterials[0]; set => sharedMaterials = value == null ? Array.Empty<Material>() : new[] { value }; }
     }
-    public struct LayerMask { public int value; }
+    public struct LayerMask { public int value; public static string LayerToName(int layer) => ""; }
     public sealed class Shader : Object { public bool Colored = true; public static Shader? Internal; public static Shader? Find(string name) => Internal; }
     public enum HideFlags { DontSave }
     public sealed class Material : Object
@@ -146,7 +149,8 @@ namespace UnityEngine
         public bool SetPass(int index) => BindPass;
     }
     public sealed class Camera : Component
-    { public int cullingMask; public CameraType cameraType = CameraType.Game; public static Camera? current; public static Camera[] allCameras => FindObjectsOfType<Camera>(); }
+    { public int cullingMask; public bool isActiveAndEnabled = true, orthographic; public float nearClipPlane = .1f, farClipPlane = 10000, fieldOfView = 60, orthographicSize = 1000; public Ray ViewportPointToRay(Vector3 point) => new(); public Vector3 WorldToViewportPoint(Vector3 point) => new(.5f, .5f, 10); public CameraType cameraType = CameraType.Game; public static Camera? current; public static Camera[] allCameras => FindObjectsOfType<Camera>(); }
+    public struct Ray { }
     public enum CameraType { Game, Reflection, Preview }
     public struct Matrix4x4 { }
     public static class GL { public static bool wireframe; }
@@ -160,21 +164,22 @@ namespace UnityEngine
             Draws++; Submeshes.Add(submesh);
         }
     }
-    public enum KeyCode { None, F10 }
-    public static class Input { public static bool Pressed; public static bool GetKeyDown(KeyCode key) { bool p = Pressed; Pressed = false; return p; } }
+    public enum KeyCode { None, F10, LeftShift, RightShift }
+    public static class Input { public static bool Pressed; public static bool GetKey(KeyCode key) => false; public static bool GetKeyDown(KeyCode key) { bool p = Pressed; Pressed = false; return p; } }
     public static class Time { public static float unscaledTime; }
     public static class Application { public static bool isFocused = true; }
-    public static class Screen { public static int height = 1080; }
+    public static class Screen { public static int height = 1080, width = 1920; }
     public struct Color { public float r, g, b, a; public Color(float r, float g, float b, float a) { this.r = r; this.g = g; this.b = b; this.a = a; } public static Color white => new(1, 1, 1, 1); }
-    public struct Rect { public Rect(float x, float y, float width, float height) { } }
-    public static class GUI { public static Color color; public static void Box(Rect rect, string text) { } public static void Label(Rect rect, string text) { } }
+    public struct Rect { public float x, y, width, height; public Rect(float x, float y, float width, float height) { this.x=x; this.y=y; this.width=width; this.height=height; } }
+    public static class GUI { public static Color color, backgroundColor, contentColor; public static Matrix4x4 matrix; public static int depth; public static bool enabled = true; public static bool Button(Rect rect, string text) => false; public static float HorizontalSlider(Rect rect, float value, float low, float high) => value; public static void Box(Rect rect, string text) { } public static void Label(Rect rect, string text) { } }
+    public static class Mathf { public static float Clamp(float value, float low, float high) => Math.Clamp(value, low, high); }
 }
 namespace UnityEngine.Rendering
 {
     public enum ShadowCastingMode { Off, On }
     public enum BlendMode { SrcAlpha, OneMinusSrcAlpha }
     public enum CompareFunction { LessEqual, Always }
-    public enum CullMode { Off }
+    public enum CullMode { Off, Back }
 }
 namespace UnityEngine.SceneManagement
 {
@@ -183,13 +188,16 @@ namespace UnityEngine.SceneManagement
 }
 public sealed class MenuManager : UnityEngine.MonoBehaviour { public static MenuManager? Instance; }
 public sealed class Ant_MapData : UnityEngine.MonoBehaviour { public static Ant_MapData? instance; }
-public sealed class Ant_Player : UnityEngine.MonoBehaviour { public enum EPlayerType { E_HUMAN_LOCAL, E_AI_LOCAL } public EPlayerType ePlayerType; }
+public sealed class Ant_Player : UnityEngine.MonoBehaviour { public enum EPlayerType { E_HUMAN_LOCAL, E_AI_LOCAL } public EPlayerType ePlayerType; public GameplayCameraStub? gameplayCamera; }
+public sealed class GameplayCameraStub { public UnityEngine.Camera? unityCamera; public GameplayCameraStub GetCamera() => this; }
 public sealed class PixelEasyCharMoveKartController : UnityEngine.MonoBehaviour
 { public Ant_Player? parentPlayer; public UnityEngine.LayerMask wallLayerToCollDetect, wallRespawn_Flat_ColliderLayer, wallRespawn_Always_ColliderLayer; }
 public sealed class PTK_HideMeshRendererInPlayMode : UnityEngine.MonoBehaviour { public bool bEnabled = true, bIncludeChildrenMeshRenderers = true; }
 public static class Ant_CurrentGameConfiguration { public enum ERaceState { E_RACE_RUNNING, E_RACE_FINISHED } public static ERaceState eCurrentRaceState; }
 namespace TK2.Customization
 {
+    internal static class LiveConfig { public static string Status = "Saved"; public static void Flush(Plugin plugin) { } public static void Change<T>(Plugin plugin, BepInEx.Configuration.ConfigEntry<T> entry, T value, float time) => entry.Value = value; }
+    internal static class StudioBehaviour { public static void DrawSolidPanel(UnityEngine.Rect rect) { } public static bool DrawCheckBox(UnityEngine.Rect rect, bool value, string text) => value; }
     public sealed class LogStub { public readonly List<string> Warnings = new(), Infos = new(); public void LogWarning(string value) => Warnings.Add(value); public void LogInfo(string value) => Infos.Add(value); }
     internal sealed class Plugin
     { public static Plugin? Instance; public static bool OfflineLabAllowed = true; public bool GameplayReady = true; public readonly BepInEx.Configuration.ConfigFile Config = new(); public readonly LogStub Log = new(); }

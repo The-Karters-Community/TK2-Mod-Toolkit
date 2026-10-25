@@ -4,11 +4,11 @@
 
 <p align="center"><img src="assets/Logo.png" alt="The Karters 2 Turbo Charged" width="260"></p>
 
-The 0.6.25 plugin is rebuilt against **0.1.4.24 (Windows x64)**. The validated loader is **BepInEx Unity IL2CPP x64 `6.0.0-be.788`**, commit `5b766a3`. Compatible game updates no longer block installation solely because the native game hash changed; individual hooks still need to work, and live Mirror Race rendering on the updated game remains unverified. Module hooks are attempted on updated builds without binary-hash or version allowlists; only actual hook/runtime failures stop the affected feature. This is a community project; gameplay-changing modules are intended for local/offline use. Online protection is mandatory and locked on.
+The 0.6.26 plugin is rebuilt against **0.1.4.30 beta_dev (Windows x64)**. The validated loader is **BepInEx Unity IL2CPP x64 `6.0.0-be.788`**, commit `5b766a3`. Compatible game updates no longer block installation solely because the native game hash changed; individual hooks still need to work, and live Mirror Race rendering on the updated game remains unverified. Module hooks are attempted on updated builds without binary-hash or version allowlists; only actual hook/runtime failures stop the affected feature. This is a community project; gameplay-changing modules are intended for local/offline use. Online protection is mandatory and locked on.
 
 ## Standalone camera and inputs
 
-The source Studio also includes experimental **Air Dash**, **Rewind / Practice
+The toolkit also includes experimental **Air Dash**, **Rewind / Practice
 Scrubbing**, and **Mine Traps** modules, plus expanded Practice Snapshots.
 They default off and still need in-game validation. Ricochet Items was removed
 after its bazooka shots failed in play. See [controls, evidence and
@@ -137,7 +137,7 @@ The updater is already configured for **`The-Karters-Community/TK2-Mod-Toolkit`*
 
 The release version is shared by `studio/version.py` and `plugins/TK2.Customization/ToolkitVersion.cs`; set both through `tools/set_version.ps1` while preparing a release. Build the archive after finalizing and committing the source. The script tags the current commit and uploads the ZIP. A release may use the default slim package or the larger loader-included package under the same required filename; the updater does not currently distinguish or offer two variants. See [release and update details](docs/RELEASING.md) and [portable packaging](docs/PORTABLE.md).
 
-The latest tagged toolkit release in this checkout is `v0.6.23`. Builds retain that version until a maintainer prepares the next release with `tools/set_version.ps1`; they do not create artificial version bumps.
+Release 0.6.26 adds the inactive-parameter allocation fix, aerial/practice modules and mine-trap corrections. See [release notes](docs/RELEASE-0.6.26.md). After publishing, source development advances to the next patch version; the release tag and portable ZIP retain their published version.
 
 ## Decompiled code and reverse-engineering evidence
 
