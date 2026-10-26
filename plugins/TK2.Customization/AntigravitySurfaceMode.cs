@@ -35,6 +35,13 @@ internal static partial class AntigravityFeature
         bool hop = motor.MustUnground();
         bool directContact = false;
 
+        // A direct-surface kart can become ungrounded for a jump or a faceted
+        // loop transition even when TriggerPhysicsJump did not report a delta.
+        // Preserve the surface frame and use the native hop grace instead of
+        // treating that transition as an immediate loss of the road.
+        if (hop && entry?.SurfaceMode == true && entry.Policy.Attached)
+            entry.AcceptedHop = true;
+
         if (!hop && grounding.FoundAnyGround && EligibleSolidSurface(grounding.GroundCollider, controller))
         { surface = grounding.GroundCollider; normal = grounding.GroundNormal; directContact = true; }
 
