@@ -46,13 +46,27 @@ The new correction changes only AI lateral velocity while in road contact:
 
 ```text
 requestedSideSpeed = clamp(2 * centreError, -6, 6)
-sideSpeed = moveTowards(sideSpeed, requestedSideSpeed, 35 * deltaTime)
+sideSpeed = clamp(moveTowards(sideSpeed, requestedSideSpeed, 35 * deltaTime), -8, 8)
 ```
 
 With no reliable route, requested side speed is zero. The correction uses the
 road's right vector, preserves route-forward/normal components and does not
 snap position or add adhesion. It does not apply during hops, forced ungrounding
 or lost contact. Human velocity is unchanged. Logs report actual/target side speed.
+
+The next user test still showed frequent falls. Samples captured lateral speeds
+of 55-84 units/second against targets of 0-6, which the previous acceleration
+limit could not arrest before reaching an edge. The 8-unit lateral ceiling above
+now handles those spikes while in contact. AI handling is deliberately assisted;
+this is not a change to the human driver's drift physics.
+
+Native `AddCounterSteerForceAtTheStartOfTheDrift` (`0x1805fad10`, local evidence
+`ai-drift-kick`) adds lateral acceleration when steering and drift signs oppose,
+guarded by `bAddLateralForceAtStartOfTheDriftToTweakVel`. The flag is now disabled
+only within attached-AI velocity calculations, then restored in postfix/finalizer.
+This avoids relying on a helper hook that a native caller could inline. The
+samples support excessive side-slip; they do not prove this force caused every
+captured fall. This revision still needs an in-game test.
 
 AI hops are suppressed while attached. Drifts remain allowed near the route
 when aligned; conflicting/recovery drifts are canceled. Boosts still use native

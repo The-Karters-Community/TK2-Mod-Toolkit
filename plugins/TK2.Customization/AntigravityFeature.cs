@@ -54,6 +54,7 @@ internal static partial class AntigravityFeature
     private struct MainVelocityPatchState
     {
         internal bool Patched, RestoreCap, OriginalCap;
+        internal bool RestoreDriftForce, OriginalDriftForce;
     }
 
     private static readonly Dictionary<int, KartState> States = new();

@@ -15,6 +15,12 @@ internal static partial class AntigravityFeature
         float tilt = Vector3.Angle(Vector3.up, entry.Up);
         if (tilt < DirectSurfaceActivationDegrees && !entry.AcceptedHop) return;
         __state.Patched = true;
+        if (IsAttachedAi(__instance))
+        {
+            __state.RestoreDriftForce = true;
+            __state.OriginalDriftForce = __instance.bAddLateralForceAtStartOfTheDriftToTweakVel;
+            __instance.bAddLateralForceAtStartOfTheDriftToTweakVel = false;
+        }
         // Keep the game's vertical cap on ordinary banks; remove it only once
         // the frame is steep enough for world-Y to oppose surface motion.
         if (tilt < SteepSurfaceDegrees && !entry.AcceptedHop)
@@ -62,6 +68,11 @@ internal static partial class AntigravityFeature
 
     private static void RestoreMainVelocityCap(PixelKartPhysics physics, ref MainVelocityPatchState state)
     {
+        if (state.RestoreDriftForce)
+        {
+            physics.bAddLateralForceAtStartOfTheDriftToTweakVel = state.OriginalDriftForce;
+            state.RestoreDriftForce = false;
+        }
         if (!state.RestoreCap) return;
         physics.bLimitVerticalUpVelocity = state.OriginalCap;
         state.RestoreCap = false;

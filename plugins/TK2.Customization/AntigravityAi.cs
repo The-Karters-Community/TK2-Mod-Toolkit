@@ -89,6 +89,8 @@ internal static partial class AntigravityFeature
         if (right.sqrMagnitude < .5f) return;
         float side = Vector3.Dot(velocity, right);
         float corrected = Mathf.MoveTowards(side, entry.AiLateralTarget, 35f * Mathf.Clamp(deltaTime, 0f, .05f));
+        // An inherited drift kick can exceed 50 units/s before guidance starts.
+        corrected = Mathf.Clamp(corrected, -8f, 8f);
         // Turning the heading alone leaves drift momentum sliding off the road.
         velocity += right * (corrected - side);
     }
