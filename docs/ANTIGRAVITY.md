@@ -51,22 +51,14 @@ probe uses the full collision mask, so a next quad on a wall layer can be
 reacquired; eligibility still rejects triggers, respawn layers, dynamic bodies
 and player colliders. Successful reacquisition resets the grace timer.
 
-When no eligible ray is returned on a steep surface, a last-known static
-support frame is latched for the same bounded grace window. This prevents a
-single KCC seam miss from throwing the kart off a loop; the latch expires and
-releases if the track is genuinely gone. A forward lookahead ray is included
-so the next quad can be acquired before the current one ends.
-
 Direct mode also carries the last tangential forward speed down by a bounded
 decay while the surface is steep or inverted. This only prevents the native
 velocity pass from zeroing a loop; reverse input and ordinary flat-road
 braking remain native. Accepted drift hops use the same bounded carry.
 
-Normal jumps remain native on flat and banked direct surfaces. Only a jump or
-drift input started while the kart is already on a steep/inverted surface is
-transported into the surface frame as an adhesion hop. The module observes
-`JumpInput` as well as the lower-level physics jump because the game can use
-the former to begin a drift without producing a physics-jump callback.
+Normal jumps remain native on flat and banked direct surfaces. Only a jump
+started while the kart is already on a steep/inverted surface is transported
+into the surface frame as an adhesion hop.
 
 The optional camera transports its previous surface frame onto the new normal,
 preserving roll through a loop. It does not rebuild each frame from world-up,

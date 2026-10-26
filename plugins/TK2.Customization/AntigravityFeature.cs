@@ -74,8 +74,6 @@ internal static partial class AntigravityFeature
             new[] { typeof(Vector3), typeof(Vector3).MakeByRefType(), typeof(Vector3).MakeByRefType(), typeof(float).MakeByRefType(), typeof(float), typeof(float), typeof(float), typeof(float) }, Postfix: nameof(SteeringPostfix)),
         new FeatureHook(typeof(PixelKartPhysics), "TriggerPhysicsJump",
             new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, Prefix: nameof(JumpPrefix), Postfix: nameof(JumpPostfix)),
-        new FeatureHook(typeof(PixelEasyCharMoveKartController), "JumpInput",
-            new[] { typeof(bool) }, Postfix: nameof(JumpInputPostfix)),
         new FeatureHook(typeof(PixelKartPhysics), "UpdateSlopeVelocity",
             new[] { typeof(Vector3).MakeByRefType(), typeof(Vector3).MakeByRefType(), typeof(float).MakeByRefType(), typeof(float) }, Prefix: nameof(SlopePrefix)),
         new FeatureHook(typeof(PixelKartPhysics), "UpdateVelocity",
@@ -308,10 +306,6 @@ internal static partial class AntigravityFeature
         {
             ConsiderContinuityRay(controller, origin + forward * lateral, -up, maxDistance, probeLayers, ref best, ref found);
             ConsiderContinuityRay(controller, origin - forward * lateral, -up, maxDistance, probeLayers, ref best, ref found);
-            float lookahead = Mathf.Clamp(motor.Velocity.magnitude * Mathf.Min(Time.fixedDeltaTime, .05f) * 2.5f,
-                lateral, maxDistance);
-            ConsiderContinuityRay(controller, origin + forward * lookahead + up * .25f,
-                -up, maxDistance, probeLayers, ref best, ref found);
         }
         if (right.sqrMagnitude > .5f)
         {
@@ -578,20 +572,6 @@ internal static partial class AntigravityFeature
     private static void JumpPrefix(PixelKartPhysics __instance, ref Vector3 __0, out Vector3 __state)
     {
         __state = __0;
-    }
-
-    private static void JumpInputPostfix(PixelEasyCharMoveKartController __instance, bool __0)
-    {
-        if (!__0 || !CanReadController(__instance) || !TryGet(__instance, out var entry) || !entry.SurfaceMode)
-            return;
-        float tilt = Vector3.Angle(Vector3.up, entry.Policy.Up);
-        if (tilt < 65f) return;
-        // The game uses JumpInput to begin a drift, and a drift input does not
-        // always reach TriggerPhysicsJump. Mark the accepted surface hop at
-        // the input boundary so the wall-ride latch remains active either way.
-        entry.AcceptedHop = true;
-        entry.Policy.HopElapsed = 0f;
-        DiagnosticLog($"input: surface drift hop tilt={tilt:0}°");
     }
 
     private static void JumpPostfix(PixelKartPhysics __instance, ref Vector3 __0, Vector3 __state)
