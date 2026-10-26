@@ -1,3 +1,11 @@
+## 2026-10-26 - Preserve native loop collision
+
+- User loop recordings showed the direct-surface candidate could pass through
+  wall geometry. Removed its wall-layer and wall-angle overrides; it now only
+  broadens stable-ground eligibility and keeps native collision resolution.
+- Surface-camera following stays disconnected after its separate crash report.
+- Built for a further in-game user test; no harness tests were added or run.
+
 ## 2026-10-26 - Loop test control and turbo-pad edge guard
 
 - Added default-off **Disable spline teleports (testing)** under Antigravity.

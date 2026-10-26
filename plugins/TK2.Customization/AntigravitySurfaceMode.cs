@@ -96,14 +96,14 @@ internal static partial class AntigravityFeature
         if (!entry.LayersOverridden)
         {
             entry.OriginalStableLayers = motor.StableGroundLayers.value;
-            entry.OriginalWallLayers = controller.wallLayerToCollDetect.value;
-            entry.OriginalWallAngle = controller.fDetectWallAsCollisionWithAngle;
             entry.LayersOverridden = true;
         }
         int respawn = controller.wallRespawn_Flat_ColliderLayer.value | controller.wallRespawn_Always_ColliderLayer.value;
         motor.StableGroundLayers = (motor.CollidableLayers.value | entry.OriginalStableLayers) & ~respawn;
-        controller.wallLayerToCollDetect = 0;
-        controller.fDetectWallAsCollisionWithAngle = 181f;
+        // Never disable the game's native wall collision while adhering to a
+        // surface. Doing so can make a loop look driveable briefly but lets the
+        // KCC pass through its mesh. Stable-ground eligibility is sufficient for
+        // the local frame; all movement and penetration resolution remain native.
 
         Vector3 oldUp = entry.Policy.Attached ? entry.Policy.Up : motor.CharacterUp;
         Vector3 oldForward = entry.Policy.Attached ? entry.Policy.Forward : physics.qSteeringOrientation * Vector3.forward;

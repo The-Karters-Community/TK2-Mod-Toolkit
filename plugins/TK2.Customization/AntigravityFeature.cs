@@ -31,8 +31,6 @@ internal static partial class AntigravityFeature
         internal Collider? SupportCollider;
         internal bool SurfaceMode, LayersOverridden;
         internal int OriginalStableLayers;
-        internal int OriginalWallLayers;
-        internal float OriginalWallAngle;
     }
 
     private struct MainVelocityPatchState
@@ -642,11 +640,6 @@ internal static partial class AntigravityFeature
         if (entry.LayersOverridden && entry.Motor != null)
         {
             entry.Motor.StableGroundLayers = entry.OriginalStableLayers;
-            if (entry.Controller != null)
-            {
-                entry.Controller.wallLayerToCollDetect = entry.OriginalWallLayers;
-                entry.Controller.fDetectWallAsCollisionWithAngle = entry.OriginalWallAngle;
-            }
             entry.LayersOverridden = false;
         }
         if (!entry.Applied) return;

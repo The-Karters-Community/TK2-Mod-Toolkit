@@ -14,6 +14,12 @@ The direct-contact continuation probe is limited to 35-degree faceted seams.
 This retains the observed 36-to-55-degree tunnel transition while preventing a
 turbo-pad or obstacle face from being selected as a surface continuation.
 
+Wall collision layers are never disabled by adhesion. A prior direct-surface
+candidate did this while attempting to relax wall detection; user recordings
+showed it could tunnel through loop geometry. The corrected candidate retains
+the game's native KCC collision and penetration resolution, so unsupported
+geometry should block or release the kart rather than permit a pass-through.
+
 ## Current test candidate: ground and wall contacts
 
 The user isolated native crashes to **Camera follows surface**. Its invocation
