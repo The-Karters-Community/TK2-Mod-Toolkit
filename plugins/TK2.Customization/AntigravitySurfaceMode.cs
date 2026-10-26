@@ -82,8 +82,18 @@ internal static partial class AntigravityFeature
         }
 
         if (surface == null || !(normal.sqrMagnitude > .5f && normal.sqrMagnitude < 1.5f))
-        { Release(id, true); SetStatus("Antigravity: waiting for solid contact"); return; }
+        {
+            bool hadAttachment = entry?.Policy.Attached == true;
+            string reason = grounding.FoundAnyGround
+                ? (grounding.IsStableOnGround ? "contact rejected" : "unstable contact")
+                : "no ground contact";
+            Release(id, true);
+            SetStatus($"Antigravity: waiting — {reason}");
+            DiagnosticLog($"release: {reason}; found={grounding.FoundAnyGround} stable={grounding.IsStableOnGround} mustUnground={hop}", hadAttachment);
+            return;
+        }
         normal = normal.normalized;
+        Vector3 rawNormal = normal;
         // Contact normals across joined quads can change in one physics tick.
         // Keep the physical frame continuous; native collision remains the source
         // of contact and the raw normal is reached within a short fraction of a second.
@@ -133,7 +143,18 @@ internal static partial class AntigravityFeature
         {
             NextAttachedStatusTime = Time.unscaledTime + .2f;
             string camera = entry.CameraEngaged ? "camera ready" : "camera flat";
-            SetStatus($"Antigravity: solid surface {worldTilt:0}° / layer {surface.gameObject.layer} / {camera}");
+            if (Diagnostics?.Value == true)
+            {
+                float motorTilt = Vector3.Angle(Vector3.up, motor.CharacterUp);
+                float frameError = Vector3.Angle(normal, motor.CharacterUp);
+                SetStatus($"Antigravity: raw {Vector3.Angle(Vector3.up, rawNormal):0}° → frame {worldTilt:0}° / " +
+                    $"motor {motorTilt:0}° Δ{frameError:0}° / limit {motor.MaxStableSlopeAngle:0}° / " +
+                    $"contact {(grounding.FoundAnyGround ? (grounding.IsStableOnGround ? "stable" : "unstable") : "none")} / " +
+                    $"speed {motor.Velocity.magnitude:0.0} / layer {surface.gameObject.layer} / {camera}");
+            }
+            else SetStatus($"Antigravity: solid surface {worldTilt:0}° / layer {surface.gameObject.layer} / {camera}");
+            DiagnosticLog($"contact: raw={Vector3.Angle(Vector3.up, rawNormal):0} frame={worldTilt:0} motor={Vector3.Angle(Vector3.up, motor.CharacterUp):0} " +
+                $"error={Vector3.Angle(normal, motor.CharacterUp):0} limit={motor.MaxStableSlopeAngle:0} found={grounding.FoundAnyGround} stable={grounding.IsStableOnGround} speed={motor.Velocity.magnitude:0.0} layer={surface.gameObject.layer}");
         }
     }
 }

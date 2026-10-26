@@ -9,8 +9,10 @@ namespace TK2.Customization;
 internal static partial class AntigravityFeature
 {
     private static BepInEx.Configuration.ConfigEntry<bool>? ShowStatus;
+    private static BepInEx.Configuration.ConfigEntry<bool>? Diagnostics;
     private static string Status = "Antigravity: waiting for eligible road";
     private static float NextAttachedStatusTime;
+    private static float NextDiagnosticLogTime;
     private struct LookaheadDiagnostic
     {
         internal bool Attempted, Hit, Eligible, SameTrack;
@@ -47,6 +49,8 @@ internal static partial class AntigravityFeature
     internal static void Install(Plugin plugin)
     {
         ShowStatus = plugin.Config.Bind("Antigravity", "ShowStatus", true, "Show current surface-contact status while testing.");
+        Diagnostics = plugin.Config.Bind("Antigravity", "Diagnostics", false,
+            "Show contact/frame details and rate-limited Antigravity logs during a local offline race.");
         FeatureHook.Install(plugin.Harmony, typeof(AntigravityFeature), Hooks());
     }
 
@@ -584,6 +588,14 @@ internal static partial class AntigravityFeature
     private static void SetStatus(string status)
     {
         if (!string.Equals(Status, status, StringComparison.Ordinal)) Status = status;
+    }
+
+    private static void DiagnosticLog(string message, bool force = false)
+    {
+        var plugin = Plugin.Instance;
+        if (plugin == null || Diagnostics?.Value != true || (!force && Time.unscaledTime < NextDiagnosticLogTime)) return;
+        NextDiagnosticLogTime = Time.unscaledTime + .35f;
+        plugin.Log.LogInfo("[Antigravity] " + message);
     }
 
     private static void SetAttachedStatus(AntigravityPolicy.State state, AntigravityPolicy.ContactKind contact,

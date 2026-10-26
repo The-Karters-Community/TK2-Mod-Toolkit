@@ -1,3 +1,10 @@
+## 2026-10-26 - Add bounded Antigravity diagnostics
+
+- Added opt-in detailed HUD/logging for raw contact, applied frame, motor tilt,
+  frame error, native slope limit, contact state, speed, layer, and release
+  reason. Logs are rate-limited to 350 ms and only run in offline races.
+- Built for the next user capture; no harness tests were added/run.
+
 ## 2026-10-26 - Apply loop frame before native slope evaluation
 
 - Surface-camera entry now follows the native motor limit minus 8 degrees

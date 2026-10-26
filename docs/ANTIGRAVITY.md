@@ -40,6 +40,11 @@ its stable-slope limit. This is required for a continuous loop: applying it only
 after the update lets the native 60-degree check stop the kart before the
 inverted section.
 
+Enable `Detailed status and logging` for diagnosis. The HUD then reports raw
+contact tilt, applied frame tilt, motor tilt, frame error, native slope limit,
+contact state, speed, and collider layer. BepInEx logs receive the same data at
+most once every 350 ms, plus forced release reasons; it is local/offline only.
+
 ## Current test candidate: ground and wall contacts
 
 The user isolated native crashes to **Camera follows surface**. Its invocation
