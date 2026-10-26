@@ -33,6 +33,10 @@ internal static partial class AntigravityFeature
         internal float NextVisualLog;
         internal bool AcceptedHop;
         internal int JumpLogCount;
+        internal int AiSteeringLogCount;
+        internal float NextAiSteeringLog;
+        internal float AiSteeringInput;
+        internal bool AiGuidanceReady, AiCanDrift;
         internal bool LayersOverridden;
         // Direct surface mode must carry tangential speed through the native
         // CharacterUp/steep-slope transition. The stock velocity pass can

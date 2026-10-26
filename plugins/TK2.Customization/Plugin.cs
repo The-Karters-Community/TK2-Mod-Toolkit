@@ -61,6 +61,8 @@ public sealed partial class Plugin : BasePlugin
             new[] { typeof(string), typeof(int) }, nameof(AudioPrefix), prefix: true));
         TryFeature("offline fast fall", InstallPhysics);
         TryFeature("offline antigravity", () => AntigravityFeature.Install(this));
+        TryFeature("antigravity AI steering", () => AntigravityFeature.InstallAiSteering(this));
+        TryFeature("antigravity racer collision filtering", () => AntigravityFeature.InstallCollisions(this));
         TryFeature("antigravity visual grounding", () => AntigravityFeature.InstallVisualGrounding(this));
         TryFeature("offline spline-teleport testing", () => AntigravitySplineTeleport.Install(this));
         TryFeature("fast-fall controller input", () => FastFallFeature.Install(this));

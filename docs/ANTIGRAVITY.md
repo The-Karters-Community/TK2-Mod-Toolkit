@@ -1,5 +1,138 @@
 # Antigravity: local offline surface driving
 
+## Simplified AI, collision filtering, and camera exit candidate
+
+The latest user test still fails. Current logs show native drift direction
+opposing desired steering, including positive correction with negative drift.
+The earlier input/yaw restoration chain has been replaced by one AI-only
+`RefreshSteeringToPoint(float)` prefix: attached AI use bounded road-frame
+heading changes directly, while native force calculations retain their vectors
+but do not apply a second heading change. Native AI guidance resumes on release.
+The AI adapter is 91 lines; obsolete smoothing state and finalizers are removed.
+
+Nearby spline tangent/centre guidance remains. Targets more than 4 units off
+the road plane or 12 units laterally away are rejected; the kart then retains
+its transported surface heading. Drifts are allowed only near the route and
+aligned, and canceled if opposing recovery. Native earned drift boost checks
+remain, AI hop requests remain blocked, and human physics are unchanged.
+This is conservative guidance, not proof that every Workshop path follows
+the physical loop. No position snapping or extra adhesion is introduced.
+
+Racer contact is rejected by the complete Collider signature on KCC collision
+eligibility when either local racer is attached. The separate native bounce
+update is also skipped/its pending impulse cleared for attached racers and
+their immediate neighbors. The neighbor check can also suppress a bounce
+between ordinary racers very close to an attached racer. No collision layers,
+Unity collider flags or global configuration are mutated, so filtering ends
+with the attachment guard. Native slices under ignored
+`local/antigravity-evidence/collision` identify the proximity bounce update
+(`0x1805f9a20`) and confirm `ForceStopDrifting` (`0x1805fcc90`) clears the native
+drifting flag. No non-blittable collision-report references are hooked.
+
+Camera entry/exit now takes 0.45/0.8 seconds with smooth endpoint weighting.
+The complete safe surface pose is blended, including height and obstruction
+distance. Previously these constraints remained fully applied after blending
+position, causing a discontinuity when state was finally removed.
+
+Build: zero warnings/errors; whitespace check passes. No new test suite or game
+launch was performed, per the user's workflow. In-game AI driving, drift boosts,
+collision filtering and camera comfort remain pending user validation.
+
+## AI surface-relative guidance candidate
+
+Fourth follow-up: the user reports the third candidate is worse. The installed
+DLL matches that candidate (`fffa966b9386e5a4d262752c3765efd5d79d92ae83dc0f5cdc36493f8181b49a`).
+Logs show many zero stored steering values despite large target errors, with
+some centre errors over 30 units. These snapshots do not prove the route
+matcher caused every death. The new continuity matcher is nevertheless removed
+to reduce the regression surface. Guidance uses the earlier native matched
+progress again. Smoothing advances using elapsed time at guidance updates,
+and writes controller/physics steering fields as well as AI input data; the
+input hook still prevents native assist from replacing that value when called.
+Bounded logs now include actual input-hook counts and drift direction to check
+whether native input consumption is bypassed. Hop suppression and native
+earned-boost consumption remain; human behavior is unchanged. Build passes,
+runtime behavior remains unverified.
+
+Third follow-up: installed/artifact hashes confirmed that the user had deployed
+the suppression build independently before reporting improved completion but
+missing drift boosts. The revised candidate removes the two drift-input filters
+and keeps AI jump-input/queued-hop suppression only. When attached AI are
+drifting with `bUseBoosting` enabled, guidance also invokes native
+`UpdateBoostUsingWhileDrifting`. Current native slice at `0x1804e4890` (ignored
+`local/antigravity-evidence/ai-boost`) checks drifting and the earned drift-bar
+progress against the existing AI threshold, then requests boost through normal
+input. It does not require a jump; no free boost or modified threshold is added.
+
+Attached AI retain the spline selected on entry and maintain a local 3D match
+around their previous progress (nine samples, at most 10 matches/second), rather
+than accepting a new global native match on every update. This reduces route
+jumps to nearby loop exits/alternate paths; it cannot fix a spline that never
+follows the physical loop. Human shortcut enforcement requires track geometry
+or ordered checkpoints and is not added as a position/velocity clamp. Runtime
+validation of this candidate is pending.
+
+Second follow-up: the user reports visible AI jumps/deaths. Captured guidance
+samples show most attached AI already drifting, plus large centre errors;
+the two-second snapshots do not capture a live hop, so a hop cause is not
+claimed from those snapshots alone. The prior smoother also advanced using
+the guidance callback's delta, rather than on the actual input consumption
+cadence. Smoothing now advances at `SteerInput(float)` using the fixed-step
+delta, with desired steering stored separately from the current value.
+
+Attached AI now receive false jump/drift requests at both controller and
+physics input boundaries. Queued AI `TriggerPhysicsJump` impulses are skipped
+while attached, and the existing jump postfix explicitly ignores that skip.
+This creates a conservative drive-through AI mode for loops; it does not
+disable human jump-drift, normal-road AI jumps, collision bounce or item forces.
+Native `ProcessRacingInput` evidence identifies the controller jump and drift
+calls consuming input fields `0x18` and `0x19`; current interop resolves the
+full boolean signatures. Runtime validation is pending. Compilation passed
+without new test suites, in accordance with the user's preference.
+
+Follow-up: the user reports repeated AI deaths, although some eventually finish
+the loop. Logs from the first candidate show mismatched steering signs (for
+example a +8.5 degree target and -0.91 input), and distant targets up to 159
+units away with 83 units of road-normal separation. The previous smoother read
+the native input each call, allowing other AI producers to contaminate it.
+Native `ProcessRacingInput` also adds `fSteerAssistSteerInputOverrideAdd` after
+reading that input. This confirms two integration problems; the logs do not
+prove the exact cause of every death.
+
+The revised candidate keeps smoothing state per kart, intercepts final AI-only
+`SteerInput(float)` consumption, and uses the local spline tangent plus lateral
+centre correction instead of the long-range offset target. Current native
+`BezierSolution.BezierSpline.GetPoint`/`GetTangent` slices (VAs `0x180d88a80` /
+`0x180d88d80`, ignored `local/antigravity-evidence/ai-route`) establish full 3D
+point/derivative calculations. This retains native route selection but removes
+its lateral avoidance offset while attached in favor of centre guidance.
+It does not teleport, constrain kart position, increase adhesion or change
+human physics. Logs now include centre error, normal offset, drift and hop.
+Build passes; live validation remains pending.
+
+The all-racer runtime logs show AI surface attachment and blocked AI spline
+travel, but the user reports that AI fall off the loop. Current native slices
+in ignored `local/antigravity-evidence/ai-steering` identify a guidance mismatch:
+`AILogicController.RefreshSteeringToPoint` (VA `0x1804e2de0`) calculates a full
+3D offset target, then uses world-XZ direction and a world-yaw rotation.
+`PixelKartAIInput.ProcessRacingInput` (VA `0x1804f70b0`) consumes its turning input.
+These are native pseudocode observations, not recovered original C#.
+
+An independently installed, AI-only hook now keeps native route selection and
+target offsets, projects that target into the attached road frame, and feeds
+bounded, rate-limited turning input to the existing surface steering adapter.
+The native AI world-yaw write is restored after this call (also on exception),
+so it cannot compete with the transported surface heading. Human steering,
+camera, jumps, collision, and off-surface AI remain unchanged. Existing offline,
+respawn, replay and player-type guards apply. Guidance logs are bounded to 12
+samples per attachment state at two-second intervals, including target distance
+and road-normal offset for diagnosing a route that shortcuts the loop.
+
+Plugin compilation passes; in-game AI behavior is pending the user's test.
+This does not generate a missing loop route or establish that this track's
+native AI spline follows the physical loop. No additional tests were run,
+per the user's requested build-and-play workflow.
+
 ## All-racer spline-blocking test
 
 The user-confirmed working Antigravity checkpoint is commit `f6b69ee`.

@@ -48,8 +48,10 @@ internal static class AntigravityCamera
             state.Frame = Quaternion.Slerp(state.Frame, target, blend);
             state.Forward = forward;
         }
-        state.Weight = Mathf.MoveTowards(state.Weight, active ? 1f : 0f, dt / .18f);
+        state.Weight = Mathf.MoveTowards(state.Weight, active ? 1f : 0f, dt / (active ? .45f : .8f));
         if (state.Weight <= 0f) { States.Remove(id); return; }
+        float weight = Mathf.SmoothStep(0f, 1f, state.Weight);
+        Vector3 nativePosition = position;
 
         Vector3 cameraUp = state.Frame * Vector3.up;
         Vector3 cameraForward = Vector3.ProjectOnPlane(state.Forward, cameraUp).normalized;
@@ -63,7 +65,7 @@ internal static class AntigravityCamera
         // stock world-up offset can put the camera beside or ahead of the kart.
         Vector3 chase = kart - cameraForward * (state.Distance * .94f)
             + cameraUp * (state.Distance * .35f);
-        position = Vector3.Lerp(position, chase, state.Weight);
+        position = chase;
         float height = Vector3.Dot(position - kart, state.Up);
         position += state.Up * Mathf.Max(0f, 1.25f - height);
         Vector3 pivot = kart + state.Up * 1.25f;
@@ -81,7 +83,9 @@ internal static class AntigravityCamera
         Vector3 focus = kart + cameraForward + cameraUp * .65f;
         Vector3 view = focus - position;
         if (view.sqrMagnitude > .0001f && Vector3.Cross(view, cameraUp).sqrMagnitude > .0001f)
-            rotation = Quaternion.Slerp(rotation, Quaternion.LookRotation(view, cameraUp), state.Weight);
+            rotation = Quaternion.Slerp(rotation, Quaternion.LookRotation(view, cameraUp), weight);
+        // Fade the complete safe pose, including its height and clearance.
+        position = Vector3.Lerp(nativePosition, position, weight);
         States[id] = state;
     }
 

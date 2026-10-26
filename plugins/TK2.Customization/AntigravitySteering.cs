@@ -87,7 +87,8 @@ internal static partial class AntigravityFeature
         bool applied = __state.Applied;
         RestoreSteeringFrame(__instance, ref __1, ref __2, ref __state);
         if (!applied || !TryGetAttached(__instance, out var entry)) return;
-        float delta = LocalSteeringDelta(__state.StartYaw, __instance.qSteeringOrientation);
+        float delta = IsAttachedAi(__instance) && entry.AiGuidanceReady
+            ? 0f : LocalSteeringDelta(__state.StartYaw, __instance.qSteeringOrientation);
         Vector3 forward = Quaternion.AngleAxis(delta, entry.Up) * entry.Forward;
         forward = Vector3.ProjectOnPlane(forward, entry.Up).normalized;
         if (forward.sqrMagnitude > .5f) entry.Forward = forward;
@@ -151,13 +152,17 @@ internal static partial class AntigravityFeature
         return Mathf.DeltaAngle(0f, degrees);
     }
 
-    private static void JumpPrefix(PixelKartPhysics __instance, ref Vector3 __0, out Vector3 __state)
+    private static bool JumpPrefix(PixelKartPhysics __instance, ref Vector3 __0, out Vector3 __state)
     {
         __state = __0;
+        // Cover a native AI jump queued just before entering the steep section.
+        // Human hop impulses and ordinary-road AI jumps keep their native path.
+        return !IsAttachedAi(__instance);
     }
 
     private static void JumpPostfix(PixelKartPhysics __instance, ref Vector3 __0, Vector3 __state)
     {
+        if (IsAttachedAi(__instance)) return;
         if (!TryGetAttached(__instance, out var entry)) return;
         // A normal jump-drift on road belongs to the native game. Surface-frame
         // impulse transport is only needed once direct mode is on a wall/loop.
