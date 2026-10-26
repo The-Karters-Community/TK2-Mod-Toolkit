@@ -33,6 +33,7 @@ internal static partial class AntigravityFeature
         Collider? surface = null;
         Vector3 normal = Vector3.zero;
         bool hop = motor.MustUnground();
+        bool frameFallback = false;
 
         // Direct mode is also active on ordinary road so it can acquire a
         // wall later. A normal road jump must remain a normal game jump; only
@@ -84,7 +85,7 @@ internal static partial class AntigravityFeature
             // the capsule crosses a faceted seam. Give the next static collider
             // a short, bounded reacquisition window; the ordinary road policy
             // keeps its stricter grace values.
-            float graceSeconds = entry.SurfaceMode && !entry.AcceptedHop ? .35f : Settings.MaxContactGraceSeconds;
+            float graceSeconds = entry.SurfaceMode && !entry.AcceptedHop ? .75f : Settings.MaxContactGraceSeconds;
             if (entry.AcceptedHop)
             {
                 entry.Policy.HopElapsed += dt;
@@ -96,14 +97,25 @@ internal static partial class AntigravityFeature
                 if (entry.Policy.ContactGraceElapsed > graceSeconds) { Release(id, true); return; }
             }
             float distance = entry.AcceptedHop ? Settings.MaxHopDistance :
-                entry.SurfaceMode ? 1.5f : Settings.MaxContactGraceDistance;
+                entry.SurfaceMode ? 2.5f : Settings.MaxContactGraceDistance;
             bool continuityHit = TryContinuityProbe(controller, motor, entry.Policy.Up, distance,
                 out var nearby, out var nearbyNormal, out float separation);
             if (continuityHit)
             { surface = nearby; normal = nearbyNormal; }
             else if (entry.SurfaceMode)
+            {
                 DiagnosticLog($"reacquire miss: grace={entry.Policy.ContactGraceElapsed:0.000}s/{graceSeconds:0.000}s distance={distance:0.00}m " +
                     $"speed={motor.Velocity.magnitude:0.0} upTilt={Vector3.Angle(Vector3.up, entry.Policy.Up):0}°");
+                // Keep the last known frame for a short, bounded gap. This is
+                // the actual wall-ride latch: KCC may report no stable ground
+                // for one or more joined loop quads even though the kart is
+                // still inside the same static track surface. The timer above
+                // guarantees that a real fall eventually releases normally.
+                bool steep = Vector3.Angle(Vector3.up, entry.Policy.Up) >= 65f;
+                if (steep && entry.SupportCollider != null &&
+                    EligibleSolidSurface(entry.SupportCollider, controller))
+                { surface = entry.SupportCollider; normal = entry.Policy.Normal; frameFallback = true; }
+            }
         }
 
         if (surface == null || !(normal.sqrMagnitude > .5f && normal.sqrMagnitude < 1.5f))
@@ -167,8 +179,11 @@ internal static partial class AntigravityFeature
         // faceted quad seam) ends the grace window. Resetting only for the
         // primary KCC contact lets ContactGraceElapsed leak across repeated
         // reacquisitions and eventually releases a perfectly supported kart.
-        entry.AcceptedHop = false;
-        entry.Policy.HopElapsed = entry.Policy.ContactGraceElapsed = 0f;
+        if (!frameFallback)
+        {
+            entry.AcceptedHop = false;
+            entry.Policy.HopElapsed = entry.Policy.ContactGraceElapsed = 0f;
+        }
         if (TryNativeYaw(physics.qSteeringOrientation, out float yaw))
         { entry.LastNativeYaw = yaw; entry.HasNativeYaw = true; }
         ApplyFrame(physics, motor, forward, normal, motor.Velocity, true);
@@ -181,9 +196,11 @@ internal static partial class AntigravityFeature
             {
                 float motorTilt = Vector3.Angle(Vector3.up, motor.CharacterUp);
                 float frameError = Vector3.Angle(normal, motor.CharacterUp);
+                string contactState = frameFallback ? "frame grace" :
+                    grounding.FoundAnyGround ? (grounding.IsStableOnGround ? "stable" : "unstable") : "none";
                 SetStatus($"Antigravity: raw {Vector3.Angle(Vector3.up, rawNormal):0}° → frame {worldTilt:0}° / " +
                     $"motor {motorTilt:0}° Δ{frameError:0}° / limit {motor.MaxStableSlopeAngle:0}° / " +
-                    $"contact {(grounding.FoundAnyGround ? (grounding.IsStableOnGround ? "stable" : "unstable") : "none")} / " +
+                    $"contact {contactState} / " +
                     $"speed {motor.Velocity.magnitude:0.0} carry {entry.SurfaceForwardSpeed:0.0} / layer {surface.gameObject.layer} / {camera}");
             }
             else SetStatus($"Antigravity: solid surface {worldTilt:0}° / layer {surface.gameObject.layer} / {camera}");

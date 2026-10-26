@@ -1,3 +1,17 @@
+## 2026-10-26 - Latch wall rides and preserve drift input
+
+- The latest run repeatedly blocked local Bezier spline movement and then
+  released the kart when KCC reported no stable ground. Direct mode now keeps a
+  bounded steep-surface frame latch through a short real-geometry gap and
+  probes the track ahead as well as the capsule center/offsets.
+- `JumpInput` is observed at the input boundary because the game uses it to
+  start a drift and it does not always call `TriggerPhysicsJump`. Steep-surface
+  drift hops now retain the adhesion grace state; flat/banked road remains
+  native.
+- The status distinguishes real contact from `frame grace`, and detailed logs
+  identify native road jumps versus surface drift hops. Build completed with
+  zero warnings/errors; deployment is pending one game-close boundary.
+
 ## 2026-10-26 - Keep native jumps and reacquire loop quads
 
 - The live run showed direct mode intercepting ordinary jumps and releasing at
