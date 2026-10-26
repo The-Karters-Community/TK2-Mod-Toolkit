@@ -82,9 +82,13 @@ internal static partial class AntigravityFeature
             }
             float distance = entry.AcceptedHop ? Settings.MaxHopDistance :
                 entry.SurfaceMode ? 1f : Settings.MaxContactGraceDistance;
-            if (TryContinuityProbe(controller, motor, entry.Policy.Up, distance,
-                out var nearby, out var nearbyNormal, out _))
+            bool continuityHit = TryContinuityProbe(controller, motor, entry.Policy.Up, distance,
+                out var nearby, out var nearbyNormal, out float separation);
+            if (continuityHit)
             { surface = nearby; normal = nearbyNormal; }
+            else if (entry.SurfaceMode)
+                DiagnosticLog($"reacquire miss: grace={entry.Policy.ContactGraceElapsed:0.000}s/{graceSeconds:0.000}s distance={distance:0.00}m " +
+                    $"speed={motor.Velocity.magnitude:0.0} upTilt={Vector3.Angle(Vector3.up, entry.Policy.Up):0}°");
         }
 
         if (surface == null || !(normal.sqrMagnitude > .5f && normal.sqrMagnitude < 1.5f))
