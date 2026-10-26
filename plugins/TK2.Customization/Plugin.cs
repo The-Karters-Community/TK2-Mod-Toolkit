@@ -50,7 +50,7 @@ public sealed partial class Plugin : BasePlugin
         AntigravityEnabled = Config.Bind("Antigravity", "Enabled", false,
             "Experimental surface adhesion for local offline races. Requires eligible road contact and remains unavailable online. In-game validation pending.");
         AntigravityCameraEnabled = Config.Bind("Antigravity", "CameraFollowsSurface", false,
-            "Unavailable while the reported surface-camera crash is investigated.");
+            "Offline visual follow for Antigravity. Transforms the native racing-camera output only; disables itself after an error.");
         AntigravityAnySurface = Config.Bind("Antigravity", "AllowWallSurfaces", false,
             "Offline free driving: follow static solid ground and wall contacts. Respawn volumes, triggers, moving bodies and racers remain excluded.");
         AntigravityDisableSplineTeleports = Config.Bind("Antigravity", "DisableSplineTeleports", false,

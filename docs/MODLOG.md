@@ -1,3 +1,12 @@
+## 2026-10-26 - Minimal surface camera and smoother quad seams
+
+- Reintroduced default-off **Camera follows surface** as a presentation-only
+  candidate. It transforms the native camera output without camera-field writes
+  or physics casts; any exception turns off only this option.
+- Smoothed direct-surface normal changes across joined inclined quads at a
+  bounded rate instead of applying each raw contact normal in one tick.
+- Built for an in-game user test; no harness tests were added or run.
+
 ## 2026-10-26 - Preserve native loop collision
 
 - User loop recordings showed the direct-surface candidate could pass through

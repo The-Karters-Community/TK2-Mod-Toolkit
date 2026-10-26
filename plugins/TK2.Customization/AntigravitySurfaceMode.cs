@@ -84,6 +84,12 @@ internal static partial class AntigravityFeature
         if (surface == null || !(normal.sqrMagnitude > .5f && normal.sqrMagnitude < 1.5f))
         { Release(id, true); SetStatus("Antigravity: waiting for solid contact"); return; }
         normal = normal.normalized;
+        // Contact normals across joined quads can change in one physics tick.
+        // Keep the physical frame continuous; native collision remains the source
+        // of contact and the raw normal is reached within a short fraction of a second.
+        if (entry?.Policy.Attached == true)
+            normal = Vector3.RotateTowards(entry.Policy.Up, normal,
+                240f * Mathf.Min(Time.fixedDeltaTime, .05f) * Mathf.Deg2Rad, 0f).normalized;
 
         if (entry == null)
         {

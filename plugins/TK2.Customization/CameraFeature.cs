@@ -91,7 +91,14 @@ internal static class CameraFeature
     private static void ApplyAntigravityCamera(Plugin plugin, PixelGameKartCamera camera,
         Ant_Player player, ref Vector3 position, ref Quaternion rotation, float fov)
     {
-        // User isolated a native crash to this camera path. Keep it disconnected even
-        // when an older configuration still contains CameraFollowsSurface=true.
+        try { AntigravityCamera.Apply(camera, player, ref position, ref rotation, fov); }
+        catch (Exception ex)
+        {
+            // Camera alignment is presentation-only. A bad frame must restore the
+            // native view rather than disable unrelated camera customization.
+            plugin.AntigravityCameraEnabled.Value = false;
+            AntigravityCamera.Reset(camera.GetInstanceID());
+            plugin.Log.LogError($"Surface camera disabled after a safe fallback: {ex.Message}");
+        }
     }
 }

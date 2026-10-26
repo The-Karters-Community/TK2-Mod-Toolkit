@@ -20,6 +20,18 @@ showed it could tunnel through loop geometry. The corrected candidate retains
 the game's native KCC collision and penetration resolution, so unsupported
 geometry should block or release the kart rather than permit a pass-through.
 
+## Optional surface camera
+
+`Camera follows surface` is default-off and local offline only. The camera
+candidate transforms the position and rotation already returned by the game's
+racing-camera routine around the kart focus, then smooths the gravity frame.
+It does not write private camera fields, replace the game camera, or use Unity
+physics casts/overlap queries. An exception disables only this option and keeps
+the native camera output for that frame. Gameplay validation is still required.
+
+Direct-surface contact normals are also rate-limited to 240 degrees per second
+to remove abrupt orientation changes across joined inclined quads.
+
 ## Current test candidate: ground and wall contacts
 
 The user isolated native crashes to **Camera follows surface**. Its invocation

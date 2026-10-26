@@ -1,18 +1,17 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace TK2.Customization;
 
-// Optional local-race camera alignment. It only consumes the already-attached antigravity
-// state and modifies the native camera's by-ref outputs for this frame.
+// Optional local-race camera alignment. It transforms only the native racing
+// camera output for the current frame; it does not write camera internals or
+// issue physics collision queries.
 internal static class AntigravityCamera
 {
-    private const float SmoothingSeconds = .18f;
+    private const float SmoothingSeconds = .16f;
     private const float FocusHeight = .65f;
-    private const float VolumePadding = .025f;
-    private static readonly Dictionary<int, AntigravityCameraMath.State> States = new();
-    private static readonly UnityCollisionProbe Collision = new();
+    private struct State { internal bool Initialized; internal Quaternion Frame; }
+    private static readonly Dictionary<int, State> States = new();
 
     internal static void Apply(PixelGameKartCamera camera, Ant_Player player,
         ref Vector3 position, ref Quaternion rotation, float fov)
@@ -42,19 +41,11 @@ internal static class AntigravityCamera
         bool active = AntigravityFeature.TryGetActiveFrame(player, out Vector3 surfaceUp, out _);
         if (!active && !States.ContainsKey(id)) return;
 
-        var sdkCamera = ReadableGame.GetCamera(camera)?.unityCamera;
-        if (sdkCamera == null || player.visualInstanceSyncedParams == null)
+        if (player.visualInstanceSyncedParams == null)
         {
             States.Remove(id);
             return;
         }
-
-        float near = Mathf.Clamp(sdkCamera.nearClipPlane, .03f, .5f);
-        float aspect = Mathf.Clamp(sdkCamera.aspect, .5f, 3f);
-        float safeFov = Mathf.Clamp(fov, 1f, 175f);
-        float halfHeight = near * Mathf.Tan(safeFov * Mathf.Deg2Rad * .5f) + VolumePadding;
-        float halfWidth = halfHeight * aspect + VolumePadding;
-        var halfExtents = new Vector3(halfWidth, halfHeight, VolumePadding);
 
         if (!States.TryGetValue(id, out var state))
         {
@@ -62,23 +53,22 @@ internal static class AntigravityCamera
             state = default;
         }
 
-        Vector3 targetUp = active ? surfaceUp.normalized : Vector3.up;
-        Vector3 pivotUp = active ? targetUp :
-            state.Initialized ? state.GravityFrame * Vector3.up : Vector3.up;
+        Vector3 targetUp = active && surfaceUp.sqrMagnitude > .5f ? surfaceUp.normalized : Vector3.up;
+        Quaternion desiredFrame = Quaternion.FromToRotation(Vector3.up, targetUp);
+        float blend = AntigravityCameraMath.BlendFactor(Time.unscaledDeltaTime, SmoothingSeconds);
+        Quaternion frame = state.Initialized ? Quaternion.Slerp(state.Frame, desiredFrame, blend) : desiredFrame;
+        Vector3 pivotUp = frame * Vector3.up;
         Vector3 pivot = player.visualInstanceSyncedParams.vCurPos + pivotUp * FocusHeight;
-        if (!Finite(pivot) || !Finite(position) || !Finite(rotation)) { States.Remove(id); return; }
-        Vector3 nativePosition = position;
+        Vector3 nativeOffset = position - pivot;
+        if (!Finite(pivot) || !Finite(nativeOffset) || !Finite(rotation)) { States.Remove(id); return; }
 
-        Collision.SetIgnoredPlayer(player);
-        var result = AntigravityCameraMath.Step(ref state, pivot, position, rotation,
-            targetUp, halfExtents, Vector3.forward * near, Time.unscaledDeltaTime, SmoothingSeconds, Collision);
-        if (!result.Safe) { States.Remove(id); return; }
+        state.Initialized = true;
+        state.Frame = frame;
         States[id] = state;
-        position = result.Position;
-        rotation = result.Rotation;
+        position = pivot + frame * nativeOffset;
+        rotation = frame * rotation;
 
-        if (!active && !result.Obstructed && Quaternion.Angle(state.GravityFrame, Quaternion.identity) < .5f &&
-            Vector3.Distance(result.Position, nativePosition) < .05f)
+        if (!active && Quaternion.Angle(frame, Quaternion.identity) < .5f)
             States.Remove(id);
     }
 
@@ -89,47 +79,4 @@ internal static class AntigravityCamera
     private static bool Finite(Quaternion value) => Finite(value.x) && Finite(value.y) && Finite(value.z) && Finite(value.w);
     private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
-    private sealed class UnityCollisionProbe : AntigravityCameraMath.ICollisionProbe
-    {
-        private readonly RaycastHit[] _hits = new RaycastHit[32];
-        private readonly Collider[] _overlaps = new Collider[32];
-        private Ant_Player? _ignoredPlayer;
-
-        internal void SetIgnoredPlayer(Ant_Player player) => _ignoredPlayer = player;
-
-        public bool IsClear(Vector3 center, Vector3 halfExtents, Quaternion orientation)
-        {
-            int count = Physics.OverlapBoxNonAlloc(center, halfExtents, _overlaps, orientation,
-                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
-            if (count >= _overlaps.Length) return false; // Saturation may hide an unreturned wall.
-            for (int i = 0; i < count; i++)
-                if (!Ignore(_overlaps[i])) return false;
-            return true;
-        }
-
-        public bool Cast(Vector3 origin, Vector3 direction, float distance, Vector3 halfExtents,
-            Quaternion orientation, out float hitDistance)
-        {
-            int count = Physics.BoxCastNonAlloc(origin, halfExtents, direction, _hits, orientation,
-                distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
-            if (count >= _hits.Length) { hitDistance = 0f; return true; }
-            float nearest = float.PositiveInfinity;
-            for (int i = 0; i < count; i++)
-            {
-                var hit = _hits[i];
-                if (hit.collider == null || Ignore(hit.collider) || !Finite(hit.distance) || hit.distance < 0f) continue;
-                if (hit.distance < nearest) nearest = hit.distance;
-            }
-            hitDistance = nearest;
-            return !float.IsInfinity(nearest);
-        }
-
-        private bool Ignore(Collider? collider)
-        {
-            if (collider == null || collider.isTrigger) return true;
-            var kart = collider.GetComponentInParent<PixelEasyCharMoveKartController>();
-            if (kart != null && kart.parentPlayer == _ignoredPlayer) return true;
-            return collider.GetComponentInParent<Ant_Player>() == _ignoredPlayer;
-        }
-    }
 }
