@@ -34,6 +34,15 @@ internal static partial class AntigravityFeature
         Vector3 normal = Vector3.zero;
         bool hop = motor.MustUnground();
 
+        // Direct mode is also active on ordinary road so it can acquire a
+        // wall later. A normal road jump must remain a normal game jump; only
+        // a genuinely steep/inverted surface gets the surface-frame hop
+        // transport. Without this gate, every jump was interpreted as an
+        // adhesion hop and the kart appeared unable to leave the road.
+        if (hop && entry?.SurfaceMode == true && entry.Policy.Attached &&
+            Vector3.Angle(Vector3.up, entry.Policy.Up) < 65f)
+        { Release(id, true); return; }
+
         // A direct-surface kart can become ungrounded for a jump or a faceted
         // loop transition even when TriggerPhysicsJump did not report a delta.
         // Preserve the surface frame and use the native hop grace instead of
