@@ -13,11 +13,19 @@ The Studio option describes this wider scope. A bounded per-racer log identifies
 human/AI blocks; the log set clears on race reset. The installed game signature
 is unchanged and plugin compilation passes. Live all-racer validation is pending.
 
-This option does not extend Antigravity physics to AI. AI karts may fall where
-the original spline bypassed their normal slope limit. Native player collisions
-remain active; side impulses can push a human kart past an edge or beyond the
-bounded contact-recovery range. The adapter rejects racer colliders as rideable
-surfaces, so collision bounce is not guaranteed to remain attached to the road.
+The user clarified that all-racer scope includes Antigravity itself. Surface
+attachment, scoped steering-force conversion, jump/landing handling, and visual
+grounding now accept both local human and local AI types through one common
+offline-race eligibility guard. Replays and remote types remain excluded.
+The chase camera still applies only to the local human view. An AI respawn
+releases that racer's state without resetting human/other AI attachment; pause
+holds existing state. Detailed per-frame diagnostics and the status HUD remain
+human-only, with one bounded AI attachment message per racer for validation.
+
+Native player collisions remain active; side impulses can push any racer past
+an edge or beyond the bounded contact-recovery range. Racer colliders are not
+rideable surfaces. The all-racer build compiles, but live AI loop driving and
+player/AI collision behavior remain unverified; AI route decisions are native.
 
 ## User-confirmed working checkpoint
 

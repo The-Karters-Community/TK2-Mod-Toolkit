@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
-using UnityEngine;
 
 namespace TK2.Customization;
 
@@ -39,12 +38,7 @@ internal static class AntigravitySplineTeleport
         if (plugin?.AntigravityEnabled.Value != true ||
             plugin.AntigravityDisableSplineTeleports.Value != true ||
             !Plugin.OfflineLabAllowed || __3 == null || __4 == null ||
-            (__3.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL &&
-             __3.ePlayerType != Ant_Player.EPlayerType.E_AI_LOCAL) ||
-            __4.parentPlayer != __3 || Time.timeScale <= 0f || MenuManager.Instance != null ||
-            Ant_CurrentGameConfiguration.eCurrentRaceState != Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING ||
-            __4.IsPlayingReplayData() || __4.outsideMapValidator?.bIsPlayerRespawning == true ||
-            __4.kartPhysics == null || __4.kartPhysics.IsTeleportingFromAtoB() || __4.bIsInTankForm)
+            __4.parentPlayer != __3 || !AntigravityFeature.RacerRunning(__4))
             return true;
 
         plugin.SessionModified = true;

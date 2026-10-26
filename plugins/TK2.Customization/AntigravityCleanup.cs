@@ -8,7 +8,7 @@ namespace TK2.Customization;
 
 internal static partial class AntigravityFeature
 {
-    private static void RaceResetPostfix() { ReleaseAll(); PendingReleaseRotation.Clear(); }
+    private static void RaceResetPostfix() { ReleaseAll(); PendingReleaseRotation.Clear(); AnnouncedAiRacers.Clear(); }
 
     internal static void ReleaseAll()
     {

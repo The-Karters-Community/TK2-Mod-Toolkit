@@ -8,6 +8,7 @@ namespace TK2.Customization;
 
 internal static partial class AntigravityFeature
 {
+    private static readonly List<int> StaleRacers = new();
     internal static void Tick()
     {
         if (States.Count == 0 && PendingReleaseRotation.Count == 0) return;
@@ -18,15 +19,22 @@ internal static partial class AntigravityFeature
                 pending.KartSceneHandle != pending.Controller.gameObject.scene.handle)
             { PendingReleaseRotation.Clear(); break; }
         if (States.Count == 0) return;
-        foreach (var entry in States.Values)
-            if (entry.Controller == null || entry.ActiveSceneHandle != scene ||
-                entry.KartSceneHandle != entry.Controller.gameObject.scene.handle)
-            { ReleaseAll(); PendingReleaseRotation.Clear(); return; }
         if (plugin != null && plugin.AntigravityEnabled.Value && Plugin.OfflineLabAllowed)
         {
-            foreach (var entry in States.Values)
-                if (!AirShiftFeature.Running(entry.Controller))
-                { ReleaseAll(); SetStatus("Antigravity: waiting for a local offline race"); return; }
+            // Pausing is not a detach. Recover only the racer that respawns or
+            // becomes invalid; an AI recovery must not reset human wall rides.
+            if (Ant_CurrentGameConfiguration.eCurrentRaceState == Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING &&
+                (Time.timeScale <= 0f || MenuManager.Instance != null)) return;
+            StaleRacers.Clear();
+            foreach (var pair in States)
+            {
+                var entry = pair.Value;
+                if (entry.Controller == null || entry.ActiveSceneHandle != scene ||
+                    entry.KartSceneHandle != entry.Controller.gameObject.scene.handle || !RacerRunning(entry.Controller))
+                    StaleRacers.Add(pair.Key);
+            }
+            foreach (int id in StaleRacers) Release(id);
+            StaleRacers.Clear();
             return;
         }
         ReleaseAll();
@@ -35,11 +43,11 @@ internal static partial class AntigravityFeature
 
     private static void AfterCharacterUpdate(PixelEasyCharMoveKartController __instance, float __0)
     {
-        if (__instance?.parentPlayer?.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL) return;
+        if (!IsLocalRacer(__instance)) return;
         int id = __instance.GetInstanceID();
         var plugin = Plugin.Instance;
         if (plugin?.AntigravityEnabled.Value != true || !Plugin.OfflineLabAllowed ||
-            !AirShiftFeature.Running(__instance))
+            !RacerRunning(__instance))
         {
             Release(id, true);
             return;
@@ -66,7 +74,7 @@ internal static partial class AntigravityFeature
     {
         var plugin = Plugin.Instance;
         if (plugin?.AntigravityEnabled.Value != true ||
-            !AirShiftFeature.Running(__instance) || !States.TryGetValue(__instance.GetInstanceID(), out var entry) ||
+            !RacerRunning(__instance) || !States.TryGetValue(__instance.GetInstanceID(), out var entry) ||
             !entry.Attached || entry.Motor == null)
             return;
         Vector3 forward = Vector3.ProjectOnPlane(entry.Forward, entry.Up).normalized;

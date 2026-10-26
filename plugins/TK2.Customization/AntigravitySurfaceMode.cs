@@ -21,6 +21,7 @@ internal static partial class AntigravityFeature
         PixelKartPhysics physics, KinematicCharacterMotor motor, KartState? entry)
     {
         int id = controller.GetInstanceID();
+        bool reportStatus = IsLocalHuman(controller);
         if (physics.bCatapultUsedLowerLateralFriction || physics.IsTeleportingFromAtoB())
         { Release(id, true); return; }
 
@@ -43,10 +44,10 @@ internal static partial class AntigravityFeature
         }
         if (attached && !hop && grounding.FoundAnyGround &&
             Vector3.Angle(Vector3.up, grounding.GroundNormal) < DirectSurfaceActivationDegrees - 10f)
-        { Release(id, true); SetStatus("Antigravity: native road handling"); return; }
+        { Release(id, true); if (reportStatus) SetStatus("Antigravity: native road handling"); return; }
         if (!attached && (!grounding.FoundAnyGround ||
             Vector3.Angle(Vector3.up, grounding.GroundNormal) < DirectSurfaceActivationDegrees))
-        { SetStatus("Antigravity: waiting for steep surface"); return; }
+        { if (reportStatus) SetStatus("Antigravity: waiting for steep surface"); return; }
         if (hop && attached && Vector3.Angle(Vector3.up, entry!.Up) < DirectSurfaceActivationDegrees)
         { ReleaseForNativeJump(id); return; }
         Collider? surface = !hop && grounding.FoundAnyGround &&
@@ -64,15 +65,15 @@ internal static partial class AntigravityFeature
                 if (elapsed > limit)
                 {
                     TraceJump(entry, physics, "contact-timeout", motor.Velocity);
-                    Release(id, true); SetStatus("Antigravity: lost surface"); return;
+                    Release(id, true); if (reportStatus) SetStatus("Antigravity: lost surface"); return;
                 }
                 ApplyFrame(physics, motor, entry.Forward, entry.Up, motor.Velocity, true);
-                SetStatus($"Antigravity: recovering contact {elapsed:0.00}s");
+                if (reportStatus) SetStatus($"Antigravity: recovering contact {elapsed:0.00}s");
                 return;
             }
         }
         if (!EligibleSolidSurface(surface, controller) || normal.sqrMagnitude < .5f)
-        { Release(id, true); SetStatus("Antigravity: waiting for eligible surface"); return; }
+        { Release(id, true); if (reportStatus) SetStatus("Antigravity: waiting for eligible surface"); return; }
 
         normal.Normalize();
         float dtTurn = Mathf.Min(Time.fixedDeltaTime, .05f);
@@ -90,6 +91,12 @@ internal static partial class AntigravityFeature
                 KartSceneHandle = controller.gameObject.scene.handle,
                 ActiveSceneHandle = SceneManager.GetActiveScene().handle };
             States[id] = entry;
+            if (!reportStatus)
+            {
+                if (AnnouncedAiRacers.Count >= 64) AnnouncedAiRacers.Clear();
+                if (AnnouncedAiRacers.Add(id))
+                    Plugin.Instance?.Log.LogInfo($"Antigravity AI attached: kart={id} tilt={Vector3.Angle(Vector3.up, normal):0}");
+            }
         }
         if (!entry.LayersOverridden)
         {
@@ -120,6 +127,6 @@ internal static partial class AntigravityFeature
         entry.ContactGraceElapsed = 0f;
         ApplyFrame(physics, motor, forward, normal, motor.Velocity, true);
         if (Plugin.Instance != null) Plugin.Instance.SessionModified = true;
-        SetStatus($"Antigravity: attached {Vector3.Angle(Vector3.up, normal):0}° / speed {motor.Velocity.magnitude:0.0}");
+        if (reportStatus) SetStatus($"Antigravity: attached {Vector3.Angle(Vector3.up, normal):0}° / speed {motor.Velocity.magnitude:0.0}");
     }
 }

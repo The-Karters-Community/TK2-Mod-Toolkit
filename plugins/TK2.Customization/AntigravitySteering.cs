@@ -10,7 +10,7 @@ internal static partial class AntigravityFeature
 {
     private static void UpdateRotationPostfix(PixelEasyCharMoveKartController __instance, ref Quaternion __0)
     {
-        if (PendingReleaseRotation.Count > 0 && IsLocalHuman(__instance) &&
+        if (PendingReleaseRotation.Count > 0 && IsLocalRacer(__instance) &&
             PendingReleaseRotation.Remove(__instance.GetInstanceID(), out var pending))
         {
             var release = AntigravityPolicy.ReleaseAtCurrentHeading(__instance.transform.forward, pending.Motor.Velocity);
@@ -93,7 +93,7 @@ internal static partial class AntigravityFeature
         if (forward.sqrMagnitude > .5f) entry.Forward = forward;
         if (ApplyAxes(__instance, entry.Forward, entry.Up, __1) && Plugin.Instance != null)
             Plugin.Instance.SessionModified = true;
-        if (Mathf.Abs(__instance.steer_input) > .1f && Time.unscaledTime >= entry.NextSteeringLog &&
+        if (IsLocalHuman(entry.Controller) && Mathf.Abs(__instance.steer_input) > .1f && Time.unscaledTime >= entry.NextSteeringLog &&
             entry.SteeringLogCount < 24)
         {
             entry.SteeringLogCount++;
@@ -220,7 +220,7 @@ internal static partial class AntigravityFeature
 
     private static void TraceJump(KartState entry, PixelKartPhysics physics, string stage, Vector3 velocity)
     {
-        if (entry.JumpLogCount++ >= 36) return;
+        if (!IsLocalHuman(entry.Controller) || entry.JumpLogCount++ >= 36) return;
         Plugin.Instance?.Log.LogInfo($"Antigravity jump {stage}: state={physics.eJumpState} " +
             $"ground={entry.Motor.GroundingStatus.FoundAnyGround} unground={entry.Motor.MustUnground()} " +
             $"hop={entry.AcceptedHop}/{entry.HopElapsed:0.000}s normalSpeed={Vector3.Dot(velocity, entry.Up):0.00} " +

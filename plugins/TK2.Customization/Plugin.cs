@@ -48,11 +48,11 @@ public sealed partial class Plugin : BasePlugin
         FallAcceleration = Config.Bind("Physics", "FastFallAcceleration", 100f, new ConfigDescription("Extra downwards acceleration.", new AcceptableValueRange<float>(0f, 500f)));
         AirTime = Config.Bind("Physics", "MinimumAirTime", 0.4f, new ConfigDescription("Minimum airborne seconds.", new AcceptableValueRange<float>(0f, 3f)));
         AntigravityEnabled = Config.Bind("Antigravity", "Enabled", false,
-            "Experimental surface adhesion for local offline races. Requires eligible road contact and remains unavailable online. In-game validation pending.");
+            "Offline surface driving for all local human and AI racers. Requires eligible static road or wall contact; remote players and replays are excluded.");
         AntigravityCameraEnabled = Config.Bind("Antigravity", "CameraFollowsSurface", false,
             "Offline loop chase camera. Follows behind the kart in the road frame, checks track clearance, and blends back to the normal view.");
         AntigravityDisableSplineTeleports = Config.Bind("Antigravity", "DisableSplineTeleports", false,
-            "Offline race test: block new Bezier spline travel for all local human and AI racers while Antigravity is enabled. AI wall-riding is not provided; respawns and instant teleports remain native.");
+            "Offline race test: block new Bezier spline travel for all local human and AI racers while Antigravity is enabled. Respawns and instant teleports remain native.");
         Log.LogInfo($"Antigravity config loaded: enabled={AntigravityEnabled.Value} " +
             $"camera={AntigravityCameraEnabled.Value} splineBlock={AntigravityDisableSplineTeleports.Value}");
         BindPack();

@@ -21,13 +21,13 @@ internal static partial class AntigravityFeature
         var plugin = Plugin.Instance;
         if (States.Count == 0 || plugin?.AntigravityEnabled.Value != true || physics == null) return false;
         var controller = physics.kartController;
-        return controller != null && AirShiftFeature.Running(controller);
+        return controller != null && RacerRunning(controller);
     }
 
     private static bool CanReadController(PixelEasyCharMoveKartController controller)
     {
         var plugin = Plugin.Instance;
-        return States.Count != 0 && plugin?.AntigravityEnabled.Value == true && AirShiftFeature.Running(controller);
+        return States.Count != 0 && plugin?.AntigravityEnabled.Value == true && RacerRunning(controller);
     }
 
     private static bool TryGet(PixelEasyCharMoveKartController controller, out KartState entry) =>
@@ -36,6 +36,21 @@ internal static partial class AntigravityFeature
     private static bool IsLocalHuman(PixelEasyCharMoveKartController controller) =>
         controller != null && controller.parentPlayer != null &&
         controller.parentPlayer.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL;
+
+    private static bool IsLocalRacer(Ant_Player player) => player != null &&
+        (player.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL ||
+         player.ePlayerType == Ant_Player.EPlayerType.E_AI_LOCAL);
+
+    private static bool IsLocalRacer(PixelEasyCharMoveKartController controller) =>
+        controller != null && IsLocalRacer(controller.parentPlayer);
+
+    internal static bool RacerRunning(PixelEasyCharMoveKartController controller) =>
+        Plugin.OfflineLabAllowed && IsLocalRacer(controller) && Time.timeScale > 0f &&
+        MenuManager.Instance == null &&
+        Ant_CurrentGameConfiguration.eCurrentRaceState == Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING &&
+        !controller.IsPlayingReplayData() && controller.outsideMapValidator != null &&
+        !controller.outsideMapValidator.bIsPlayerRespawning && controller.kartPhysics != null &&
+        !controller.kartPhysics.IsTeleportingFromAtoB() && !controller.bIsInTankForm;
 
     private static void UpdateCameraEngagement(KartState entry, Vector3 up, float nativeSlopeLimit)
     {

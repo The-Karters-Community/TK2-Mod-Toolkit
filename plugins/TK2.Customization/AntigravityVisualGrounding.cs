@@ -36,7 +36,7 @@ internal static partial class AntigravityFeature
     {
         state = default;
         if (visual == null || Plugin.Instance?.AntigravityEnabled.Value != true || !Plugin.OfflineLabAllowed ||
-            visual.parentPlayer == null || visual.parentPlayer.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL) return;
+            !IsLocalRacer(visual.parentPlayer)) return;
         foreach (var entry in States.Values)
         {
             if (!entry.Attached || entry.Controller == null || entry.Controller.parentPlayer != visual.parentPlayer) continue;
@@ -53,7 +53,7 @@ internal static partial class AntigravityFeature
             visual.bIsPlayerGrouned = visual.bIsPlayerVisualGrouned = true;
             visual.vPlayerVisualGrounedNormal = entry.Up;
             visual.fPlayerDistanceToGround = 0f;
-            if ((!state.Grounded || !state.VisualGrounded) && entry.VisualLogCount < 4 &&
+            if (IsLocalHuman(entry.Controller) && (!state.Grounded || !state.VisualGrounded) && entry.VisualLogCount < 4 &&
                 Time.unscaledTime >= entry.NextVisualLog)
             {
                 entry.VisualLogCount++;

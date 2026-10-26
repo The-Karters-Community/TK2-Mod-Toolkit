@@ -51,12 +51,13 @@ internal static partial class AntigravityFeature
     }
 
     private static readonly Dictionary<int, KartState> States = new();
+    private static readonly HashSet<int> AnnouncedAiRacers = new();
     private static readonly Dictionary<int, KartState> PendingReleaseRotation = new();
     internal static void Install(Plugin plugin)
     {
         ShowStatus = plugin.Config.Bind("Antigravity", "ShowStatus", true, "Show current surface-contact status while testing.");
         FeatureHook.Install(plugin.Harmony, typeof(AntigravityFeature), Hooks());
-        plugin.Log.LogInfo("Antigravity revision: playable steering baseline plus filtered contact, grounded grip, camera stabilization.");
+        plugin.Log.LogInfo("Antigravity revision: shared human/AI offline surface physics and visual grounding; per-racer recovery.");
     }
 
     internal static FeatureHook[] Hooks() => new[] {
