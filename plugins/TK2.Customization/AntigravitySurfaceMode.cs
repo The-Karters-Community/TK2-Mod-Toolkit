@@ -1,4 +1,3 @@
-using System;
 using KinematicCharacterController;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -7,28 +6,8 @@ namespace TK2.Customization;
 
 internal static partial class AntigravityFeature
 {
-    // Explicit free-driving mode: use real collision/support normals, including walls.
-    // KCC still resolves collisions; only its game-specific wall-hit response is skipped.
-    private static bool SurfaceMovementHit(PixelEasyCharMoveKartController __instance,
-        Collider __0, Vector3 __1, ref HitStabilityReport __3)
-    {
-        var plugin = Plugin.Instance;
-        if (plugin?.AntigravityEnabled.Value != true || !plugin.AntigravityAnySurface.Value ||
-            !AirShiftFeature.Running(__instance) || !TryGet(__instance, out var entry) ||
-            !entry.SurfaceMode || !EligibleSolidSurface(__0, __instance)) return true;
-        try
-        {
-            if (!(__1.sqrMagnitude > .5f && __1.sqrMagnitude < 1.5f)) return true;
-            Vector3 normal = __1.normalized;
-            if (Vector3.Angle(entry.Policy.Up, normal) > 110f) return true;
-            entry.MovementSurface = __0;
-            entry.MovementNormal = normal;
-            entry.MovementContactTime = Time.unscaledTime;
-            __3.IsStable = true;
-            return false;
-        }
-        catch (Exception ex) { Fail(__instance.GetInstanceID(), plugin, ex); return true; }
-    }
+    // Do not hook OnMovementHit: its non-blittable ref HitStabilityReport is unsafe
+    // through the installed IL2CPP bridge. Use this local kart's support/probes only.
 
     private static bool EligibleSolidSurface(Collider? collider, PixelEasyCharMoveKartController controller)
     {
@@ -56,14 +35,27 @@ internal static partial class AntigravityFeature
         bool hop = motor.MustUnground();
         bool directContact = false;
 
-        // Prefer an actual wall movement contact over last tick's floor grounding.
-        if (!hop && entry?.MovementSurface != null &&
-            Time.unscaledTime - entry.MovementContactTime <= .08f &&
-            EligibleSolidSurface(entry.MovementSurface, controller))
-        { surface = entry.MovementSurface; normal = entry.MovementNormal; directContact = true; }
-        else if (!hop && grounding.FoundAnyGround && EligibleSolidSurface(grounding.GroundCollider, controller))
+        if (!hop && grounding.FoundAnyGround && EligibleSolidSurface(grounding.GroundCollider, controller))
         { surface = grounding.GroundCollider; normal = grounding.GroundNormal; directContact = true; }
-        if (entry != null) entry.MovementSurface = null;
+
+        // A single near-body ray can pick up a wall being driven into. KCC still
+        // performs the actual movement and penetration/collision resolution.
+        if (!hop && entry?.Policy.Attached == true &&
+            Vector3.Dot(motor.Velocity, entry.Policy.Forward) > .05f)
+        {
+            Vector3 origin = motor.TransientPosition +
+                motor.TransientRotation * motor.CharacterTransformToCapsuleCenter;
+            float reach = Mathf.Clamp(motor.Capsule.radius, .05f, 3f) + .1f;
+            if (Physics.Raycast(origin, entry.Policy.Forward, out var wall, reach,
+                motor.CollidableLayers, QueryTriggerInteraction.Ignore) &&
+                EligibleSolidSurface(wall.collider, controller) &&
+                Vector3.Dot(entry.Policy.Forward, -wall.normal) > .25f)
+            {
+                float turn = Vector3.Angle(entry.Policy.Up, wall.normal);
+                if (turn > 5f && turn <= 110f)
+                { surface = wall.collider; normal = wall.normal; directContact = true; }
+            }
+        }
 
         if (surface == null && entry?.Policy.Attached == true)
         {
@@ -97,9 +89,16 @@ internal static partial class AntigravityFeature
             States[id] = entry;
         }
         if (!entry.LayersOverridden)
-        { entry.OriginalStableLayers = motor.StableGroundLayers.value; entry.LayersOverridden = true; }
+        {
+            entry.OriginalStableLayers = motor.StableGroundLayers.value;
+            entry.OriginalWallLayers = controller.wallLayerToCollDetect.value;
+            entry.OriginalWallAngle = controller.fDetectWallAsCollisionWithAngle;
+            entry.LayersOverridden = true;
+        }
         int respawn = controller.wallRespawn_Flat_ColliderLayer.value | controller.wallRespawn_Always_ColliderLayer.value;
         motor.StableGroundLayers = (motor.CollidableLayers.value | entry.OriginalStableLayers) & ~respawn;
+        controller.wallLayerToCollDetect = 0;
+        controller.fDetectWallAsCollisionWithAngle = 181f;
 
         Vector3 oldUp = entry.Policy.Attached ? entry.Policy.Up : motor.CharacterUp;
         Vector3 oldForward = entry.Policy.Attached ? entry.Policy.Forward : physics.qSteeringOrientation * Vector3.forward;

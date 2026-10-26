@@ -31,9 +31,8 @@ internal static partial class AntigravityFeature
         internal Collider? SupportCollider;
         internal bool SurfaceMode, LayersOverridden;
         internal int OriginalStableLayers;
-        internal Collider? MovementSurface;
-        internal Vector3 MovementNormal;
-        internal float MovementContactTime = -100f;
+        internal int OriginalWallLayers;
+        internal float OriginalWallAngle;
     }
 
     private struct MainVelocityPatchState
@@ -68,10 +67,7 @@ internal static partial class AntigravityFeature
         new FeatureHook(typeof(PixelKartPhysics), "UpdateVelocity",
             new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, Prefix: nameof(MainVelocityPrefix),
             Postfix: nameof(MainVelocityPostfix), Finalizer: nameof(MainVelocityFinalizer)),
-        new FeatureHook(typeof(PlayerRaceLogic), nameof(PlayerRaceLogic.OnRaceResetted), Type.EmptyTypes, Postfix: nameof(RaceResetPostfix)),
-        new FeatureHook(typeof(PixelEasyCharMoveKartController),
-            nameof(PixelEasyCharMoveKartController.KinematicCharacterController_ICharacterController_OnMovementHit),
-            new[] { typeof(Collider), typeof(Vector3), typeof(Vector3), typeof(HitStabilityReport).MakeByRefType() }, Prefix: nameof(SurfaceMovementHit))
+        new FeatureHook(typeof(PlayerRaceLogic), nameof(PlayerRaceLogic.OnRaceResetted), Type.EmptyTypes, Postfix: nameof(RaceResetPostfix))
     };
 
     // Called from StudioBehaviour.Update only while entries exist. It does no scene or kart scans.
@@ -646,6 +642,11 @@ internal static partial class AntigravityFeature
         if (entry.LayersOverridden && entry.Motor != null)
         {
             entry.Motor.StableGroundLayers = entry.OriginalStableLayers;
+            if (entry.Controller != null)
+            {
+                entry.Controller.wallLayerToCollDetect = entry.OriginalWallLayers;
+                entry.Controller.fDetectWallAsCollisionWithAngle = entry.OriginalWallAngle;
+            }
             entry.LayersOverridden = false;
         }
         if (!entry.Applied) return;

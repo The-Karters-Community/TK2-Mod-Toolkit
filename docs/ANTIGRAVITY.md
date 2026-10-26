@@ -11,8 +11,10 @@ The new **Drive on ground and walls** option is an explicit offline free-driving
 mode. It follows actual native ground/movement contacts rather than the
 curved-road arming gate. It accepts solid collision layers including walls,
 temporarily extends the kart's stable-ground layers, and restores the original
-mask on release. A valid static movement contact is marked stable and skips the
-game's wall-hit response; KCC collision movement/resolution still executes.
+mask on release. The kart's wall-response layer mask and wall-angle threshold
+are temporarily overridden and restored with it. Native KCC collision
+movement/resolution still executes. A single capsule-radius forward ray detects
+a nearby static wall being driven into, without teleporting the kart.
 Respawn layers, triggers, rigidbody objects and racers stay excluded. Accepted
 native drift hops retain bounded nearby-support grace. Ordinary curved-road
 mode remains available when the option is off.
@@ -26,12 +28,41 @@ only. At the user's request, no further harness tests were written or run.
 In-game behavior is awaiting the user's test; earlier assertion counts below
 describe earlier builds and do not establish that this candidate works.
 
-Installed candidate SHA-256:
+Previous crashing candidate SHA-256:
 `1bcd7a7c8071db9d46c0395c32cba2a9627664208e39e4588d6576c74fb725b5`.
 DLL rollback backup: `local/backups/1792999362763653900`. Test configuration
 backup: `local/backups/1792999402849420800`. The local test profile has
 Antigravity and wall surfaces enabled, surface camera disabled. Source defaults
 remain opt-in. No game was launched automatically.
+
+### Race-start crash correction
+
+The preceding ground/wall candidate also crashed at race start. The newest
+recorded dump (`TheKarters2.exe.40048.dmp`) exposes this managed/native boundary:
+
+```
+IL_STUB_ReversePInvoke(Int64, Int64, Vector3, Vector3, Int64, Int64)
+Il2CppObjectPool.Get<T>(IntPtr)
+IL2CPP.il2cpp_object_get_class(IntPtr)
+```
+
+That reverse-P/Invoke signature matches the newly patched `OnMovementHit`
+callback. Its `ref HitStabilityReport` contains a collider reference and is not
+a blittable struct; the installed interop bridge attempted to treat its native
+data as an object pointer before entering the feature handler. Consequently,
+handler-side local-player/enable guards cannot protect other racers' callbacks.
+This explains why another racer's landing could trigger a crash. The fatal
+`coreclr` report was secondary exception handling, not the original source.
+
+Removed the **entire OnMovementHit patch**, including the report mutation. The
+replacement uses local-kart settings and ordinary support/near-wall probes.
+Camera following remains disconnected. Compilation only; the user will perform
+in-game validation. No further harness tests were written or run.
+
+Corrected DLL installed with the game stopped, SHA-256
+`6dca98418e2890f0de89bf014bf284c6328f748d5924df6fcc0e699c01c393bc`.
+Rollback backup: `local/backups/1793000248442952600`. Antigravity is left **off**;
+the ground/wall option remains selected for the next explicit offline test.
 
 The Antigravity module is intended for banked roads and continuous loops. It is
 opt-in under **Community Mods / Driving**. It does not make every collider

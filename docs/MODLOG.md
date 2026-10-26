@@ -1,3 +1,15 @@
+## 2026-10-26 - Remove unsafe movement-hit bridge
+
+- Race-start crash dump identified `Il2CppObjectPool.Get`/`il2cpp_object_get_class`
+  beneath the six-argument movement-hit reverse-P/Invoke shim. The newly hooked
+  callback's non-blittable `ref HitStabilityReport` was being marshalled before
+  handler guards could execute, so AI contact could also crash the game.
+- Removed that hook entirely. Ground/wall mode now uses local-kart wall-response
+  settings (restored on release) and a short near-body wall ray. KCC collision
+  resolution remains native. Surface-camera invocation remains disabled.
+- Compiled against current interop; manual gameplay validation pending. No new
+  harness tests written or run, per the user's instruction.
+
 ## 2026-10-26 - Explicit ground/wall surface mode
 
 - User isolated the native crash to surface-camera following. Disconnected that
