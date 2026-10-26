@@ -83,6 +83,48 @@ or lap times to the unmodified game.
 
 ## Validation boundary
 
+### First live test and rotation-commit correction
+
+The first tunnel test on Workshop item `3268524772` failed: the HUD reported
+adhesion, but the kart tilted and stopped at its usual angle limit. This is
+failed gameplay validation, regardless of the earlier automated test results.
+
+Fresh native inspection found a concrete integration defect. The module wrote
+`motor.Transform.rotation` from `AfterCharacterUpdate`. In
+`KinematicCharacterSystem.Simulate` (`0x180d75780`), the game calls Phase2 and
+then commits the motor's stored transient position/rotation to the transform,
+overwriting a transform-only change. Phase2 (`0x180d5dd70`) ends with the
+after-update callback. The native transient-rotation setter (`0x180d5f590`)
+updates `CharacterUp`, forward and right together with the cached rotation.
+
+The correction sets **`motor.TransientRotation`**, comparing against that
+native cached rotation rather than the displayed transform. The normal system
+commit applies it after the callback. It avoids resetting the initial/tick
+interpolation baselines every step as `SetRotation(..., true)` would do.
+The existing HUD now shows road/policy/motor angles and their disagreement at
+most five times per second, rather than claiming success from policy state.
+
+The revised adapter tests model transient state separately, derive native-style
+support from the motor's actual up vector, and simulate the final commit. They
+replace fixtures that previously labelled arbitrary steep contacts stable while
+the motor still faced world-up. Current correction checks pass: **120 adapter
+assertions, 393 policy assertions, 147 Python tests and 18 actual hook/signature
+resolutions**, with a plugin build containing zero warnings/errors. A repeat
+in-game tunnel test is still required.
+
+Correction deployment: installed with the game stopped and checked against the
+built artifact, SHA-256
+`4caffc63f2525e1dc5710567fd3040eb4211564edc481315eb2297feb523d141`.
+Rollback backup: `local/backups/1792991626496802500`. Existing user configuration
+was preserved. The user can now retry the tunnel with road/motor angle feedback.
+
+Native wall classification and helper inlining were also inspected. No blanket
+wall-collision override or live world-Y restoration was added: the observed
+end-of-velocity Y-zero branch is countdown-gated, so it does not establish a
+live-race cause. Some gravity/vertical helper logic is inlined in the native
+caller; resolving a helper hook alone does not prove the game invokes it during
+a drift hop. Live hop handling remains part of the required test.
+
 Automated policy, metadata and hook checks establish bounded state transitions,
 frame math and integration. They cannot establish wheel contact, camera comfort,
 drift feel or checkpoint behavior in a real loop. A user-driven offline test is
@@ -90,7 +132,7 @@ required before describing the module as working in game. Do not use a public
 leaderboard attempt as the test.
 
 Implemented and tested with the user-requested Luna agents, with design and
-native-evidence review in the main task. Completed automated checks:
+native-evidence review in the main task. First-build automated checks:
 
 - Plugin build: 0 warnings and errors against current installed interop.
 - Pure policy/frame harness: 393 assertions.

@@ -1,3 +1,24 @@
+## 2026-10-26 - Antigravity motor-frame correction
+
+- User's first live tunnel test failed: policy status said active but climbing
+  stopped at the ordinary angle limit. Recorded it as failed gameplay validation.
+- Current Ghidra slices prove `KinematicCharacterSystem.Simulate` commits cached
+  transient rotation after the controller's after-update callback. The original
+  transform-only change could be overwritten. Changed the adapter to set native
+  `TransientRotation`, refreshing collision axes and preserving interpolation
+  baselines. Compare native cached rotation, not just the displayed transform.
+- Luna implemented the correction and expanded the tests before reaching its
+  usage limit; main task finished clock-stub/guard regression checks and final
+  verification. Adapter tests now model actual motor-up-derived ground support,
+  distinct transient state, staged slopes and the final native-style commit.
+- Passed: 120 adapter / 393 policy assertions, 147 Python tests, 18 actual
+  interop hook signatures; plugin compilation has 0 warnings/errors. HUD reports
+  road/policy/motor tilt and disagreement at 5 Hz. Repeat driving test pending.
+- Corrected installed DLL hash:
+  `4caffc63f2525e1dc5710567fd3040eb4211564edc481315eb2297feb523d141`.
+  Installed with the game stopped, backed up at
+  `local/backups/1792991626496802500`; existing settings preserved.
+
 ## 2026-10-26 - Experimental Antigravity
 
 - Added a default-off first-class Community Mods driving module for continuous

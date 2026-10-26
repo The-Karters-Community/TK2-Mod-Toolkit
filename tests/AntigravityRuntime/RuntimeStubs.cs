@@ -63,7 +63,7 @@ namespace UnityEngine
         }
     }
 
-    internal static class Time { internal static float fixedDeltaTime = 1f / 60f; }
+    internal static class Time { internal static float fixedDeltaTime = 1f / 60f, unscaledTime = 0f; }
 }
 
 namespace UnityEngine.SceneManagement
@@ -99,10 +99,19 @@ namespace KinematicCharacterController
         internal bool ThrowOnGroundingRead;
         internal GroundingStatus GroundingStatus { get { if (ThrowOnGroundingRead) throw new Exception("grounding access fault"); return _groundingStatus; } set => _groundingStatus = value; }
         internal LayerMask StableGroundLayers = 1 << 8;
-        internal Vector3 Velocity, BaseVelocity, CharacterTransformToCapsuleBottom = Vector3.zero, CharacterUp = Vector3.up;
+        internal Vector3 Velocity, BaseVelocity, CharacterTransformToCapsuleBottom = Vector3.zero;
+        internal Quaternion TransientRotation { get; set; } = new(0, 0, 0, 1);
+        // In KCC CharacterUp follows the accepted transient frame, not an independent test value.
+        internal Vector3 CharacterUp => TransientRotation * Vector3.up;
         internal bool MustUngroundValue;
         internal Transform Transform = new();
         internal bool MustUnground() => MustUngroundValue;
+        internal void SetRotation(Quaternion rotation, bool bypassInterpolation)
+        {
+            Transform.rotation = rotation;
+            TransientRotation = rotation;
+        }
+        internal void SimulateCommit() => Transform.rotation = TransientRotation;
     }
 }
 
@@ -200,6 +209,7 @@ internal sealed class PixelKartPhysics
 {
     internal PixelEasyCharMoveKartController? kartController;
     internal UnityEngine.Quaternion qSteeringOrientation = new(0, 0, 0, 1);
+    internal bool bAlignToGround = true;
     internal bool bIsDrifting = false, bCatapultUsedLowerLateralFriction = false;
     internal bool bUseAccelerationVectorAsMidForwardMidVelocity = false, bIsMovingBackward = false;
     internal UnityEngine.Vector3 vForward_SteeringChar_NotAligned = UnityEngine.Vector3.forward;

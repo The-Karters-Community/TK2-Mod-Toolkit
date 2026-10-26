@@ -48,12 +48,51 @@ Fixture NewFixture(bool enabled = true)
     f.Kart.Motor = f.Motor;
     f.Road = new Collider { gameObject = new GameObject { layer = 8 } };
     f.Motor.StableGroundLayers = 1 << 8;
-    f.Motor.GroundingStatus = new GroundingStatus { FoundAnyGround = true, IsStableOnGround = true, GroundCollider = f.Road, GroundNormal = Vector3.up };
+    ReportGround(f, Vector3.up);
     return f;
 }
 
 void Update(Fixture f) => Invoke("AfterCharacterUpdate", f.Kart, Time.fixedDeltaTime);
-void Acquire(Fixture f) { Update(f); Check(StateCount() == 1, "eligible local offline native stable road acquires adapter state"); }
+void MotorRotationPhase(Fixture f)
+{
+    // KCC calls the controller rotation callback, then refreshes transient rotation and CharacterUp.
+    object?[] rotationCall = { f.Kart, f.Motor.TransientRotation };
+    Invoke("UpdateRotationPostfix", rotationCall);
+    f.Motor.TransientRotation = (Quaternion)rotationCall[1]!;
+}
+void ReportGround(Fixture f, Vector3 normal, float nativeStableAngle = 60f)
+{
+    bool stable = Vector3.Angle(normal, f.Motor.CharacterUp) <= nativeStableAngle;
+    f.Motor.GroundingStatus = new GroundingStatus { FoundAnyGround = true, IsStableOnGround = stable,
+        GroundCollider = f.Road, GroundNormal = normal };
+}
+void KccUpdate(Fixture f, Vector3 normal)
+{
+    // Phase1 refreshes transient axes from Transform before probing the current road.
+    f.Motor.TransientRotation = f.Motor.Transform.rotation;
+    ReportGround(f, normal);
+    // Phase2 invokes the controller rotation callback before its movement callbacks.
+    MotorRotationPhase(f);
+    Update(f);
+    // KinematicCharacterSystem.Simulate commits transient position/rotation after the callback.
+    f.Motor.SimulateCommit();
+}
+void Acquire(Fixture f) { KccUpdate(f, Vector3.up); Check(StateCount() == 1, "eligible local offline native stable road acquires adapter state"); }
+void DriveToNormal(Fixture f, float degrees)
+{
+    if (StateCount() == 0)
+        f.Physics.qSteeringOrientation = Quaternion.LookRotation(Vector3.right, Vector3.up);
+    for (float angle = 10; angle <= degrees; angle += 10)
+    {
+        KccUpdate(f, LoopNormal(angle));
+        Check(StateCount() == 1, $"native phase support continues through {angle} degree road normal (motor up {Vector3.Angle(f.Motor.CharacterUp, LoopNormal(angle)):0.0}°, speed {f.Motor.Velocity.magnitude:0.0})");
+        Check(Vector3.Dot(f.Motor.CharacterUp, LoopNormal(angle)) > .99f,
+            $"native transient motor frame adopts {angle} degree road normal before movement");
+        Check(Quaternion.Angle(f.Motor.Transform.rotation,
+            Quaternion.LookRotation(f.Kart.transform.forward, f.Motor.CharacterUp)) < 1,
+            $"KCC simulation commit preserves the {angle} degree surface frame on the transform");
+    }
+}
 Vector3 Vec(Quaternion q, Vector3 v) => q * v;
 
 // The default-off callback exits before instance lookup, kart properties, or game physics access.
@@ -105,16 +144,47 @@ Vector3 Vec(Quaternion q, Vector3 v) => q * v;
     Check(StateCount() == 0, "online race cannot acquire local adhesion");
 }
 
+// Transform-only rotation does not update the KCC transient frame or make a steep surface stable.
+{
+    var f = NewFixture();
+    var vertical = LoopNormal(90);
+    var rotation = Quaternion.LookRotation(Vector3.right, vertical);
+    f.Motor.Transform.rotation = rotation;
+    ReportGround(f, vertical);
+    Check(Vector3.Dot(f.Motor.CharacterUp, Vector3.up) > .99f,
+        "writing Transform alone leaves the KCC CharacterUp frame unchanged");
+    Check(!f.Motor.GroundingStatus.IsStableOnGround,
+        "native-style support rejects a steep contact while transient motor up remains upright");
+    f.Motor.SetRotation(rotation, true);
+    ReportGround(f, vertical);
+    Check(Vector3.Dot(f.Motor.CharacterUp, vertical) > .99f && f.Motor.GroundingStatus.IsStableOnGround,
+        "native SetRotation adopts transient orientation and refreshes support frame");
+}
+
+// Matching visuals must not hide a stale native motor frame.
+{
+    var f = NewFixture();
+    var normal = LoopNormal(30);
+    var forward = new Vector3(1, 0, 0);
+    var desired = Quaternion.LookRotation(forward, normal);
+    f.Motor.Transform.rotation = desired;
+    Invoke("ApplyFrame", f.Physics, f.Motor, forward, normal, f.Motor.Velocity, true);
+    Check(Vector3.Dot(f.Motor.CharacterUp, normal) > .99f,
+        "matching Transform does not suppress adoption of the requested transient motor frame");
+    f.Motor.SimulateCommit();
+    Check(Quaternion.Angle(f.Motor.Transform.rotation, desired) < .01f,
+        "the native-style final commit retains the corrected rotation");
+}
+
 // Stale native acceleration caches cannot reverse the transported forward at a >90 degree normal.
 {
     var f = NewFixture();
     var normal = LoopNormal(100);
-    var expectedForward = Vector3.ProjectOnPlane(Vector3.forward, normal).normalized;
-    f.Motor.GroundingStatus.GroundNormal = normal;
+    var expectedForward = Vector3.ProjectOnPlane(Vector3.right, normal).normalized;
     f.Motor.Velocity = expectedForward * 20;
     f.Motor.BaseVelocity = f.Motor.Velocity;
     f.Physics.vAccelerationForwardDirection = -expectedForward;
-    Acquire(f);
+    DriveToNormal(f, 100);
     Check(Vector3.Dot(f.Physics.vAccelerationForwardDirection.normalized, expectedForward) > .99f,
         "adapter rebuilds acceleration from current local forward instead of a reversed world-projected cache");
 }
@@ -125,10 +195,11 @@ Vector3 Vec(Quaternion q, Vector3 v) => q * v;
     Acquire(f);
     var nextNormal = LoopNormal(10).normalized;
     var alreadyTangent = Vector3.ProjectOnPlane(Vector3.forward, nextNormal).normalized * 25;
-    f.Motor.GroundingStatus.GroundNormal = nextNormal;
     f.Motor.Velocity = alreadyTangent;
     f.Motor.BaseVelocity = alreadyTangent;
-    Update(f);
+    KccUpdate(f, nextNormal);
+    Check(Vector3.Dot(f.Motor.CharacterUp, nextNormal) > .99f,
+        "accepted native rotation updates transient motor up before the movement phase");
     Check(MathF.Abs(Vector3.Dot(f.Motor.BaseVelocity, nextNormal)) < .02f,
         "stable normal change keeps native base velocity tangent to the new surface");
     Check(MathF.Abs(f.Motor.BaseVelocity.magnitude - alreadyTangent.magnitude) < .02f,
@@ -149,14 +220,12 @@ Vector3 Vec(Quaternion q, Vector3 v) => q * v;
 // A native jump starts finite grace even when drift state is false, and redirects only its added delta.
 {
     var f = NewFixture();
-    f.Motor.GroundingStatus.GroundNormal = Vector3.right;
-    f.Motor.Velocity = new Vector3(0, 0, 20);
+    f.Motor.Velocity = new Vector3(20, 0, 0);
     f.Motor.BaseVelocity = f.Motor.Velocity;
-    f.Physics.qSteeringOrientation = Quaternion.LookRotation(Vector3.forward, Vector3.up);
-    Acquire(f);
+    DriveToNormal(f, 90);
     f.Physics.bIsDrifting = false;
 
-    Vector3 velocity = new(0, 0, 20);
+    Vector3 velocity = new(20, 0, 0);
     object?[] prefix = { f.Physics, velocity, null };
     Invoke("JumpPrefix", prefix);
     var nativeBefore = (Vector3)prefix[2]!;
@@ -166,13 +235,13 @@ Vector3 Vec(Quaternion q, Vector3 v) => q * v;
     var redirected = (Vector3)postfix[1]!;
     Check(MathF.Abs((redirected - nativeBefore).magnitude - 5f) < .02f,
         "native jump redirect preserves the game-produced impulse magnitude");
-    Check(((Vector3)redirected).x > 4.9f,
+    Check(((Vector3)redirected).z > 4.9f,
         "native jump added impulse is redirected along the attached wall normal");
 
     // KCC can retain the last stable report for the force-unground jump phase.
     f.Motor.MustUngroundValue = true;
-    Physics.RaycastHandler = (_, _, _, _, _) => (true, new RaycastHit(f.Road, Vector3.right, 1.1f));
-    Update(f);
+    Physics.RaycastHandler = (_, _, _, _, _) => (true, new RaycastHit(f.Road, LoopNormal(90), 1.1f));
+    KccUpdate(f, LoopNormal(90));
     Check(StateCount() == 1 && f.Physics.bIsDrifting == false,
         "post-jump continuity remains attached through the latched native hop without drift held");
     var stateEntries = Dictionary("States").Values.GetEnumerator(); stateEntries.MoveNext();
@@ -184,7 +253,7 @@ Vector3 Vec(Quaternion q, Vector3 v) => q * v;
         "native jump latch starts the bounded hop clock on a valid nearby road probe");
 
     f.Motor.MustUngroundValue = false;
-    Update(f); // Fresh native stable contact confirms landing and consumes the latch.
+    KccUpdate(f, LoopNormal(90)); // Fresh native stable contact confirms landing and consumes the latch.
     var landedEntries = Dictionary("States").Values.GetEnumerator(); landedEntries.MoveNext();
     var landed = landedEntries.Current!;
     Check(!(bool)landed.GetType().GetField("AcceptedHop", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(landed)!,

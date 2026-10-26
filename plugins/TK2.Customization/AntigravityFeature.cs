@@ -10,6 +10,7 @@ internal static class AntigravityFeature
 {
     private static BepInEx.Configuration.ConfigEntry<bool>? ShowStatus;
     private static string Status = "Antigravity: waiting for eligible road";
+    private static float NextAttachedStatusTime;
     private sealed class KartState
     {
         internal PixelEasyCharMoveKartController Controller = null!;
@@ -162,7 +163,8 @@ internal static class AntigravityFeature
             }
             if (ApplyFrame(physics, motor, decision.Forward, decision.Up, velocity, true))
                 plugin.SessionModified = true;
-            SetStatus(policyState.HopElapsed > 0f ? "Antigravity: drift hop grace active" : "Antigravity: surface adhesion active");
+            SetAttachedStatus(policyState, contact, motor, grounding.FoundAnyGround,
+                grounding.IsStableOnGround, grounding.GroundNormal);
         }
         catch (Exception ex) { Fail(id, plugin, ex); }
     }
@@ -248,8 +250,14 @@ internal static class AntigravityFeature
         forward = Vector3.ProjectOnPlane(forward, up).normalized;
         bool changed = ApplyAxes(physics, forward, up, velocity);
         Quaternion rotation = Quaternion.LookRotation(forward, up);
-        if (updateTransform && Quaternion.Angle(motor.Transform.rotation, rotation) > .001f)
-        { motor.Transform.rotation = rotation; changed = true; }
+        if (updateTransform && Quaternion.Angle(motor.TransientRotation, rotation) > .001f)
+        {
+            // The after-update callback runs before KinematicCharacterSystem commits transients
+            // to Transform. Updating the native transient rotation refreshes CharacterUp and
+            // its derived axes without resetting the interpolation baselines every physics tick.
+            motor.TransientRotation = rotation;
+            changed = true;
+        }
         return changed;
     }
 
@@ -363,6 +371,25 @@ internal static class AntigravityFeature
         if (!string.Equals(Status, status, StringComparison.Ordinal)) Status = status;
     }
 
+    private static void SetAttachedStatus(AntigravityPolicy.State state, AntigravityPolicy.ContactKind contact,
+        KinematicCharacterMotor motor, bool foundGround, bool stableGround, Vector3 groundNormal)
+    {
+        if (Time.unscaledTime < NextAttachedStatusTime) return;
+        NextAttachedStatusTime = Time.unscaledTime + .2f;
+
+        float roadTilt = Vector3.Angle(Vector3.up, state.Normal);
+        float policyTilt = Vector3.Angle(Vector3.up, state.Up);
+        float motorTilt = Vector3.Angle(Vector3.up, motor.CharacterUp);
+        float frameError = Vector3.Angle(state.Up, motor.CharacterUp);
+        string support = foundGround && stableGround
+            ? "stable road" : contact == AntigravityPolicy.ContactKind.ContinuousRoadProbe
+                ? "drift hop" : "frame installed";
+        string landingError = foundGround
+            ? $" / contact Δ{Vector3.Angle(state.Up, groundNormal):0}°" : string.Empty;
+        string hop = state.HopElapsed > 0f ? " / hop grace" : string.Empty;
+        SetStatus($"Antigravity: {support} road {roadTilt:0}° / policy {policyTilt:0}° / motor {motorTilt:0}° (Δ{frameError:0}°){landingError}{hop}");
+    }
+
     private static string StatusFor(AntigravityPolicy.DetachReason reason) => reason switch
     {
         AntigravityPolicy.DetachReason.LowSpeed => "Antigravity: steep surface needs more speed",
@@ -414,7 +441,7 @@ internal static class AntigravityFeature
         var release = AntigravityPolicy.ReleaseAtCurrentHeading(entry.Controller.transform.forward, entry.Motor.Velocity);
         ApplyAxes(entry.Controller.kartPhysics, release.Forward, release.Up, release.Velocity);
         entry.Motor.BaseVelocity = release.Velocity;
-        if (safeCharacterBoundary) entry.Motor.Transform.rotation = release.Rotation;
+        if (safeCharacterBoundary) entry.Motor.TransientRotation = release.Rotation;
         else PendingReleaseRotation[entry.Controller.GetInstanceID()] = entry;
     }
 
