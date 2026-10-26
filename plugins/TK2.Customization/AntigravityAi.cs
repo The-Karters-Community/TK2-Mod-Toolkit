@@ -31,6 +31,7 @@ internal static partial class AntigravityFeature
         var follower = __instance.playerBezierFollower;
         var spline = follower?.currentUsedBezierSpline;
         Vector3 direction = entry.Forward;
+        Vector3 roadRight = Vector3.Cross(entry.Up, entry.Forward);
         float lateral = 0f, normal = 0f;
         bool validRoute = false;
         if (spline != null && spline.Count >= 2 && float.IsFinite(follower!.fCurrentGreenMatchedSplineNormalized))
@@ -44,13 +45,19 @@ internal static partial class AntigravityFeature
             // transported road heading instead of steering toward a distant lane.
             validRoute = float.IsFinite(offset.sqrMagnitude) && tangent.sqrMagnitude > .5f &&
                 Mathf.Abs(normal) < 4f && Mathf.Abs(lateral) < 12f;
-            if (validRoute) direction = tangent * 12f + Vector3.Cross(entry.Up, tangent) * lateral;
+            if (validRoute)
+            {
+                roadRight = Vector3.Cross(entry.Up, tangent);
+                direction = tangent * 12f + roadRight * lateral;
+            }
         }
         float angle = Vector3.SignedAngle(entry.Forward, direction, entry.Up);
         float turn = Mathf.Clamp(angle, -100f * Mathf.Clamp(__0, 0f, .05f), 100f * Mathf.Clamp(__0, 0f, .05f));
         entry.Forward = (Quaternion.AngleAxis(turn, entry.Up) * entry.Forward).normalized;
         entry.AiSteeringInput = Mathf.Clamp(angle / 45f, -1f, 1f);
         entry.AiGuidanceReady = true;
+        entry.AiRoadRight = validRoute ? roadRight : Vector3.Cross(entry.Up, entry.Forward);
+        entry.AiLateralTarget = validRoute ? Mathf.Clamp(lateral * 2f, -6f, 6f) : 0f;
         entry.AiCanDrift = validRoute && Mathf.Abs(lateral) < 3f && Mathf.Abs(angle) < 15f;
         if (physics.bIsDrifting && Mathf.Abs(angle) > 5f && Mathf.Sign(angle) != Mathf.Sign(physics.fDriftingSteerDir))
             entry.AiCanDrift = false;
@@ -69,9 +76,21 @@ internal static partial class AntigravityFeature
         {
             entry.AiSteeringLogCount++;
             entry.NextAiSteeringLog = Time.unscaledTime + 2f;
-            Plugin.Instance?.Log.LogInfo($"Antigravity AI road guidance: kart={entry.Controller.GetInstanceID()} route={validRoute} angle={angle:0.0} centre={lateral:0.0} normal={normal:0.0} drift={physics.bIsDrifting}");
+            float sideSpeed = Vector3.Dot(entry.Motor.Velocity, entry.AiRoadRight);
+            Plugin.Instance?.Log.LogInfo($"Antigravity AI road guidance: kart={entry.Controller.GetInstanceID()} route={validRoute} angle={angle:0.0} centre={lateral:0.0} normal={normal:0.0} drift={physics.bIsDrifting} sideSpeed={sideSpeed:0.0} sideTarget={entry.AiLateralTarget:0.0}");
         }
         return false;
+    }
+
+    private static void GuideAiVelocity(KartState entry, ref Vector3 velocity, float deltaTime)
+    {
+        if (!entry.AiGuidanceReady || !IsAttachedAi(entry.Controller.kartPhysics) || !HasJumpContact(entry)) return;
+        Vector3 right = Vector3.ProjectOnPlane(entry.AiRoadRight, entry.Up).normalized;
+        if (right.sqrMagnitude < .5f) return;
+        float side = Vector3.Dot(velocity, right);
+        float corrected = Mathf.MoveTowards(side, entry.AiLateralTarget, 35f * Mathf.Clamp(deltaTime, 0f, .05f));
+        // Turning the heading alone leaves drift momentum sliding off the road.
+        velocity += right * (corrected - side);
     }
 
     private static void AiInputPrefix(PixelEasyCharMoveKartController __instance, ref float __0)

@@ -67,7 +67,7 @@ internal static partial class AntigravityFeature
         state.RestoreCap = false;
     }
 
-    private static void CharacterVelocityPostfix(PixelEasyCharMoveKartController __instance, ref Vector3 __0)
+    private static void CharacterVelocityPostfix(PixelEasyCharMoveKartController __instance, ref Vector3 __0, float __1)
     {
         if (!CanReadController(__instance) || !TryGet(__instance, out var entry) ||
             !entry.Attached || !entry.Applied) return;
@@ -120,6 +120,7 @@ internal static partial class AntigravityFeature
                     Vector3.Dot(Vector3.ProjectOnPlane(__0, up), forward));
             }
         }
+        GuideAiVelocity(entry, ref __0, __1);
         // Keep contact sweeps gently directed into the road instead of perfectly
         // tangent to it. The hop/forced-unground returns above preserve jumps.
         float normalSpeed = Vector3.Dot(__0, entry.Up);

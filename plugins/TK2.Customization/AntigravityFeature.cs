@@ -36,6 +36,8 @@ internal static partial class AntigravityFeature
         internal int AiSteeringLogCount;
         internal float NextAiSteeringLog;
         internal float AiSteeringInput;
+        internal Vector3 AiRoadRight;
+        internal float AiLateralTarget;
         internal bool AiGuidanceReady, AiCanDrift;
         internal bool LayersOverridden;
         // Direct surface mode must carry tangential speed through the native
