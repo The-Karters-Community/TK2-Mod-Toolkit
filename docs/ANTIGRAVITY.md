@@ -1,100 +1,168 @@
-# Antigravity: road adhesion for offline driving
+# Antigravity: local offline surface driving
 
-## Temporary spline-path switch
+## User-confirmed working checkpoint
 
-`Disable spline teleports (testing)` is an opt-in, offline-only loop-test
-switch. It blocks the local player's *new* `QuickDashMovement_Bezier` entries
-while Antigravity is enabled. It does not change respawns, instant teleports,
-AI players, or an already-running spline move. The shipped native entry sets
-the player/kart and then initializes the Bezier path, so blocking it at entry
-avoids partial path state. This is a testing control, not a general teleport
-disable feature.
+On 2026-10-26, after installing the corrected character animator hook, the user
+reported: "everything is working perfectly" and requested this checkpoint be
+committed. This confirms their tested offline driving, loop, steering, hop,
+camera and pose scenario. It does not establish every track or multiplayer
+behavior. The installed checkpoint DLL hash is
+`CA44762E53AC56C3BFD98C2929C561DA567F74AC04A804C734F75A09EEC285FF`.
 
-The direct-contact continuation probe is limited to 35-degree faceted seams.
-This retains the observed 36-to-55-degree tunnel transition while preventing a
-turbo-pad or obstacle face from being selected as a surface continuation.
+## Character animator consumer correction
 
-Wall collision layers are never disabled by adhesion. A prior direct-surface
-candidate did this while attempting to relax wall detection; user recordings
-showed it could tunnel through loop geometry. The corrected candidate retains
-the game's native KCC collision and penetration resolution, so unsupported
-geometry should block or release the kart rather than permit a pass-through.
+The visual-grounding logs confirm the bridge is active, but the user still
+sees the character's airborne pose. Fresh native evidence under
+`local/antigravity-evidence/character-pose` identifies the missing consumer:
+`Ant_CharacterWorker.Update` (`0x180502410`) writes animator grounded from synced
+visual-grounded offset `0x178` (including secondary/third character animators).
+The previously hooked `Ant_CharacterControllerWorker.Update` instead calls an
+aim-update path; the scoped flags were restored before the separate animator
+update. The character hook now targets the actual worker update. The existing
+contact/hop guards and restoration remain in force. Runtime validation pending.
 
-## Optional surface camera
+## Visual-grounding candidate after the 12:58 recording
 
-`Camera follows surface` is default-off and local offline only. The camera
-candidate transforms the position and rotation already returned by the game's
-racing-camera routine around the kart focus, then smooths the gravity frame.
-It does not write private camera fields, replace the game camera, or use Unity
-physics casts/overlap queries. An exception disables only this option and keeps
-the native camera output for that frame. Gameplay validation is still required.
-It enters at eight degrees before the motor's native stable-slope limit (about
-52 degrees with the observed 60-degree default) and exits eight degrees below
-that, so normal road and small banking retain the game's ordinary camera.
+The user confirms smoother driving but reports an airborne character/kart pose
+while attached. Logs confirm real hops and landings, sometimes with motor
+`ground=False` at the close-contact landing boundary. This supports a visual
+grounding mismatch; it does not by itself prove the exact remaining camera cause.
 
-Direct-surface contact normals are also rate-limited to 240 degrees per second
-to remove abrupt orientation changes across joined inclined quads.
+Fresh matching-build Ghidra slices under `local/antigravity-evidence/visual-pose`
+show `Ant_KartAnimatorWorker.Update` reading visual-grounded at synced offset
+`0x178` for its animator and air timer, and
+`Ant_VisualKart.CalculatetargetVisualAngle` reading grounded at `0xBC` to select
+its in-air steering pose. The character controller's update calls its worker's
+visual update separately from the kart pose update.
 
-The surface frame is reapplied at `BeforeCharacterUpdate`, before KCC evaluates
-its stable-slope limit. This is required for a continuous loop: applying it only
-after the update lets the native 60-degree check stop the kart before the
-inverted section.
+The new bridge supplies close-contact grounded flags and the surface normal only
+during these local visual-consumer calls. It restores the original synced fields
+in postfix/finalizer and never changes motor grounding. Accepted hops, forced
+ungrounding, and missing close contact bypass it. Contact checks are cached once
+per rendered frame. Its hook installation is independent so a visual signature
+failure cannot disable the playable physics module. Compilation passes; live
+pose validation remains pending. The preceding smoother build is preserved in
+`local/playable-backups/20261026-stabilized-before-visual-grounding`.
 
-Enable `Detailed status and logging` for diagnosis. The HUD then reports raw
-contact tilt, applied frame tilt, motor tilt, frame error, native slope limit,
-contact state, speed, and collider layer. BepInEx logs receive the same data at
-most once every 350 ms, plus forced release reasons; it is local/offline only.
+## Playable checkpoint and stabilization candidate
 
-The direct loop mode allows a bounded 0.35-second/1.5-metre reacquisition across
-faceted seams after KCC temporarily reports no ground. In all-surface mode the
-probe uses the full collision mask, so a next quad on a wall layer can be
-reacquired; eligibility still rejects triggers, respawn layers, dynamic bodies
-and player colliders. Successful reacquisition resets the grace timer.
+The user describes the steering candidate as almost perfect/playable, with
+remaining kart and camera shake in `20261026-1244-15.2975772.mp4`. The installed
+playable DLL has SHA-256
+`0CF5DCD153582B21191DE33153430DAF6E604E6759679E7A986D03AD107A2225`.
+Before editing it, the full plugin source, DLL, configuration, logs, and baseline
+notes were copied to
+`local/playable-backups/20261026-144626-antigravity-playable`, with a hash manifest
+and runtime restore instructions. This checkpoint is separate from deployment
+rollback receipts.
 
-Direct mode also carries the last tangential forward speed down by a bounded
-decay while the surface is steep or inverted. This only prevents the native
-velocity pass from zeroing a loop; reverse input and ordinary flat-road
-braking remain native. Accepted drift hops use the same bounded carry.
+The stabilization candidate filters contact-normal noise over 25 ms while
+retaining the existing quad-transition turn cap, adds a 10-degree attachment
+exit hysteresis, and supplies a 1-unit/second inward contact velocity only after
+the hop/forced-unground guards. It adds no ground queries. The camera filters
+heading over 35 ms in the tangent plane; obstruction retraction remains instant,
+but recovery outward is eased instead of snapping on alternating cast results.
+The playable road-frame steering and hop adapters are retained. Build succeeds;
+live smoothness and jump preservation need the next user run.
 
-The optional camera transports its previous surface frame onto the new normal,
-preserving roll through a loop. It does not rebuild each frame from world-up,
-which avoids the arbitrary-roll snap at the top/bottom of a loop.
+## 2026-10-26 steering candidate after the 14:26 recording
 
-## Current test candidate: ground and wall contacts
+The user reports right input producing leftward movement while drifting on the
+loop. The current log proves the bounded hop and landing path executes, but has
+no steering observations and cannot establish the input/force relationship.
+The recording shows the improved chase camera and a drift crossing the bank.
 
-The user isolated a previous native crash to **Camera follows surface**. The
-current camera path is limited to the native camera output and transported
-surface frame; it performs no physics casts or private camera-field writes.
-If the option throws another exception it disables itself for that session.
-The saved crash dumps remain private. A real race test is still required.
+The retained matching-build native steering body (`0x180601ff0`) uses world-up
+in its lateral/centripetal construction, then updates a yaw quaternion. The
+adapter additionally flipped that quaternion delta when surface-up opposed
+world-up. These mixed bases can reverse steering behavior on the inverted half.
 
-The new **Drive on ground and walls** option is an explicit offline free-driving
-mode. It follows actual native ground/movement contacts rather than the
-curved-road arming gate. It accepts solid collision layers including walls,
-temporarily extends the kart's stable-ground layers, and restores the original
-mask on release. The kart's wall-response layer mask and wall-angle threshold
-are temporarily overridden and restored with it. Native KCC collision
-movement/resolution still executes. A single capsule-radius forward ray detects
-a nearby static wall being driven into, without teleporting the kart.
-Respawn layers, triggers, rigidbody objects and racers stay excluded. Accepted
-native drift hops retain bounded nearby-support grace. Ordinary curved-road
-mode remains available when the option is off.
+This candidate runs only that native steering call in a temporary flat frame:
+before-step velocity, current velocity, acceleration, cached axes, and cached
+centripetal contribution are transformed consistently. Its outputs are mapped
+back to the surface frame; cached axes are restored in postfix/finalizer. The
+native yaw delta is applied once around surface-up with no tilt-dependent sign.
+Existing native drift/countersteer scalar rules and speed calculations remain
+in use. Camera and hop changes from the preceding candidate are retained.
 
-This mode is intentionally capable of wall driving and shortcuts; mandatory
-online/submission protection remains in force. The user explicitly requested
-this broader behavior after the conservative mode failed.
+Bounded `Antigravity steering` logs include input, drift direction, per-call yaw
+delta, sideways velocity, and tilt. Opposite lateral motion alone is not proof
+of reversed input because a native drift can continue sliding during
+countersteering. Plugin build succeeds; live steering validation is pending.
 
-Validation for this candidate is compilation against current installed interop
-only. At the user's request, no further harness tests were written or run.
-In-game behavior is awaiting the user's test; earlier assertion counts below
-describe earlier builds and do not establish that this candidate works.
+## 2026-10-26 follow-up: inverted-hop separation and camera pose
 
-Previous crashing candidate SHA-256:
-`1bcd7a7c8071db9d46c0395c32cba2a9627664208e39e4588d6576c74fb725b5`.
-DLL rollback backup: `local/backups/1792999362763653900`. Test configuration
-backup: `local/backups/1792999402849420800`. The local test profile has
-Antigravity and wall surfaces enabled, surface camera disabled. Source defaults
-remain opt-in. No game was launched automatically.
+The `1213-43` and `1214-26` recordings show the camera sliding alongside the kart
+and an airborne loss of the loop. This time the installed build's log confirms
+accepted input, triggered native jump, and surviving normal velocity: impulses
+range from about 20 to 62 units/second. It also records successful landings at
+0.365-0.440 seconds. Jump input is therefore no longer the observed blocker.
+
+The previous adapter retained world-space hop velocity while the road frame
+turned, and the hop probe still used the shorter 1.5-unit contact range despite
+the separate 2.5-unit hop setting. It also expired a hop after 0.45 seconds even
+if the underlying road remained detectable. This candidate bounds the outward
+component to the kart's current base jump strength, transports airborne velocity
+with the sampled road normal without changing its magnitude, uses the hop
+probe range, and applies the 0.8-second timeout only while no road is detected.
+Landing still requires close surface contact and descending normal velocity.
+
+The camera is now a rear/above pose derived directly from road forward/up,
+using the stock following distance captured on entry. It blends with the native
+camera at the existing steep-section threshold, keeps one up-alignment smoothing
+stage, and applies clearance before aiming. It no longer derives its lateral
+position from the stock world-up camera offset. Runtime validation is pending.
+
+## 2026-10-26 jump and camera candidate
+
+The user's `1155-56` recording still shows camera lag and rejected repeat
+jump-drifts. The corresponding loader log reports successful hook installation,
+but the previous build emitted no per-jump observations; that log cannot prove
+whether input, impulse, or landing failed.
+
+The retained current-build Ghidra slice for
+`CheckAndDecideIfAllowedToJumpInPhysics` (`0x1805fb8c0`) checks both the request
+flag and `eJumpState`; its waiting state rearms through motor ground contact.
+Its provenance hash matches the installed GameAssembly. A new REA full-binary
+query timed out, so this diagnosis uses the retained matching slice.
+
+This candidate supplies confirmed close surface contact to that native gate for
+the duration of its call, restoring the original report in postfix/finalizer.
+It retains accepted-hop state until actual landing rather than clearing it when
+a continuity probe merely sees the road. Input and impulse hooks remain local
+and offline; bounded `Antigravity jump` events record input, impulse, resulting
+velocity, and landing for the next user run. Repeated air hops are not granted.
+
+The camera uses one surface-up smoothing stage, aims after final placement, and
+constrains its clearance against the actual road normal and a static-solid
+sphere cast. The older fixed lift and stacked heading/view lag were removed.
+Plugin compilation succeeds; live driving, hop, and camera validation is pending.
+
+## Current implementation
+
+There is one direct, contact-driven ride path. It attaches to eligible static
+track colliders once the contact normal reaches 45 degrees, carries the local
+surface frame over the loop, and returns to the game's normal handling below
+45 degrees. Flat-road steering and jump-drift remain native.
+
+The frame is installed before KCC checks its slope limit. A short 0.35-second
+sphere-probe grace handles gaps between adjacent track quads. Native collision
+resolution remains enabled; triggers, respawn volumes, moving bodies, and racer
+colliders are excluded. The old arming/lookahead state machine and separate
+"allow walls" mode were removed from the live path.
+
+Steering evaluates the native force calculation in a temporary flat frame and
+maps its results to the road. The native yaw delta is applied around surface-up
+without a world-tilt sign flip.
+
+`Camera follows surface` remains off by default. The user previously observed
+crashes with it enabled; this implementation does not claim that camera issue
+is fixed. `Disable spline teleports (testing)` remains an opt-in local test
+switch for tracks that use spline teleports.
+
+The latest user run reached inverted loop angles but steering felt reversed and
+the ride was janky. This source revision simplifies contact handling and adds
+local-frame steering correction; it still needs the user to validate in-game.
 
 ### Race-start crash correction
 

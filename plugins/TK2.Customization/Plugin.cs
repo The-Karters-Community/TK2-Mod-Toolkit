@@ -16,7 +16,7 @@ public sealed partial class Plugin : BasePlugin
     internal static Plugin? Instance;
     internal readonly Harmony Harmony = new("local.tk2.customization");
     internal ConfigEntry<bool> UiEnabled = null!, AudioEnabled = null!, CameraEnabled = null!, PhysicsEnabled = null!;
-    internal ConfigEntry<bool> AntigravityEnabled = null!, AntigravityCameraEnabled = null!, AntigravityAnySurface = null!, AntigravityDisableSplineTeleports = null!;
+    internal ConfigEntry<bool> AntigravityEnabled = null!, AntigravityCameraEnabled = null!, AntigravityDisableSplineTeleports = null!;
     internal ConfigEntry<float> HudScale = null!, Volume = null!, Fov = null!, FallAcceleration = null!, AirTime = null!;
     internal ConfigEntry<string> CanvasFilter = null!;
     internal ConfigEntry<bool> PreserveKartFraming = null!;
@@ -50,12 +50,10 @@ public sealed partial class Plugin : BasePlugin
         AntigravityEnabled = Config.Bind("Antigravity", "Enabled", false,
             "Experimental surface adhesion for local offline races. Requires eligible road contact and remains unavailable online. In-game validation pending.");
         AntigravityCameraEnabled = Config.Bind("Antigravity", "CameraFollowsSurface", false,
-            "Offline visual follow for Antigravity. Transforms the native racing-camera output only; disables itself after an error.");
-        AntigravityAnySurface = Config.Bind("Antigravity", "AllowWallSurfaces", false,
-            "Offline free driving: follow static solid ground and wall contacts. Respawn volumes, triggers, moving bodies and racers remain excluded.");
+            "Offline loop chase camera. Follows behind the kart in the road frame, checks track clearance, and blends back to the normal view.");
         AntigravityDisableSplineTeleports = Config.Bind("Antigravity", "DisableSplineTeleports", false,
             "Temporary offline loop test: block new local Bezier spline-path movement while Antigravity is enabled. Respawns and instant teleports are not changed.");
-        Log.LogInfo($"Antigravity config loaded: enabled={AntigravityEnabled.Value} wallSurfaces={AntigravityAnySurface.Value} " +
+        Log.LogInfo($"Antigravity config loaded: enabled={AntigravityEnabled.Value} " +
             $"camera={AntigravityCameraEnabled.Value} splineBlock={AntigravityDisableSplineTeleports.Value}");
         BindPack();
 
@@ -63,6 +61,7 @@ public sealed partial class Plugin : BasePlugin
             new[] { typeof(string), typeof(int) }, nameof(AudioPrefix), prefix: true));
         TryFeature("offline fast fall", InstallPhysics);
         TryFeature("offline antigravity", () => AntigravityFeature.Install(this));
+        TryFeature("antigravity visual grounding", () => AntigravityFeature.InstallVisualGrounding(this));
         TryFeature("offline spline-teleport testing", () => AntigravitySplineTeleport.Install(this));
         TryFeature("fast-fall controller input", () => FastFallFeature.Install(this));
         TryFeature("air shift", () => AirShiftFeature.Install(this));
