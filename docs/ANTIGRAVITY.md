@@ -1,5 +1,24 @@
 # Antigravity: local offline surface driving
 
+## All-racer spline-blocking test
+
+The user-confirmed working Antigravity checkpoint is commit `f6b69ee`.
+The existing `DisableSplineTeleports` option now blocks new Bezier travel for
+both local human and local AI racers during a running offline race. It remains
+default-off and requires Antigravity enabled. Remote players, replay playback,
+paused/menu states, respawning/tank karts, and already-teleporting controllers
+are excluded. Instant teleports and respawns are separate native paths.
+
+The Studio option describes this wider scope. A bounded per-racer log identifies
+human/AI blocks; the log set clears on race reset. The installed game signature
+is unchanged and plugin compilation passes. Live all-racer validation is pending.
+
+This option does not extend Antigravity physics to AI. AI karts may fall where
+the original spline bypassed their normal slope limit. Native player collisions
+remain active; side impulses can push a human kart past an edge or beyond the
+bounded contact-recovery range. The adapter rejects racer colliders as rideable
+surfaces, so collision bounce is not guaranteed to remain attached to the road.
+
 ## User-confirmed working checkpoint
 
 On 2026-10-26, after installing the corrected character animator hook, the user

@@ -52,7 +52,7 @@ public sealed partial class Plugin : BasePlugin
         AntigravityCameraEnabled = Config.Bind("Antigravity", "CameraFollowsSurface", false,
             "Offline loop chase camera. Follows behind the kart in the road frame, checks track clearance, and blends back to the normal view.");
         AntigravityDisableSplineTeleports = Config.Bind("Antigravity", "DisableSplineTeleports", false,
-            "Temporary offline loop test: block new local Bezier spline-path movement while Antigravity is enabled. Respawns and instant teleports are not changed.");
+            "Offline race test: block new Bezier spline travel for all local human and AI racers while Antigravity is enabled. AI wall-riding is not provided; respawns and instant teleports remain native.");
         Log.LogInfo($"Antigravity config loaded: enabled={AntigravityEnabled.Value} " +
             $"camera={AntigravityCameraEnabled.Value} splineBlock={AntigravityDisableSplineTeleports.Value}");
         BindPack();

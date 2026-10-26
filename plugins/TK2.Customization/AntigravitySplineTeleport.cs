@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using HarmonyLib;
+using UnityEngine;
 
 namespace TK2.Customization;
 
@@ -6,6 +9,7 @@ namespace TK2.Customization;
 // deliberately does not touch the separate instant-teleport or respawn paths.
 internal static class AntigravitySplineTeleport
 {
+    private static readonly HashSet<int> LoggedRacers = new();
     internal static void Install(Plugin plugin)
     {
         FeatureHook.Install(plugin.Harmony, typeof(AntigravitySplineTeleport), new[]
@@ -18,12 +22,14 @@ internal static class AntigravitySplineTeleport
                     typeof(PTK_Command_05_PlayerLogicEffects.CPlayerEffect_E6_QuickDashMovementBase.EMoveSpeed),
                     typeof(Ant_Player), typeof(PixelEasyCharMoveKartController),
                     typeof(int), typeof(bool), typeof(bool)
-                }, Prefix: nameof(BezierPrefix))
+                }, Prefix: nameof(BezierPrefix)),
+            new FeatureHook(typeof(PlayerRaceLogic), nameof(PlayerRaceLogic.OnRaceResetted),
+                Type.EmptyTypes, Postfix: nameof(ResetLog))
         });
     }
 
     // Complete native signature: retain all arguments even though only the
-    // player/controller identity decides whether this local test may apply.
+    // player/controller identity decides whether this offline race test may apply.
     private static bool BezierPrefix(PTK_PlayerLogicModCommand_QuickDashMovement __instance,
         PTK_BezierSpline __0, bool __1,
         PTK_Command_05_PlayerLogicEffects.CPlayerEffect_E6_QuickDashMovementBase.EMoveSpeed __2,
@@ -33,12 +39,21 @@ internal static class AntigravitySplineTeleport
         if (plugin?.AntigravityEnabled.Value != true ||
             plugin.AntigravityDisableSplineTeleports.Value != true ||
             !Plugin.OfflineLabAllowed || __3 == null || __4 == null ||
-            __3.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL ||
-            !AirShiftFeature.Running(__4))
+            (__3.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL &&
+             __3.ePlayerType != Ant_Player.EPlayerType.E_AI_LOCAL) ||
+            __4.parentPlayer != __3 || Time.timeScale <= 0f || MenuManager.Instance != null ||
+            Ant_CurrentGameConfiguration.eCurrentRaceState != Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING ||
+            __4.IsPlayingReplayData() || __4.outsideMapValidator?.bIsPlayerRespawning == true ||
+            __4.kartPhysics == null || __4.kartPhysics.IsTeleportingFromAtoB() || __4.bIsInTankForm)
             return true;
 
         plugin.SessionModified = true;
-        plugin.Log.LogInfo("Antigravity test: blocked one local Bezier spline movement.");
+        int id = __4.GetInstanceID();
+        if (LoggedRacers.Count >= 64) LoggedRacers.Clear();
+        if (LoggedRacers.Add(id))
+            plugin.Log.LogInfo($"Antigravity test: blocked Bezier spline movement for {__3.ePlayerType} kart {id}.");
         return false;
     }
+
+    private static void ResetLog() => LoggedRacers.Clear();
 }
