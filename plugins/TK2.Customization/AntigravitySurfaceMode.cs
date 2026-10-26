@@ -33,7 +33,6 @@ internal static partial class AntigravityFeature
         Collider? surface = null;
         Vector3 normal = Vector3.zero;
         bool hop = motor.MustUnground();
-        bool directContact = false;
 
         // A direct-surface kart can become ungrounded for a jump or a faceted
         // loop transition even when TriggerPhysicsJump did not report a delta.
@@ -43,7 +42,7 @@ internal static partial class AntigravityFeature
             entry.AcceptedHop = true;
 
         if (!hop && grounding.FoundAnyGround && EligibleSolidSurface(grounding.GroundCollider, controller))
-        { surface = grounding.GroundCollider; normal = grounding.GroundNormal; directContact = true; }
+        { surface = grounding.GroundCollider; normal = grounding.GroundNormal; }
 
         // A single near-body ray can pick up a wall being driven into. KCC still
         // performs the actual movement and penetration/collision resolution.
@@ -65,7 +64,7 @@ internal static partial class AntigravityFeature
                 // transition after contact; retain this probe only for faceted
                 // curve seams (the observed 36° -> 55° tunnel step is 19°).
                 if (turn > 5f && turn <= 35f)
-                { surface = wall.collider; normal = wall.normal; directContact = true; }
+                { surface = wall.collider; normal = wall.normal; }
             }
         }
 
@@ -76,7 +75,7 @@ internal static partial class AntigravityFeature
             // the capsule crosses a faceted seam. Give the next static collider
             // a short, bounded reacquisition window; the ordinary road policy
             // keeps its stricter grace values.
-            float graceSeconds = entry.SurfaceMode && !entry.AcceptedHop ? .25f : Settings.MaxContactGraceSeconds;
+            float graceSeconds = entry.SurfaceMode && !entry.AcceptedHop ? .35f : Settings.MaxContactGraceSeconds;
             if (entry.AcceptedHop)
             {
                 entry.Policy.HopElapsed += dt;
@@ -88,7 +87,7 @@ internal static partial class AntigravityFeature
                 if (entry.Policy.ContactGraceElapsed > graceSeconds) { Release(id, true); return; }
             }
             float distance = entry.AcceptedHop ? Settings.MaxHopDistance :
-                entry.SurfaceMode ? 1f : Settings.MaxContactGraceDistance;
+                entry.SurfaceMode ? 1.5f : Settings.MaxContactGraceDistance;
             bool continuityHit = TryContinuityProbe(controller, motor, entry.Policy.Up, distance,
                 out var nearby, out var nearbyNormal, out float separation);
             if (continuityHit)
@@ -149,9 +148,18 @@ internal static partial class AntigravityFeature
         entry.Policy.Forward = forward;
         entry.SupportCollider = surface;
         float worldTilt = Vector3.Angle(Vector3.up, normal);
+        float forwardSpeed = Vector3.Dot(Vector3.ProjectOnPlane(motor.Velocity, normal), forward);
+        if (forwardSpeed > 1f)
+            entry.SurfaceForwardSpeed = Mathf.Max(entry.SurfaceForwardSpeed, Mathf.Min(forwardSpeed, 160f));
+        else if (worldTilt < 65f)
+            entry.SurfaceForwardSpeed = Mathf.Max(0f, forwardSpeed);
         UpdateCameraEngagement(entry, normal, motor.MaxStableSlopeAngle);
-        if (directContact)
-        { entry.AcceptedHop = false; entry.Policy.HopElapsed = entry.Policy.ContactGraceElapsed = 0f; }
+        // Any successful contact (including the continuity ray used across a
+        // faceted quad seam) ends the grace window. Resetting only for the
+        // primary KCC contact lets ContactGraceElapsed leak across repeated
+        // reacquisitions and eventually releases a perfectly supported kart.
+        entry.AcceptedHop = false;
+        entry.Policy.HopElapsed = entry.Policy.ContactGraceElapsed = 0f;
         if (TryNativeYaw(physics.qSteeringOrientation, out float yaw))
         { entry.LastNativeYaw = yaw; entry.HasNativeYaw = true; }
         ApplyFrame(physics, motor, forward, normal, motor.Velocity, true);
@@ -167,11 +175,11 @@ internal static partial class AntigravityFeature
                 SetStatus($"Antigravity: raw {Vector3.Angle(Vector3.up, rawNormal):0}° → frame {worldTilt:0}° / " +
                     $"motor {motorTilt:0}° Δ{frameError:0}° / limit {motor.MaxStableSlopeAngle:0}° / " +
                     $"contact {(grounding.FoundAnyGround ? (grounding.IsStableOnGround ? "stable" : "unstable") : "none")} / " +
-                    $"speed {motor.Velocity.magnitude:0.0} / layer {surface.gameObject.layer} / {camera}");
+                    $"speed {motor.Velocity.magnitude:0.0} carry {entry.SurfaceForwardSpeed:0.0} / layer {surface.gameObject.layer} / {camera}");
             }
             else SetStatus($"Antigravity: solid surface {worldTilt:0}° / layer {surface.gameObject.layer} / {camera}");
             DiagnosticLog($"contact: raw={Vector3.Angle(Vector3.up, rawNormal):0} frame={worldTilt:0} motor={Vector3.Angle(Vector3.up, motor.CharacterUp):0} " +
-                $"error={Vector3.Angle(normal, motor.CharacterUp):0} limit={motor.MaxStableSlopeAngle:0} found={grounding.FoundAnyGround} stable={grounding.IsStableOnGround} speed={motor.Velocity.magnitude:0.0} layer={surface.gameObject.layer}");
+                $"error={Vector3.Angle(normal, motor.CharacterUp):0} limit={motor.MaxStableSlopeAngle:0} found={grounding.FoundAnyGround} stable={grounding.IsStableOnGround} speed={motor.Velocity.magnitude:0.0} carry={entry.SurfaceForwardSpeed:0.0} layer={surface.gameObject.layer}");
         }
     }
 }

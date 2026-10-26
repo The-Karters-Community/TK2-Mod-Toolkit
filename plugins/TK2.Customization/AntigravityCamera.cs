@@ -54,9 +54,15 @@ internal static class AntigravityCamera
         }
 
         Vector3 targetUp = active && surfaceUp.sqrMagnitude > .5f ? surfaceUp.normalized : Vector3.up;
-        Quaternion desiredFrame = Quaternion.FromToRotation(Vector3.up, targetUp);
+        // Transport the previous frame onto the new surface normal instead of
+        // rebuilding from world-up every frame. FromToRotation(Vector3.up,
+        // targetUp) has an arbitrary roll near the top/bottom of a loop and
+        // was the source of the visible camera snap/jitter there.
+        Quaternion priorFrame = state.Initialized ? state.Frame : Quaternion.identity;
+        Vector3 priorUp = priorFrame * Vector3.up;
+        Quaternion desiredFrame = Quaternion.FromToRotation(priorUp, targetUp) * priorFrame;
         float blend = AntigravityCameraMath.BlendFactor(Time.unscaledDeltaTime, SmoothingSeconds);
-        Quaternion frame = state.Initialized ? Quaternion.Slerp(state.Frame, desiredFrame, blend) : desiredFrame;
+        Quaternion frame = state.Initialized ? Quaternion.Slerp(priorFrame, desiredFrame, blend) : desiredFrame;
         Vector3 pivotUp = frame * Vector3.up;
         Vector3 pivot = player.visualInstanceSyncedParams.vCurPos + pivotUp * FocusHeight;
         Vector3 nativeOffset = position - pivot;

@@ -1,3 +1,20 @@
+## 2026-10-26 - Preserve loop momentum and hop continuity
+
+- The live diagnostics showed `FoundAnyGround` dropping at the native slope
+  boundary while the kart was still supported. The installed build was also
+  one commit behind the hop-preservation source fix.
+- Direct mode now resets its grace timer after every successful contact,
+  including continuity-ray reacquisition, and probes the full collision mask
+  so wall-layer quads can be reacquired. A bounded forward-speed carry keeps
+  the native velocity pass from collapsing tangential motion on steep/inverted
+  surfaces or during an accepted drift hop; reverse input and flat-road
+  braking remain native.
+- Camera frame transport now carries the previous roll through a loop instead
+  of rebuilding from world-up, removing the arbitrary-roll snap near the top
+  and bottom of a loop.
+- Build completed against the installed interop with zero warnings/errors.
+  In-game validation remains required after the single final deployment.
+
 ## 2026-10-26 - Extend direct loop contact reacquisition
 
 - Diagnostics showed frame error 0° and stable KCC contact through 167° before

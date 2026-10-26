@@ -32,6 +32,11 @@ internal static partial class AntigravityFeature
         internal bool AcceptedHop;
         internal Collider? SupportCollider;
         internal bool SurfaceMode, LayersOverridden;
+        // Direct surface mode must carry tangential speed through the native
+        // CharacterUp/steep-slope transition. The stock velocity pass can
+        // otherwise collapse the forward component to zero once the kart is
+        // past the normal 60-degree world-up limit.
+        internal float SurfaceForwardSpeed;
         // Presentation has a higher bar than generic solid contact. This avoids
         // the camera entering on ordinary flat or lightly banked road pieces.
         internal bool CameraEngaged;
@@ -285,8 +290,14 @@ internal static partial class AntigravityFeature
         candidate = null; normal = Vector3.zero; separation = 0f;
         Vector3 bottom = WorldCapsuleBottom(motor);
         Vector3 origin = bottom + up * .1f;
+        // In direct/all-surface mode the next quad may be on a wall layer that
+        // KCC deliberately excludes from StableGroundLayers. Use the full
+        // collision mask for this bounded probe; EligibleCollider still rejects
+        // triggers, dynamic bodies, respawn surfaces and player colliders.
+        LayerMask probeLayers = Plugin.Instance?.AntigravityAnySurface.Value == true
+            ? motor.CollidableLayers : motor.StableGroundLayers;
         if (!Physics.Raycast(origin, -up, out var hit, maxDistance + .1f,
-            motor.StableGroundLayers, QueryTriggerInteraction.Ignore)) return false;
+            probeLayers, QueryTriggerInteraction.Ignore)) return false;
         Collider collider = hit.collider;
         if (!EligibleCollider(collider, controller)) return false;
         candidate = collider;
@@ -450,11 +461,47 @@ internal static partial class AntigravityFeature
             !entry.Policy.Attached || !entry.Applied) return;
         var motor = entry.Motor;
         var grounding = motor.GroundingStatus;
-        if (!grounding.FoundAnyGround || !grounding.IsStableOnGround || motor.MustUnground()) return;
+        bool directSurface = entry.SurfaceMode;
+        bool surfaceHop = directSurface && (entry.AcceptedHop || entry.Policy.HopElapsed > 0f);
+        if (!directSurface && (!grounding.FoundAnyGround || !grounding.IsStableOnGround || motor.MustUnground())) return;
+        if (directSurface && !grounding.FoundAnyGround && !surfaceHop) return;
         Vector3 aligned = AntigravityPolicy.AlignVelocityTangent(__0, entry.Policy.Normal, entry.Policy.Forward);
-        if ((aligned - __0).sqrMagnitude <= .000001f) return;
+        bool changed = (aligned - __0).sqrMagnitude > .000001f;
         __0 = aligned;
-        if (Plugin.Instance != null) Plugin.Instance.SessionModified = true;
+
+        // When a loop crosses the native slope boundary, UpdateVelocity can
+        // return an almost-zero tangent even though the kart was travelling
+        // normally one tick earlier. Keep bounded forward momentum on steep
+        // direct surfaces (and during the accepted drift hop), while letting
+        // flat-road braking and reverse input behave natively.
+        if (directSurface && __instance.kartPhysics != null &&
+            !__instance.kartPhysics.bIsMovingBackward)
+        {
+            Vector3 up = entry.Policy.Up.normalized;
+            Vector3 forward = Vector3.ProjectOnPlane(entry.Policy.Forward, up).normalized;
+            float tilt = Vector3.Angle(Vector3.up, up);
+            if (forward.sqrMagnitude > .5f && tilt >= 65f)
+            {
+                float currentForward = Vector3.Dot(Vector3.ProjectOnPlane(__0, up), forward);
+                float dt = Mathf.Min(Time.fixedDeltaTime, .05f);
+                float carried = Mathf.Max(0f, entry.SurfaceForwardSpeed - 35f * dt);
+                float target = Mathf.Max(currentForward, carried);
+                if (target > 8f && currentForward < target - 1.5f)
+                {
+                    Vector3 right = Vector3.Cross(up, forward).normalized;
+                    float lateral = Mathf.Clamp(Vector3.Dot(__0, right), -target * .6f, target * .6f);
+                    __0 = forward * target + right * lateral + up * Vector3.Dot(__0, up);
+                    changed = true;
+                }
+                entry.SurfaceForwardSpeed = target;
+            }
+            else
+            {
+                entry.SurfaceForwardSpeed = Mathf.Max(0f,
+                    Vector3.Dot(Vector3.ProjectOnPlane(__0, up), forward));
+            }
+        }
+        if (changed && Plugin.Instance != null) Plugin.Instance.SessionModified = true;
     }
 
     private static bool ApplyFrame(PixelKartPhysics physics, KinematicCharacterMotor motor,

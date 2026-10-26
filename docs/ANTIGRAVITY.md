@@ -45,16 +45,28 @@ contact tilt, applied frame tilt, motor tilt, frame error, native slope limit,
 contact state, speed, and collider layer. BepInEx logs receive the same data at
 most once every 350 ms, plus forced release reasons; it is local/offline only.
 
-The direct loop mode allows a bounded 0.25-second/1-metre reacquisition across
-faceted seams after KCC temporarily reports no ground. The ordinary curved-road
-policy retains its stricter contact grace values.
+The direct loop mode allows a bounded 0.35-second/1.5-metre reacquisition across
+faceted seams after KCC temporarily reports no ground. In all-surface mode the
+probe uses the full collision mask, so a next quad on a wall layer can be
+reacquired; eligibility still rejects triggers, respawn layers, dynamic bodies
+and player colliders. Successful reacquisition resets the grace timer.
+
+Direct mode also carries the last tangential forward speed down by a bounded
+decay while the surface is steep or inverted. This only prevents the native
+velocity pass from zeroing a loop; reverse input and ordinary flat-road
+braking remain native. Accepted drift hops use the same bounded carry.
+
+The optional camera transports its previous surface frame onto the new normal,
+preserving roll through a loop. It does not rebuild each frame from world-up,
+which avoids the arbitrary-roll snap at the top/bottom of a loop.
 
 ## Current test candidate: ground and wall contacts
 
-The user isolated native crashes to **Camera follows surface**. Its invocation
-is now disconnected even if an old configuration enables it; the control is
-removed from the Studio catalog pending a separate fix. The saved crash dumps
-remain private. No camera-crash fix or safe camera follow is claimed.
+The user isolated a previous native crash to **Camera follows surface**. The
+current camera path is limited to the native camera output and transported
+surface frame; it performs no physics casts or private camera-field writes.
+If the option throws another exception it disables itself for that session.
+The saved crash dumps remain private. A real race test is still required.
 
 The new **Drive on ground and walls** option is an explicit offline free-driving
 mode. It follows actual native ground/movement contacts rather than the
