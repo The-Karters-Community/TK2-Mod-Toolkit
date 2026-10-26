@@ -65,6 +65,11 @@ internal static partial class AntigravityFeature
         if (surface == null && entry?.Policy.Attached == true)
         {
             float dt = Mathf.Min(Time.fixedDeltaTime, .05f);
+            // Direct loop surfaces can briefly leave KCC's GroundingStatus while
+            // the capsule crosses a faceted seam. Give the next static collider
+            // a short, bounded reacquisition window; the ordinary road policy
+            // keeps its stricter grace values.
+            float graceSeconds = entry.SurfaceMode && !entry.AcceptedHop ? .25f : Settings.MaxContactGraceSeconds;
             if (entry.AcceptedHop)
             {
                 entry.Policy.HopElapsed += dt;
@@ -73,9 +78,10 @@ internal static partial class AntigravityFeature
             else
             {
                 entry.Policy.ContactGraceElapsed += dt;
-                if (entry.Policy.ContactGraceElapsed > Settings.MaxContactGraceSeconds) { Release(id, true); return; }
+                if (entry.Policy.ContactGraceElapsed > graceSeconds) { Release(id, true); return; }
             }
-            float distance = entry.AcceptedHop ? Settings.MaxHopDistance : Settings.MaxContactGraceDistance;
+            float distance = entry.AcceptedHop ? Settings.MaxHopDistance :
+                entry.SurfaceMode ? 1f : Settings.MaxContactGraceDistance;
             if (TryContinuityProbe(controller, motor, entry.Policy.Up, distance,
                 out var nearby, out var nearbyNormal, out _))
             { surface = nearby; normal = nearbyNormal; }

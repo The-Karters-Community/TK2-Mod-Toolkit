@@ -1,3 +1,10 @@
+## 2026-10-26 - Extend direct loop contact reacquisition
+
+- Diagnostics showed frame error 0° and stable KCC contact through 167° before
+  `FoundAnyGround` briefly became false. Direct mode now gets a bounded
+  0.25-second/1-metre static-surface reacquisition window across mesh seams.
+- The ordinary curved-road policy is unchanged.
+
 ## 2026-10-26 - Add bounded Antigravity diagnostics
 
 - Added opt-in detailed HUD/logging for raw contact, applied frame, motor tilt,

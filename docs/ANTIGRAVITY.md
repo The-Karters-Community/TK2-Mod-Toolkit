@@ -45,6 +45,10 @@ contact tilt, applied frame tilt, motor tilt, frame error, native slope limit,
 contact state, speed, and collider layer. BepInEx logs receive the same data at
 most once every 350 ms, plus forced release reasons; it is local/offline only.
 
+The direct loop mode allows a bounded 0.25-second/1-metre reacquisition across
+faceted seams after KCC temporarily reports no ground. The ordinary curved-road
+policy retains its stricter contact grace values.
+
 ## Current test candidate: ground and wall contacts
 
 The user isolated native crashes to **Camera follows surface**. Its invocation
