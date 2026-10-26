@@ -52,7 +52,12 @@ internal static partial class AntigravityFeature
                 Vector3.Dot(entry.Policy.Forward, -wall.normal) > .25f)
             {
                 float turn = Vector3.Angle(entry.Policy.Up, wall.normal);
-                if (turn > 5f && turn <= 110f)
+                // This is only a continuity probe, not a general wall selector.
+                // Large front-facing normals are commonly boost-pad lips, steps,
+                // and obstacle faces. Native grounding handles a real larger road
+                // transition after contact; retain this probe only for faceted
+                // curve seams (the observed 36° -> 55° tunnel step is 19°).
+                if (turn > 5f && turn <= 35f)
                 { surface = wall.collider; normal = wall.normal; directContact = true; }
             }
         }

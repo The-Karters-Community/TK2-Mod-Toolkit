@@ -16,7 +16,7 @@ public sealed partial class Plugin : BasePlugin
     internal static Plugin? Instance;
     internal readonly Harmony Harmony = new("local.tk2.customization");
     internal ConfigEntry<bool> UiEnabled = null!, AudioEnabled = null!, CameraEnabled = null!, PhysicsEnabled = null!;
-    internal ConfigEntry<bool> AntigravityEnabled = null!, AntigravityCameraEnabled = null!, AntigravityAnySurface = null!;
+    internal ConfigEntry<bool> AntigravityEnabled = null!, AntigravityCameraEnabled = null!, AntigravityAnySurface = null!, AntigravityDisableSplineTeleports = null!;
     internal ConfigEntry<float> HudScale = null!, Volume = null!, Fov = null!, FallAcceleration = null!, AirTime = null!;
     internal ConfigEntry<string> CanvasFilter = null!;
     internal ConfigEntry<bool> PreserveKartFraming = null!;
@@ -53,12 +53,15 @@ public sealed partial class Plugin : BasePlugin
             "Unavailable while the reported surface-camera crash is investigated.");
         AntigravityAnySurface = Config.Bind("Antigravity", "AllowWallSurfaces", false,
             "Offline free driving: follow static solid ground and wall contacts. Respawn volumes, triggers, moving bodies and racers remain excluded.");
+        AntigravityDisableSplineTeleports = Config.Bind("Antigravity", "DisableSplineTeleports", false,
+            "Temporary offline loop test: block new local Bezier spline-path movement while Antigravity is enabled. Respawns and instant teleports are not changed.");
         BindPack();
 
         TryFeature("Wwise volume", () => PatchExact(typeof(PTK_AudioListenerManager), "SetVolume",
             new[] { typeof(string), typeof(int) }, nameof(AudioPrefix), prefix: true));
         TryFeature("offline fast fall", InstallPhysics);
         TryFeature("offline antigravity", () => AntigravityFeature.Install(this));
+        TryFeature("offline spline-teleport testing", () => AntigravitySplineTeleport.Install(this));
         TryFeature("fast-fall controller input", () => FastFallFeature.Install(this));
         TryFeature("air shift", () => AirShiftFeature.Install(this));
         TryFeature("practice rewind", () => PracticeRewindFeature.Install(this));

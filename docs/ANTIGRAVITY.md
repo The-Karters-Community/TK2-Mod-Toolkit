@@ -1,5 +1,19 @@
 # Antigravity: road adhesion for offline driving
 
+## Temporary spline-path switch
+
+`Disable spline teleports (testing)` is an opt-in, offline-only loop-test
+switch. It blocks the local player's *new* `QuickDashMovement_Bezier` entries
+while Antigravity is enabled. It does not change respawns, instant teleports,
+AI players, or an already-running spline move. The shipped native entry sets
+the player/kart and then initializes the Bezier path, so blocking it at entry
+avoids partial path state. This is a testing control, not a general teleport
+disable feature.
+
+The direct-contact continuation probe is limited to 35-degree faceted seams.
+This retains the observed 36-to-55-degree tunnel transition while preventing a
+turbo-pad or obstacle face from being selected as a surface continuation.
+
 ## Current test candidate: ground and wall contacts
 
 The user isolated native crashes to **Camera follows surface**. Its invocation

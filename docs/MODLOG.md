@@ -1,3 +1,12 @@
+## 2026-10-26 - Loop test control and turbo-pad edge guard
+
+- Added default-off **Disable spline teleports (testing)** under Antigravity.
+  It blocks only new local offline Bezier spline movement while Antigravity is
+  enabled; instant teleports, respawns, AI, and an active path are untouched.
+- Limited the forward surface-continuation probe to 35-degree faceted seams so
+  boost-pad lips and obstacle faces cannot be selected as a wall continuation.
+- Built for an in-game user test; no harness tests were added or run.
+
 ## 2026-10-26 - Remove unsafe movement-hit bridge
 
 - Race-start crash dump identified `Il2CppObjectPool.Get`/`il2cpp_object_get_class`
