@@ -56,10 +56,6 @@ decay while the surface is steep or inverted. This only prevents the native
 velocity pass from zeroing a loop; reverse input and ordinary flat-road
 braking remain native. Accepted drift hops use the same bounded carry.
 
-Normal jumps remain native on flat and banked direct surfaces. Only a jump
-started while the kart is already on a steep/inverted surface is transported
-into the surface frame as an adhesion hop.
-
 The optional camera transports its previous surface frame onto the new normal,
 preserving roll through a loop. It does not rebuild each frame from world-up,
 which avoids the arbitrary-roll snap at the top/bottom of a loop.

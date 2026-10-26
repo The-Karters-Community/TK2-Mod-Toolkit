@@ -1,16 +1,3 @@
-## 2026-10-26 - Keep native jumps and reacquire loop quads
-
-- The live run showed direct mode intercepting ordinary jumps and releasing at
-  a 94-degree loop section with `mustUnground=False`; the center continuity ray
-  missed the next faceted quad.
-- Flat and banked direct surfaces now keep the game's native jump. Surface-hop
-  transport is reserved for genuinely steep/inverted sections. Continuity
-  reacquisition samples the capsule center and four bounded lateral/forward
-  offsets, while retaining collider eligibility checks.
-- Added a diagnostic jump line so the log identifies native road jumps versus
-  steep surface hops. Build completed with zero warnings/errors; deployment is
-  pending one game-close boundary.
-
 ## 2026-10-26 - Preserve loop momentum and hop continuity
 
 - The live diagnostics showed `FoundAnyGround` dropping at the native slope

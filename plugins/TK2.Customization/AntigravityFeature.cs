@@ -296,37 +296,14 @@ internal static partial class AntigravityFeature
         // triggers, dynamic bodies, respawn surfaces and player colliders.
         LayerMask probeLayers = Plugin.Instance?.AntigravityAnySurface.Value == true
             ? motor.CollidableLayers : motor.StableGroundLayers;
-        float lateral = Mathf.Clamp(motor.Capsule.radius * .65f, .08f, .55f);
-        Vector3 forward = Vector3.ProjectOnPlane(motor.TransientRotation * Vector3.forward, up).normalized;
-        Vector3 right = forward.sqrMagnitude > .5f ? Vector3.Cross(up, forward).normalized : Vector3.zero;
-        RaycastHit best = default;
-        bool found = false;
-        ConsiderContinuityRay(controller, origin, -up, maxDistance, probeLayers, ref best, ref found);
-        if (forward.sqrMagnitude > .5f)
-        {
-            ConsiderContinuityRay(controller, origin + forward * lateral, -up, maxDistance, probeLayers, ref best, ref found);
-            ConsiderContinuityRay(controller, origin - forward * lateral, -up, maxDistance, probeLayers, ref best, ref found);
-        }
-        if (right.sqrMagnitude > .5f)
-        {
-            ConsiderContinuityRay(controller, origin + right * lateral, -up, maxDistance, probeLayers, ref best, ref found);
-            ConsiderContinuityRay(controller, origin - right * lateral, -up, maxDistance, probeLayers, ref best, ref found);
-        }
-        if (!found) return false;
-        candidate = best.collider;
-        normal = best.normal;
-        separation = Mathf.Max(0f, best.distance - .1f);
+        if (!Physics.Raycast(origin, -up, out var hit, maxDistance + .1f,
+            probeLayers, QueryTriggerInteraction.Ignore)) return false;
+        Collider collider = hit.collider;
+        if (!EligibleCollider(collider, controller)) return false;
+        candidate = collider;
+        normal = hit.normal;
+        separation = Mathf.Max(0f, hit.distance - .1f);
         return true;
-    }
-
-    private static void ConsiderContinuityRay(PixelEasyCharMoveKartController controller,
-        Vector3 origin, Vector3 direction, float maxDistance, LayerMask layers,
-        ref RaycastHit best, ref bool found)
-    {
-        if (!Physics.Raycast(origin, direction, out var hit, maxDistance + .1f,
-            layers, QueryTriggerInteraction.Ignore) || !EligibleCollider(hit.collider, controller)) return;
-        if (!found || hit.distance < best.distance)
-        { best = hit; found = true; }
     }
 
     private static Vector3 WorldCapsuleBottom(KinematicCharacterMotor motor) =>
@@ -577,18 +554,8 @@ internal static partial class AntigravityFeature
     private static void JumpPostfix(PixelKartPhysics __instance, ref Vector3 __0, Vector3 __state)
     {
         if (!TryGetAttached(__instance, out var entry)) return;
-        float surfaceTilt = Vector3.Angle(Vector3.up, entry.Policy.Up);
-        // Preserve ordinary jumps on flat/banked road. Surface-frame jump
-        // transport is reserved for the steep/inverted portion where the
-        // native world-up impulse would otherwise detach the kart.
-        if (entry.SurfaceMode && surfaceTilt < 65f)
-        {
-            DiagnosticLog($"jump: native road jump tilt={surfaceTilt:0}°");
-            return;
-        }
         Vector3 nativeDelta = __0 - __state;
         if (nativeDelta.sqrMagnitude > .000001f) entry.AcceptedHop = true;
-        DiagnosticLog($"jump: surface hop tilt={surfaceTilt:0}° delta={nativeDelta.magnitude:0.0}");
         Vector3 redirected = AntigravityPolicy.RedirectAddedDelta(__state, __0, Vector3.up, entry.Policy.Up);
         if ((redirected - __0).sqrMagnitude > .000001f && Plugin.Instance != null) Plugin.Instance.SessionModified = true;
         __0 = redirected;
