@@ -14,6 +14,10 @@ They default off and still need in-game validation. Ricochet Items was removed
 after its bazooka shots failed in play. See [controls, evidence and
 limitations](docs/AERIAL-PRACTICE.md).
 
+Experimental **Antigravity** adds offline road adhesion for steep banks and
+continuous loops, with bounded drift-hop continuity. It defaults off and keeps
+mandatory online/submission protection. See [driving rules and native evidence](docs/ANTIGRAVITY.md).
+
 [Bobby's Race Tools](standalone/README.md) separates Camera setup and the Gamepad
 viewer into a small Windows executable that runs without BepInEx. Build it with
 `python standalone/build.py`; the rest of this README describes the full Toolkit.

@@ -291,6 +291,7 @@ internal sealed class DrivingSnapshot
         // Latch before the first write, including partially failed restores.
         Plugin.Instance!.SessionModified = true;
         var c = b.kartController; var p = c.kartPhysics; var r = c.outsideMapValidator;
+        AntigravityFeature.ReleaseKartBeforeRestore(p);
         float elapsed = Time.time - CapturedTime;
         var race = c.parentPlayer.playerRaceLogic;
         race.fPlayerCurrentRoadDistance = RoadDistance; c.parentPlayer.fDistanceOnTrack = PlayerDistance;

@@ -44,6 +44,7 @@ FEATURES = [
         ("Opacity", "Background opacity", "float", .92, .45, 1),
     ]},
     {"id": "Physics", "name": "Fast fall", "category": "Driving", "description": "Press Down Arrow or the mapped controller button after the minimum air time. Includes the legacy press, directional input and optional dodge modes.", "origin": "Community legacy port", "gameplay": True, "settings": [("FastFallAcceleration", "Downward acceleration", "float", 100, 0, 500), ("MinimumAirTime", "Air time before activation", "float", .4, 0, 3), ("UseSinglePressInput", "Press once per jump", "bool", True, None, None), ("ControllerAction", "Controller button", "text", "MenuTriangle", None, None), ("KeyboardKey", "Keyboard key", "text", "DownArrow", None, None), ("ShouldDodgeOnPress", "Dodge on fast fall", "bool", False, None, None), ("DodgeDurationAfterPress", "Dodge duration", "float", .5, .1, 1), ("MinimumJoystickInputBeforeFastFall", "Directional deadzone", "float", .1, 0, 1)]},
+    {"id": "Antigravity", "name": "Antigravity (experimental)", "category": "Driving", "description": "Experimental surface adhesion for local offline races. Follows stable road contact through banks and loops; steep surfaces need speed, and a real native jump can use a short bounded road-continuity grace. In-game validation pending. Online protection blocks online sessions.", "origin": "New", "gameplay": True, "settings": [("ShowStatus", "Show status", "bool", True, None, None, "Show current surface-contact status while testing.")]},
     {"id": "Laps", "name": "Custom lap count", "category": "Race rules", "description": "Choose how many laps an offline race requires. Port of the legacy custom-laps idea.", "origin": "Legacy port", "gameplay": True, "settings": [("Count", "Laps", "int", 3, 1, 99)]},
     {"id": "SimpleDriving", "name": "Driving challenge", "category": "Driving", "description": "Disable local jump and drift inputs. Fresh port of the legacy BoringMode idea.", "origin": "Legacy port", "gameplay": True, "settings": [("DisableJump", "Disable jumping", "bool", True, None, None), ("DisableDrift", "Disable drifting", "bool", True, None, None)]},
     {"id": "AutoBoost", "name": "Automatic drift boost", "category": "Driving", "description": "Automatically fire valid boosts; includes the legacy drift-release and early-press protection hooks.", "origin": "Legacy port", "gameplay": True, "settings": [("ThresholdPercent", "Auto-boost threshold", "float", 100, 1, 100), ("BoostOnDriftStop", "Boost when drift ends", "bool", True, None, None), ("SuppressEarlyBoost", "Ignore premature presses", "bool", True, None, None)]},
@@ -184,7 +185,7 @@ def defaults():
 
 PACKS = [
     {"id": "garage", "name": "Toolkit Essentials", "description": "Online protection, camera, interface, audio, graphics and race performance controls.", "features": ["OnlineProtection", "UI", "HudOpacity", "DisableVignette", "GamepadOverlay", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
-    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "AirShift", "PracticeRewind", "MineTraps"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
+    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "Antigravity", "AirShift", "PracticeRewind", "MineTraps"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
 
@@ -240,6 +241,7 @@ def module_sources():
         "Audio": ["AudioFeature.cs", "Plugin.cs"],
         "Camera": ["CameraFeature.cs", "CameraSettings.cs", "CameraPanel.cs"],
         "Physics": ["FastFallFeature.cs", "ShortcutInput.cs", "Plugin.cs"],
+        "Antigravity": ["AntigravityFeature.cs", "AntigravityPolicy.cs", "FeatureHook.cs", "AirShiftFeature.cs", "AirDashMath.cs", "Plugin.cs"],
         "AirShift": ["FeatureHook.cs", "AirShiftFeature.cs", "AirDashMath.cs", "ShortcutInput.cs", "Plugin.cs"],
         "PracticeRewind": ["FeatureHook.cs", "PracticeRewindFeature.cs", "PracticeHistory.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirDashMath.cs", "FastFallFeature.cs", "ShortcutInput.cs", "StudioBehaviour.cs", "Plugin.cs"],
         "MineTraps": ["FeatureHook.cs", "MineTrapFeature.cs", "ShortcutInput.cs", "AirShiftFeature.cs", "AirDashMath.cs", "Plugin.cs", "StudioBehaviour.cs"],

@@ -80,6 +80,7 @@ public sealed class StudioBehaviour : MonoBehaviour
         }
         CameraPanel.Tick(p);
         GamepadOverlay.Tick(p);
+        AntigravityFeature.Tick();
         RunFeature(ref _audioFaulted, "audio", () => AudioFeature.Tick(p));
         RecipeHost.Tick();
         PerformanceFeature.Tick();
@@ -203,6 +204,7 @@ public sealed class StudioBehaviour : MonoBehaviour
         TrackBoundaries.Draw();
         PracticeRewindFeature.DrawStatus();
         AirShiftFeature.DrawStatus();
+        AntigravityFeature.DrawStatus();
         MineTrapFeature.DrawStatus();
     }
 

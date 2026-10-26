@@ -1,3 +1,27 @@
+## 2026-10-26 - Experimental Antigravity
+
+- Added a default-off first-class Community Mods driving module for continuous
+  road banks/loops, with mandatory online/submission protection and local-human
+  eligibility. Luna agents implemented the module and tests under main-task
+  design/native review.
+- Freshly inspected the installed 0.1.4.30 GameAssembly/metadata with Ghidra
+  function slices and current interop signature checks. Corrected surface axes,
+  native yaw mapping, local acceleration, drift-hop impulse/gravity direction,
+  and already-projected velocity handling. Kept native collisions, slope limits,
+  jumps/drift side effects, checkpoints and recovery rules.
+- Added finite drift-hop grace from accepted native jumps, tangential-speed and
+  curvature limits, wall/respawn/trigger/body exclusions, status display and
+  disable/recovery/rewind cleanup. Detailed constraints and evidence are in
+  [ANTIGRAVITY.md](ANTIGRAVITY.md).
+- Verification: clean plugin build; 393 policy and 59 headless production-adapter
+  assertions; 147 Python and 23 frontend tests; 18 real-interop hook/signature
+  resolutions. Source UI assets/catalog served correctly; visual automation was
+  unavailable. No in-game handling claim.
+- Installed DLL hash `f492c0e137aeb44722bea4925cc0751e0e169b7bb4feb8db46a10be8a59d394d`
+  verified, with the game stopped. Rollback backup:
+  `local/backups/1792990481967402300`. Module left off; game not launched.
+  User-proposed tunnel test: Workshop item `3268524772`, pending live feedback.
+
 ## 2026-10-18 - Standalone race tools 0.1.1
 
 - Fixed apparently inactive controls after a saved player choice stopped matching
