@@ -8,6 +8,12 @@ namespace TK2.Customization;
 internal static class AntigravityPolicy
 {
     internal enum ContactKind { None, NativeStableRoad, ContinuousRoadProbe }
+    internal enum ArmBlockReason
+    {
+        None, LookaheadNotSampled, LookaheadMiss, LookaheadIneligible, LookaheadTrackMismatch,
+        LookaheadHeight, LookaheadTurn, LookaheadNotIncreasing, LookaheadBelowTarget,
+        StableContacts, ForwardTravel, CurveProgress, NormalProgress, CurrentSlope, LowSpeed
+    }
 
     internal enum DetachReason
     {
@@ -24,6 +30,7 @@ internal static class AntigravityPolicy
         internal Vector3 ArmNormal, ArmForward, LastPosition;
         internal float LastSlopeAngle, ArmForwardTravel, ArmCurveProgress, ArmNormalTravel;
         internal int StableSamples;
+        internal string LastArmResetCause;
     }
 
     internal readonly struct Settings
@@ -76,6 +83,8 @@ internal static class AntigravityPolicy
         internal readonly bool Enabled, LocalHuman, OfflineAllowed, LayerInStableGroundMask;
         internal readonly bool IsTrigger, IsPlayerCollider, HasDynamicRigidbody, LaunchOrTeleport, DriftHopCandidate;
         internal readonly bool HasEligibleLookahead, SameEligibleTrack, ActiveContactCandidate;
+        internal readonly bool LookaheadAttempted, LookaheadHit, LookaheadEligible, LookaheadSameTrack;
+        internal readonly float LookaheadNormalTurnDegrees;
 
         internal Sample(float deltaTime, float speed, Vector3 position, Vector3 contactNormal,
             Vector3 referenceForward, float probeSeparation, float steeringDeltaDegrees, ContactKind contact, bool enabled, bool localHuman,
@@ -83,7 +92,9 @@ internal static class AntigravityPolicy
             bool isPlayerCollider, bool hasDynamicRigidbody, bool launchOrTeleport, bool driftHopCandidate,
             Vector3 nativeCharacterUp = default, float nativeMaxStableSlopeAngle = 0f,
             float forwardProgress = 0f, bool hasEligibleLookahead = false, Vector3 lookaheadNormal = default,
-            float lookaheadHeightError = 0f, bool sameEligibleTrack = false, bool activeContactCandidate = false)
+            float lookaheadHeightError = 0f, bool sameEligibleTrack = false, bool activeContactCandidate = false,
+            bool lookaheadAttempted = false, bool lookaheadHit = false, bool lookaheadEligible = false,
+            bool lookaheadSameTrack = false, float lookaheadNormalTurnDegrees = 0f)
         {
             DeltaTime = deltaTime; Speed = speed; Position = position; ContactNormal = contactNormal;
             ReferenceForward = referenceForward; Contact = contact; Enabled = enabled;
@@ -97,6 +108,11 @@ internal static class AntigravityPolicy
             ForwardProgress = forwardProgress; HasEligibleLookahead = hasEligibleLookahead;
             LookaheadNormal = lookaheadNormal; LookaheadHeightError = lookaheadHeightError;
             SameEligibleTrack = sameEligibleTrack; ActiveContactCandidate = activeContactCandidate;
+            LookaheadAttempted = lookaheadAttempted || hasEligibleLookahead;
+            LookaheadHit = lookaheadHit || hasEligibleLookahead;
+            LookaheadEligible = lookaheadEligible || hasEligibleLookahead;
+            LookaheadSameTrack = lookaheadSameTrack || (hasEligibleLookahead && sameEligibleTrack);
+            LookaheadNormalTurnDegrees = lookaheadNormalTurnDegrees;
         }
     }
 
@@ -187,6 +203,8 @@ internal static class AntigravityPolicy
             if (!Finite(armTurn) || armTurn > allowedArmTurn + .001f ||
                 slopeAngle + .5f < state.LastSlopeAngle)
             {
+                string resetCause = !Finite(armTurn) || armTurn > allowedArmTurn + .001f
+                    ? "normal-step" : "slope-regression";
                 if (!TryProjectForward(sample.ReferenceForward, candidateNormal, out var resetForward))
                     return Detach(ref state, DetachReason.InvalidNormal);
                 state = new State {
@@ -195,7 +213,8 @@ internal static class AntigravityPolicy
                     ArmForward = resetForward,
                     LastPosition = sample.Position,
                     LastSlopeAngle = slopeAngle,
-                    StableSamples = 1
+                    StableSamples = 1,
+                    LastArmResetCause = resetCause
                 };
                 return ArmedCurrent(ref state, slopeAngle);
             }
@@ -213,16 +232,17 @@ internal static class AntigravityPolicy
             if (TryProjectForward(sample.ReferenceForward, candidateNormal, out var updatedArmForward))
                 state.ArmForward = updatedArmForward;
 
-            bool lookahead = sample.HasEligibleLookahead && sample.SameEligibleTrack &&
+            bool lookahead = sample.HasEligibleLookahead && sample.LookaheadSameTrack &&
                 Finite(sample.LookaheadHeightError) && sample.LookaheadHeightError <= settings.MaxLookaheadHeight &&
                 TryNormalize(sample.LookaheadNormal, out var lookaheadNormal) &&
                 Vector3.Angle(candidateNormal, lookaheadNormal) <= settings.MaxLookaheadNormalTurn &&
+                Vector3.Angle(Vector3.up, lookaheadNormal) + .01f >= slopeAngle &&
                 Vector3.Angle(Vector3.up, lookaheadNormal) >= activationAngle;
             bool ready = state.StableSamples >= settings.MinStableSamples &&
                 state.ArmForwardTravel >= settings.MinForwardTravel &&
                 state.ArmCurveProgress >= settings.MinCurveProgress &&
                 state.ArmNormalTravel >= settings.MinCurveProgress &&
-                slopeAngle >= settings.MinActivationAngle && slopeAngle >= activationAngle && lookahead;
+                slopeAngle >= settings.MinActivationAngle && lookahead;
             if (!ready) return ArmedCurrent(ref state, slopeAngle);
 
             if (sample.Speed < settings.AttachSpeed)
@@ -339,6 +359,31 @@ internal static class AntigravityPolicy
 
     private static Decision ArmedCurrent(ref State state, float slopeAngle) =>
         new(false, true, DetachReason.None, state.ArmNormal, Vector3.zero, state.ArmForward, 0f, 0f, slopeAngle);
+
+    internal static ArmBlockReason GetArmBlockReason(in State state, in Sample sample, in Settings settings)
+    {
+        float target = WorldActivationThreshold(sample.NativeMaxStableSlopeAngle, in settings);
+        float currentSlope = Vector3.Angle(Vector3.up, sample.ContactNormal);
+        if (!sample.LookaheadAttempted) return ArmBlockReason.LookaheadNotSampled;
+        if (!sample.LookaheadHit) return ArmBlockReason.LookaheadMiss;
+        if (!sample.LookaheadEligible) return ArmBlockReason.LookaheadIneligible;
+        if (!sample.LookaheadSameTrack) return ArmBlockReason.LookaheadTrackMismatch;
+        if (!Finite(sample.LookaheadHeightError) || sample.LookaheadHeightError > settings.MaxLookaheadHeight)
+            return ArmBlockReason.LookaheadHeight;
+        if (!Finite(sample.LookaheadNormalTurnDegrees) || sample.LookaheadNormalTurnDegrees > settings.MaxLookaheadNormalTurn)
+            return ArmBlockReason.LookaheadTurn;
+        if (!Finite(sample.LookaheadNormal) || Vector3.Angle(Vector3.up, sample.LookaheadNormal) + .01f < currentSlope)
+            return ArmBlockReason.LookaheadNotIncreasing;
+        if (Vector3.Angle(Vector3.up, sample.LookaheadNormal) < target)
+            return ArmBlockReason.LookaheadBelowTarget;
+        if (state.StableSamples < settings.MinStableSamples) return ArmBlockReason.StableContacts;
+        if (state.ArmForwardTravel < settings.MinForwardTravel) return ArmBlockReason.ForwardTravel;
+        if (state.ArmCurveProgress < settings.MinCurveProgress) return ArmBlockReason.CurveProgress;
+        if (state.ArmNormalTravel < settings.MinCurveProgress) return ArmBlockReason.NormalProgress;
+        if (currentSlope < settings.MinActivationAngle) return ArmBlockReason.CurrentSlope;
+        if (sample.Speed < settings.AttachSpeed) return ArmBlockReason.LowSpeed;
+        return ArmBlockReason.None;
+    }
 
     private static Decision Detach(ref State state, DetachReason reason)
     {

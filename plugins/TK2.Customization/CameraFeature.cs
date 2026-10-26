@@ -91,15 +91,7 @@ internal static class CameraFeature
     private static void ApplyAntigravityCamera(Plugin plugin, PixelGameKartCamera camera,
         Ant_Player player, ref Vector3 position, ref Quaternion rotation, float fov)
     {
-        try { AntigravityCamera.Apply(camera, player, ref position, ref rotation, fov); }
-        catch (Exception ex)
-        {
-            AntigravityCamera.Reset(camera.GetInstanceID());
-            if (plugin.AntigravityCameraEnabled.Value)
-            {
-                plugin.AntigravityCameraEnabled.Value = false;
-                plugin.Log.LogError($"Antigravity camera stopped after runtime failure: {ex.Message}");
-            }
-        }
+        // User isolated a native crash to this camera path. Keep it disconnected even
+        // when an older configuration still contains CameraFollowsSurface=true.
     }
 }

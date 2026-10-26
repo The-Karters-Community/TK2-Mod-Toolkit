@@ -6,22 +6,34 @@ using UnityEngine.SceneManagement;
 
 namespace TK2.Customization;
 
-internal static class AntigravityFeature
+internal static partial class AntigravityFeature
 {
     private static BepInEx.Configuration.ConfigEntry<bool>? ShowStatus;
     private static string Status = "Antigravity: waiting for eligible road";
     private static float NextAttachedStatusTime;
+    private struct LookaheadDiagnostic
+    {
+        internal bool Attempted, Hit, Eligible, SameTrack;
+        internal float HeightError, NormalTurnDegrees;
+        internal Vector3 Normal;
+    }
+
     private sealed class KartState
     {
         internal PixelEasyCharMoveKartController Controller = null!;
         internal KinematicCharacterMotor Motor = null!;
         internal AntigravityPolicy.State Policy;
-        internal int SceneHandle;
+        internal int KartSceneHandle, ActiveSceneHandle;
         internal bool HasNativeYaw;
         internal bool Applied;
         internal float LastNativeYaw;
         internal bool AcceptedHop;
         internal Collider? SupportCollider;
+        internal bool SurfaceMode, LayersOverridden;
+        internal int OriginalStableLayers;
+        internal Collider? MovementSurface;
+        internal Vector3 MovementNormal;
+        internal float MovementContactTime = -100f;
     }
 
     private struct MainVelocityPatchState
@@ -56,7 +68,10 @@ internal static class AntigravityFeature
         new FeatureHook(typeof(PixelKartPhysics), "UpdateVelocity",
             new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, Prefix: nameof(MainVelocityPrefix),
             Postfix: nameof(MainVelocityPostfix), Finalizer: nameof(MainVelocityFinalizer)),
-        new FeatureHook(typeof(PlayerRaceLogic), nameof(PlayerRaceLogic.OnRaceResetted), Type.EmptyTypes, Postfix: nameof(RaceResetPostfix))
+        new FeatureHook(typeof(PlayerRaceLogic), nameof(PlayerRaceLogic.OnRaceResetted), Type.EmptyTypes, Postfix: nameof(RaceResetPostfix)),
+        new FeatureHook(typeof(PixelEasyCharMoveKartController),
+            nameof(PixelEasyCharMoveKartController.KinematicCharacterController_ICharacterController_OnMovementHit),
+            new[] { typeof(Collider), typeof(Vector3), typeof(Vector3), typeof(HitStabilityReport).MakeByRefType() }, Prefix: nameof(SurfaceMovementHit))
     };
 
     // Called from StudioBehaviour.Update only while entries exist. It does no scene or kart scans.
@@ -66,10 +81,14 @@ internal static class AntigravityFeature
         var plugin = Plugin.Instance;
         int scene = SceneManager.GetActiveScene().handle;
         foreach (var pending in PendingReleaseRotation.Values)
-            if (pending.Controller == null || pending.SceneHandle != scene) { PendingReleaseRotation.Clear(); break; }
+            if (pending.Controller == null || pending.ActiveSceneHandle != scene ||
+                pending.KartSceneHandle != pending.Controller.gameObject.scene.handle)
+            { PendingReleaseRotation.Clear(); break; }
         if (States.Count == 0) return;
         foreach (var entry in States.Values)
-            if (entry.SceneHandle != scene) { ReleaseAll(); PendingReleaseRotation.Clear(); return; }
+            if (entry.Controller == null || entry.ActiveSceneHandle != scene ||
+                entry.KartSceneHandle != entry.Controller.gameObject.scene.handle)
+            { ReleaseAll(); PendingReleaseRotation.Clear(); return; }
         if (plugin != null && plugin.AntigravityEnabled.Value && Plugin.OfflineLabAllowed)
         {
             foreach (var entry in States.Values)
@@ -99,6 +118,12 @@ internal static class AntigravityFeature
             var motor = __instance.Motor;
             if (physics == null || motor == null) { Release(id, true); return; }
             States.TryGetValue(id, out var entry);
+            if (plugin.AntigravityAnySurface.Value)
+            {
+                UpdateSolidSurface(__instance, physics, motor, entry);
+                return;
+            }
+            if (entry?.SurfaceMode == true) { Release(id, true); entry = null; }
             AntigravityPolicy.State policyState = entry?.Policy ?? default;
             var grounding = motor.GroundingStatus;
             Collider ground = grounding.GroundCollider;
@@ -148,8 +173,7 @@ internal static class AntigravityFeature
                 ? AntigravityPolicy.ForwardProgress(position - policyState.LastPosition,
                     policyState.ArmForward, policyState.ArmNormal) : 0f;
             bool hasLookahead = false;
-            Vector3 lookaheadNormal = Vector3.zero;
-            float lookaheadHeightError = 0f;
+            var lookahead = new LookaheadDiagnostic { HeightError = float.PositiveInfinity };
             float nativeSlopeLimit = motor.MaxStableSlopeAngle;
             Vector3 nativeUp = motor.CharacterUp;
             float worldActivationThreshold = AntigravityPolicy.WorldActivationThreshold(nativeSlopeLimit, in Settings);
@@ -158,16 +182,18 @@ internal static class AntigravityFeature
                 Vector3.Angle(Vector3.up, normal) >= Mathf.Max(Settings.MinActivationAngle, worldActivationThreshold - 25f))
             {
                 hasLookahead = TryForwardLookahead(__instance, motor, ground, normal, nativeHeading,
-                    tangentialSpeed, Time.fixedDeltaTime, out lookaheadNormal,
-                    out lookaheadHeightError, out sameEligibleTrack);
+                    tangentialSpeed, Time.fixedDeltaTime, out lookahead);
+                sameEligibleTrack = lookahead.SameTrack;
             }
             var sample = new AntigravityPolicy.Sample(Time.fixedDeltaTime, tangentialSpeed,
                 position, normal, nativeHeading, probeSeparation, 0f, contact,
                 true, true, !Ant_CurrentGameConfiguration.IsOnlineGame_InRoom_WithInternet,
                 inMask, trigger, playerCollider, dynamicBody, launching, acceptedHop,
-                nativeUp, nativeSlopeLimit, forwardProgress, hasLookahead, lookaheadNormal,
-                lookaheadHeightError, sameEligibleTrack,
-                activeContactCandidate && contact == AntigravityPolicy.ContactKind.ContinuousRoadProbe);
+                nativeUp, nativeSlopeLimit, forwardProgress, hasLookahead, lookahead.Normal,
+                lookahead.HeightError, sameEligibleTrack,
+                activeContactCandidate && contact == AntigravityPolicy.ContactKind.ContinuousRoadProbe,
+                lookahead.Attempted, lookahead.Hit, lookahead.Eligible, lookahead.SameTrack,
+                lookahead.NormalTurnDegrees);
             var decision = AntigravityPolicy.Step(ref policyState, in sample, in Settings);
             if (!decision.Attached)
             {
@@ -182,7 +208,8 @@ internal static class AntigravityFeature
                     {
                         if (States.Count >= 4) { ReleaseAll(); PendingReleaseRotation.Clear(); }
                         entry = new KartState { Controller = __instance, Motor = motor,
-                            SceneHandle = __instance.gameObject.scene.handle, Policy = policyState,
+                            KartSceneHandle = __instance.gameObject.scene.handle,
+                            ActiveSceneHandle = SceneManager.GetActiveScene().handle, Policy = policyState,
                             SupportCollider = ground };
                         if (TryNativeYaw(physics.qSteeringOrientation, out float armYaw))
                         { entry.LastNativeYaw = armYaw; entry.HasNativeYaw = true; }
@@ -195,7 +222,7 @@ internal static class AntigravityFeature
                         if (TryNativeYaw(physics.qSteeringOrientation, out float armYaw))
                         { entry.LastNativeYaw = armYaw; entry.HasNativeYaw = true; }
                     }
-                    SetArmedStatus(decision.ArmSlopeAngle, nativeSlopeLimit);
+                    SetArmedStatus(decision.ArmSlopeAngle, nativeSlopeLimit, policyState, in sample);
                 }
                 else
                 {
@@ -214,7 +241,8 @@ internal static class AntigravityFeature
                     PendingReleaseRotation.Clear();
                 }
                 entry = new KartState { Controller = __instance, Motor = motor,
-                    SceneHandle = __instance.gameObject.scene.handle };
+                    KartSceneHandle = __instance.gameObject.scene.handle,
+                    ActiveSceneHandle = SceneManager.GetActiveScene().handle };
                 if (TryNativeYaw(physics.qSteeringOrientation, out float yaw))
                 { entry.LastNativeYaw = yaw; entry.HasNativeYaw = true; }
                 States[id] = entry;
@@ -253,12 +281,9 @@ internal static class AntigravityFeature
 
     private static bool TryForwardLookahead(PixelEasyCharMoveKartController controller,
         KinematicCharacterMotor motor, Collider currentRoad, Vector3 normal, Vector3 referenceForward,
-        float tangentSpeed, float deltaTime, out Vector3 lookaheadNormal,
-        out float heightError, out bool sameTrack)
+        float tangentSpeed, float deltaTime, out LookaheadDiagnostic diagnostic)
     {
-        lookaheadNormal = Vector3.zero;
-        heightError = float.PositiveInfinity;
-        sameTrack = false;
+        diagnostic = new LookaheadDiagnostic { Attempted = true, HeightError = float.PositiveInfinity };
         Vector3 forward = Vector3.ProjectOnPlane(referenceForward, normal).normalized;
         if (forward.sqrMagnitude < .0001f) return false;
         float distance = Mathf.Clamp(tangentSpeed * deltaTime * 2f, .25f, 1.5f);
@@ -267,12 +292,15 @@ internal static class AntigravityFeature
         float maxCastDistance = .35f + Settings.MaxLookaheadHeight;
         if (!Physics.Raycast(origin, -normal, out var hit, maxCastDistance,
             motor.StableGroundLayers, QueryTriggerInteraction.Ignore)) return false;
+        diagnostic.Hit = true;
         if (!EligibleCollider(hit.collider, controller)) return false;
+        diagnostic.Eligible = true;
         if (!SameEligibleTrack(currentRoad, hit.collider)) return false;
-        heightError = Mathf.Abs(Vector3.Dot(hit.point - expectedRoadPoint, normal));
-        if (heightError > Settings.MaxLookaheadHeight) return false;
-        lookaheadNormal = hit.normal;
-        sameTrack = true;
+        diagnostic.SameTrack = true;
+        diagnostic.HeightError = Mathf.Abs(Vector3.Dot(hit.point - expectedRoadPoint, normal));
+        diagnostic.Normal = hit.normal;
+        diagnostic.NormalTurnDegrees = Vector3.Angle(normal, hit.normal);
+        if (diagnostic.HeightError > Settings.MaxLookaheadHeight) return false;
         return true;
     }
 
@@ -295,6 +323,8 @@ internal static class AntigravityFeature
 
     private static bool EligibleCollider(Collider collider, PixelEasyCharMoveKartController controller)
     {
+        if (Plugin.Instance?.AntigravityAnySurface.Value == true)
+            return EligibleSolidSurface(collider, controller);
         if (collider == null || collider.isTrigger || controller == null) return false;
         if (!IsEligibleLayer(collider.gameObject.layer, controller.Motor.StableGroundLayers.value,
             controller.wallLayerToCollDetect.value, controller.wallRespawn_Flat_ColliderLayer.value,
@@ -467,7 +497,7 @@ internal static class AntigravityFeature
 
     private static bool SlopePrefix(PixelKartPhysics __instance) =>
         !TryGetAttached(__instance, out var entry) ||
-        Vector3.Angle(Vector3.up, entry.Policy.Up) < Settings.SteepAngle;
+        (!entry.SurfaceMode && Vector3.Angle(Vector3.up, entry.Policy.Up) < Settings.SteepAngle);
 
     private static bool TryGetAttachedHop(PixelKartPhysics physics, out KartState entry) =>
         TryGetAttached(physics, out entry) && (entry.Policy.HopElapsed > 0f || entry.AcceptedHop);
@@ -495,7 +525,7 @@ internal static class AntigravityFeature
     }
 
     private static bool TryGet(PixelEasyCharMoveKartController controller, out KartState entry) =>
-        States.TryGetValue(controller.GetInstanceID(), out entry!) && entry.SceneHandle == controller.gameObject.scene.handle;
+        States.TryGetValue(controller.GetInstanceID(), out entry!) && entry.KartSceneHandle == controller.gameObject.scene.handle;
 
     private static bool IsLocalHuman(PixelEasyCharMoveKartController controller) =>
         controller != null && controller.parentPlayer != null &&
@@ -522,7 +552,7 @@ internal static class AntigravityFeature
     {
         if (ShowStatus?.Value == true && Plugin.Instance?.AntigravityEnabled.Value == true &&
             Plugin.OfflineLabAllowed && MenuManager.Instance == null)
-            GUI.Label(new Rect(18, Screen.height - 168, 850, 28), Status);
+            GUI.Label(new Rect(18, Screen.height - 190, 1400, 48), Status);
     }
 
     private static void SetStatus(string status)
@@ -549,12 +579,20 @@ internal static class AntigravityFeature
         SetStatus($"Antigravity: {support} road {roadTilt:0}° / policy {policyTilt:0}° / motor {motorTilt:0}° (Δ{frameError:0}°){landingError}{hop}");
     }
 
-    private static void SetArmedStatus(float slopeAngle, float nativeLimit)
+    private static void SetArmedStatus(float slopeAngle, float nativeLimit,
+        AntigravityPolicy.State state, in AntigravityPolicy.Sample sample)
     {
         if (Time.unscaledTime < NextAttachedStatusTime) return;
         NextAttachedStatusTime = Time.unscaledTime + .2f;
         float target = AntigravityPolicy.WorldActivationThreshold(nativeLimit, in Settings);
-        SetStatus($"Antigravity: armed/passive road {slopeAngle:0}° / calibrated engage near {target:0}° / native CharacterUp limit {nativeLimit:0}°");
+        var blocker = AntigravityPolicy.GetArmBlockReason(in state, in sample, in Settings);
+        float lookSlope = sample.LookaheadNormal.sqrMagnitude > .0001f
+            ? Vector3.Angle(Vector3.up, sample.LookaheadNormal) : 0f;
+        string lookahead = !sample.LookaheadAttempted ? "not-sampled" : !sample.LookaheadHit ? "miss" :
+            !sample.LookaheadEligible ? "ineligible" : !sample.LookaheadSameTrack ? "other-track" : "hit";
+        string reset = string.IsNullOrEmpty(state.LastArmResetCause) ? "none" : state.LastArmResetCause;
+        SetStatus($"Antigravity ARM {blocker}: road {slopeAngle:0}° / target {target:0}° / native CharacterUp limit {nativeLimit:0}° / speed {sample.Speed:0.0}/12 m/s\n" +
+            $"look {lookahead} h{sample.LookaheadHeightError:0.00}/.55m Δn{sample.LookaheadNormalTurnDegrees:0}/20° slope{lookSlope:0}°/{target:0}°; history {state.StableSamples}/4 travel{state.ArmForwardTravel:0.00}/.50m curve{state.ArmCurveProgress:0.0}/2° normal{state.ArmNormalTravel:0.0}/2° reset:{reset}");
     }
 
     private static string StatusFor(AntigravityPolicy.DetachReason reason) => reason switch
@@ -605,6 +643,11 @@ internal static class AntigravityFeature
 
     private static void ReleaseKart(KartState entry, bool safeCharacterBoundary = false)
     {
+        if (entry.LayersOverridden && entry.Motor != null)
+        {
+            entry.Motor.StableGroundLayers = entry.OriginalStableLayers;
+            entry.LayersOverridden = false;
+        }
         if (!entry.Applied) return;
         if (entry.Controller == null || entry.Motor == null || entry.Controller.kartPhysics == null) return;
         var release = AntigravityPolicy.ReleaseAtCurrentHeading(entry.Controller.transform.forward, entry.Motor.Velocity);

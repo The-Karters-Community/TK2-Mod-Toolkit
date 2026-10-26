@@ -20,6 +20,9 @@ AntigravityPolicy.Sample Sample(float degrees = 0, float speed = 20,
     Vector3? nativeUp = null, float nativeMaxSlope = 45, float forwardProgress = 0,
     bool hasLookahead = false, Vector3? lookaheadNormal = null, float lookaheadHeight = 0,
     bool sameTrack = false, bool activeContactCandidate = false,
+    bool lookaheadAttempted = false, bool lookaheadHit = false,
+    bool lookaheadEligible = false, bool lookaheadSameTrack = false,
+    float lookaheadNormalTurn = 0,
     bool enabled = true, bool local = true, bool offline = true, bool groundMask = true,
     bool trigger = false, bool player = false, bool dynamicBody = false,
     bool launch = false, bool hop = false) => new(dt, speed, position ?? Vector3.zero,
@@ -27,7 +30,8 @@ AntigravityPolicy.Sample Sample(float degrees = 0, float speed = 20,
         steeringDeltaDegrees, contact, enabled, local, offline, groundMask, trigger, player,
         dynamicBody, launch, hop, nativeUp ?? Vector3.up, nativeMaxSlope, forwardProgress,
         hasLookahead, lookaheadNormal ?? Vector3.zero, lookaheadHeight, sameTrack,
-        activeContactCandidate);
+        activeContactCandidate, lookaheadAttempted, lookaheadHit, lookaheadEligible,
+        lookaheadSameTrack, lookaheadNormalTurn);
 
 AntigravityPolicy.Decision Step(ref AntigravityPolicy.State state,
     AntigravityPolicy.Sample sample, AntigravityPolicy.Settings? settings = null)
@@ -37,7 +41,7 @@ AntigravityPolicy.Decision Step(ref AntigravityPolicy.State state,
 }
 
 AntigravityPolicy.Decision Activate(ref AntigravityPolicy.State state, float speed = 20,
-    bool passivelyTiltedMotor = false, float startAngle = 30, float finalAngle = 38,
+    bool passivelyTiltedMotor = false, float startAngle = 0, float finalAngle = 0,
     bool validLookahead = true, bool sameTrack = true, float lookaheadHeight = 0,
     Vector3? referenceForward = null, Vector3? previewNormal = null,
     float nativeLimit = 45, float progress = .13f)
@@ -45,18 +49,24 @@ AntigravityPolicy.Decision Activate(ref AntigravityPolicy.State state, float spe
     AntigravityPolicy.Decision result = default;
     int sampleIndex = 0;
     Vector3 forward = referenceForward ?? Vector3.forward;
-    for (float angle = startAngle; angle <= finalAngle + .001f; angle += 1f)
+    float[] facetedAngles = { 0, 0, 18, 36 };
+    bool faceted = startAngle == 0 && finalAngle == 0;
+    IEnumerable<float> angles = faceted ? facetedAngles : Enumerable.Range(0,
+        Math.Max(1, (int)MathF.Floor(finalAngle - startAngle) + 1)).Select(index => startAngle + index);
+    foreach (float angle in angles)
     {
         sampleIndex++;
+        float sampleProgress = faceted ? .18f : progress;
         Vector3 normal = forward.x > .9f ? LoopNormal(angle) : Normal(angle);
         Vector3 motorUp = passivelyTiltedMotor ? normal : Vector3.up;
-        Vector3 lookahead = previewNormal ?? (forward.x > .9f ? LoopNormal(42) : Normal(42));
+        Vector3 lookahead = previewNormal ?? (forward.x > .9f ? LoopNormal(55) : Normal(55));
         result = Step(ref state, Sample(speed: speed, dt: .05f,
-            position: new Vector3(0, 0, (sampleIndex - 1) * progress), contactNormal: normal,
-            referenceForward: referenceForward, nativeUp: motorUp, nativeMaxSlope: nativeLimit,
-            forwardProgress: sampleIndex == 1 ? 0 : progress,
+            position: new Vector3(0, 0, (sampleIndex - 1) * sampleProgress), contactNormal: normal,
+            referenceForward: forward, nativeUp: motorUp, nativeMaxSlope: nativeLimit,
+            forwardProgress: sampleIndex == 1 ? 0 : sampleProgress,
             hasLookahead: validLookahead, lookaheadNormal: lookahead,
             lookaheadHeight: lookaheadHeight, sameTrack: sameTrack));
+        if (result.Attached) return result;
     }
     return result;
 }
@@ -113,23 +123,23 @@ AntigravityPolicy.Decision Activate(ref AntigravityPolicy.State state, float spe
     Check(!latest.Attached && latest.Armed,
         "lookahead outside the bounded road-height tolerance cannot activate");
     state = new AntigravityPolicy.State();
-    latest = Activate(ref state, startAngle: 30, finalAngle: 36, previewNormal: Normal(45));
+    latest = Activate(ref state, startAngle: 20, finalAngle: 24, previewNormal: Normal(55));
     Check(!latest.Attached && latest.Armed,
-        "lookahead at the activation band cannot engage before the current road reaches that band");
+        "valid lookahead cannot activate while the current road incline is below 25°");
     state = new AntigravityPolicy.State();
     latest = Activate(ref state, referenceForward: Vector3.right, previewNormal: Vector3.right);
     Check(!latest.Attached && latest.Armed,
         "a same-track lookahead with an abrupt wall normal cannot activate");
 }
 
-// Smooth uphill progression activates only near the actual native slope boundary.
+// A connected next facet can activate the frame just before an empirical surface threshold.
 {
     var state = new AntigravityPolicy.State();
     var result = Activate(ref state, passivelyTiltedMotor: true);
     Check(result.Attached && state.Attached && !state.Armed,
-        "gradual near-limit curve activates after stable history, actual travel, and same-road lookahead");
-    Check(Vector3.Angle(result.Up, Normal(38)) < 1,
-        "active frame follows the current road normal even when native motor up passively tracks the road");
+        "faceted 0→18→36° road activates before the next 55° facet with matching lookahead");
+    Check(Vector3.Angle(result.Up, Normal(36)) < 1,
+        "predictive activation follows the current 36° road facet, not the uncontacted 55° preview");
     Check(state.StableSamples >= 4 && state.ArmForwardTravel >= .5f && state.ArmCurveProgress >= 2f,
         "activation records minimum stable samples, forward travel, and curve progress");
 
@@ -151,19 +161,13 @@ AntigravityPolicy.Decision Activate(ref AntigravityPolicy.State state, float spe
     foreach (float nativeLimit in new[] { 85f, 90f })
     {
         state = new AntigravityPolicy.State();
-        result = Activate(ref state, nativeLimit: nativeLimit, startAngle: 40, finalAngle: 46,
-            previewNormal: Normal(53));
-        Check(!result.Attached && result.Armed,
-            $"native limit {nativeLimit:0}° cannot activate before 47° world slope even with forward lookahead");
-        result = Step(ref state, Sample(48, dt: .05f, position: new Vector3(0, 0, 7 * .13f),
-            forwardProgress: .13f, nativeMaxSlope: nativeLimit,
-            hasLookahead: true, lookaheadNormal: Normal(53), sameTrack: true));
-        Check(result.Attached && Vector3.Angle(result.Normal, Normal(48)) < 1,
-            $"native limit {nativeLimit:0}° activates at the empirical 47° world calibration, not nativeLimit−8°");
+        result = Activate(ref state, nativeLimit: nativeLimit);
+        Check(result.Attached && Vector3.Angle(result.Normal, Normal(36)) < 1,
+            $"native limit {nativeLimit:0}° uses the same empirical 47° preview threshold to activate at36°");
     }
 
     state = new AntigravityPolicy.State();
-    result = Activate(ref state, startAngle: 30, finalAngle: 34, progress: .1f);
+    result = Activate(ref state, startAngle: 30, finalAngle: 36, progress: .04f);
     Check(!result.Attached && result.Armed,
         "stable sample count without the required half metre of actual forward travel stays passive");
 }
@@ -182,9 +186,68 @@ AntigravityPolicy.Decision Activate(ref AntigravityPolicy.State state, float spe
         "a wall contact outside native stable support cannot arm in midair");
 
     state = new AntigravityPolicy.State();
+    Step(ref state, Sample(0));
+    result = Step(ref state, Sample(25, nativeUp: Normal(25), forwardProgress: .2f,
+        hasLookahead: true, lookaheadNormal: Normal(55), sameTrack: true));
+    Check(!result.Attached && result.Armed && state.StableSamples == 1,
+        "a sharp 25° facet jump resets passive road history instead of activating predictively");
+
+    state = new AntigravityPolicy.State();
     result = Step(ref state, Sample(10, launch: true));
     Check(!result.Attached && !result.Armed && result.Reason == AntigravityPolicy.DetachReason.LaunchOrTeleport,
         "launch and teleport clear passive arming");
+}
+
+// Armed HUD blocker codes identify preview, speed, reset, and progress requirements.
+{
+    var settings = AntigravityPolicy.Settings.Default;
+    AntigravityPolicy.Sample lastSample = default;
+
+    var noPreview = new AntigravityPolicy.State();
+    float[] angles = { 0, 0, 18 };
+    for (int i = 0; i < angles.Length; i++)
+        Step(ref noPreview, Sample(angles[i], dt: .05f,
+            position: Vector3.forward * (i * .18f), forwardProgress: i == 0 ? 0 : .18f));
+    lastSample = Sample(36, dt: .05f, position: Vector3.forward * .54f, forwardProgress: .18f);
+    Step(ref noPreview, lastSample);
+    Check(AntigravityPolicy.GetArmBlockReason(in noPreview, in lastSample, in settings) ==
+        AntigravityPolicy.ArmBlockReason.LookaheadNotSampled,
+        "armed diagnostic identifies missing forward preview");
+
+    var lowSpeed = new AntigravityPolicy.State();
+    for (int i = 0; i < angles.Length; i++)
+        Step(ref lowSpeed, Sample(angles[i], dt: .05f,
+            position: Vector3.forward * (i * .18f), forwardProgress: i == 0 ? 0 : .18f));
+    lastSample = Sample(36, speed: 11.99f, dt: .05f, position: Vector3.forward * .54f,
+        forwardProgress: .18f, hasLookahead: true, lookaheadNormal: Normal(55),
+        lookaheadHeight: .1f, sameTrack: true, lookaheadNormalTurn: 19);
+    Step(ref lowSpeed, lastSample);
+    Check(AntigravityPolicy.GetArmBlockReason(in lowSpeed, in lastSample, in settings) ==
+        AntigravityPolicy.ArmBlockReason.LowSpeed,
+        "armed diagnostic names the 12 m/s acquisition-speed requirement");
+
+    var reset = new AntigravityPolicy.State();
+    Step(ref reset, Sample(0));
+    lastSample = Sample(25, nativeUp: Normal(25), forwardProgress: .2f,
+        hasLookahead: true, lookaheadNormal: Normal(55), lookaheadHeight: .1f,
+        sameTrack: true, lookaheadNormalTurn: 20);
+    Step(ref reset, lastSample);
+    Check(reset.StableSamples == 1 &&
+        AntigravityPolicy.GetArmBlockReason(in reset, in lastSample, in settings) ==
+            AntigravityPolicy.ArmBlockReason.StableContacts,
+        "a discontinuous facet reset is visible as a fresh stable-contact history");
+
+    var shortTravel = new AntigravityPolicy.State();
+    for (int i = 0; i < angles.Length; i++)
+        Step(ref shortTravel, Sample(angles[i], dt: .05f,
+            position: Vector3.forward * (i * .03f), forwardProgress: i == 0 ? 0 : .03f));
+    lastSample = Sample(36, dt: .05f, position: Vector3.forward * .09f, forwardProgress: .03f,
+        hasLookahead: true, lookaheadNormal: Normal(55), lookaheadHeight: .1f,
+        sameTrack: true, lookaheadNormalTurn: 19);
+    Step(ref shortTravel, lastSample);
+    Check(AntigravityPolicy.GetArmBlockReason(in shortTravel, in lastSample, in settings) ==
+        AntigravityPolicy.ArmBlockReason.ForwardTravel,
+        "armed diagnostic identifies insufficient half-metre forward progress");
 }
 
 // Road-facet normal changes are bounded geometrically, not by fixedDeltaTime.
@@ -201,18 +264,18 @@ AntigravityPolicy.Decision Activate(ref AntigravityPolicy.State state, float spe
         armed = new AntigravityPolicy.State();
         Activate(ref armed);
         Vector3 previousNormal = armed.Normal;
-        var activeFacet = Step(ref armed, Sample(dt: dt, contactNormal: Normal(53),
+        var activeFacet = Step(ref armed, Sample(dt: dt, contactNormal: Normal(51),
             nativeUp: previousNormal, referenceForward: armed.Forward));
-        Check(activeFacet.Attached && Vector3.Angle(activeFacet.Normal, Normal(53)) < 1,
+        Check(activeFacet.Attached && Vector3.Angle(activeFacet.Normal, Normal(51)) < 1,
             $"15° native-stable facet remains attached at {1f / dt:0} Hz");
 
         armed = new AntigravityPolicy.State();
         Activate(ref armed);
         var probeFacet = Step(ref armed, Sample(dt: dt,
             contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
-            contactNormal: Normal(53), nativeUp: armed.Up, referenceForward: armed.Forward,
+            contactNormal: Normal(51), nativeUp: armed.Up, referenceForward: armed.Forward,
             probeSeparation: .1f, sameTrack: true, activeContactCandidate: true));
-        Check(probeFacet.Attached && Vector3.Angle(probeFacet.Normal, Normal(53)) < 1,
+        Check(probeFacet.Attached && Vector3.Angle(probeFacet.Normal, Normal(51)) < 1,
             $"15° same-track contact facet remains supported at {1f / dt:0} Hz");
     }
 

@@ -1,3 +1,29 @@
+## 2026-10-26 - Explicit ground/wall surface mode
+
+- User isolated the native crash to surface-camera following. Disconnected that
+  call path and removed its Studio control; camera following remains unresolved.
+- Added opt-in offline **Drive on ground and walls**. Follow native solid
+  contacts, including wall collision layers, without the road-history gate.
+  Restore stable-ground masks on release; retain KCC collision movement and
+  exclusions for respawn layers, triggers, rigidbody objects and racers.
+- Per user instruction, compiled for an in-game test without writing or running
+  more harness tests. This candidate is not gameplay-validated.
+
+## 2026-10-26 - Preserve Antigravity contact history
+
+- User's follow-up recording exposed a frozen 1/4-sample arm history despite
+  valid preview hits and sufficient speed. Fixed the lifecycle check that
+  compared a kart's owning scene to the active scene. Track both identities
+  independently so persistent/additive-scene karts retain history across render
+  updates, while scene changes still release state.
+- Anticipate a validated 36-to-55-degree facet transition instead of waiting for
+  a nonexistent 47-degree intermediate face. Preserve geometry, layer, speed,
+  history and abrupt-corner guards. Added precise 5 Hz arm-block diagnostics.
+- Read-only native samples confirmed sufficient speed and upright motor state;
+  the native upward cap was 60 and is not established as this failure's cause.
+- New live gameplay validation remains required. See `ANTIGRAVITY.md` for the
+  recording evidence and the corrected physics/render lifecycle test.
+
 ## 2026-10-26 - Antigravity curved-road redesign
 
 - Recorded the second tunnel test and supplied video as failed gameplay

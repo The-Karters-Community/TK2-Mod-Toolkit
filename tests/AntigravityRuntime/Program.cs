@@ -17,6 +17,8 @@ void Check(bool ok, string message)
 bool Near(float a, float b, float epsilon = .03f) => MathF.Abs(a - b) <= epsilon;
 bool NearVector(Vector3 a, Vector3 b, float epsilon = .02f) => (a - b).magnitude <= epsilon;
 Vector3 Normal(float degrees) => new(MathF.Sin(degrees * Mathf.Deg2Rad), MathF.Cos(degrees * Mathf.Deg2Rad), 0);
+Vector3 RoadNormal(float degrees) => new(0, MathF.Cos(degrees * Mathf.Deg2Rad), -MathF.Sin(degrees * Mathf.Deg2Rad));
+Vector3 RoadForward(float degrees) => new(0, MathF.Sin(degrees * Mathf.Deg2Rad), MathF.Cos(degrees * Mathf.Deg2Rad));
 
 FieldInfo StaticField(string name) => typeof(AntigravityFeature).GetField(name, HiddenStatic)!;
 IDictionary States() => (IDictionary)StaticField("States").GetValue(null)!;
@@ -96,7 +98,11 @@ void KccRoadFrame(Fixture f, Vector3 normal, bool nativePassiveAlignment = true)
     KccRotationPhase(f);
     if (nativePassiveAlignment)
     {
-        Quaternion nativeRotation = Quaternion.LookRotation(Vector3.forward, normal);
+        float slope = Vector3.Angle(Vector3.up, normal) * Mathf.Deg2Rad;
+        Vector3 nativeForward = MathF.Abs(normal.x) > .001f
+            ? new Vector3(-MathF.Cos(slope), MathF.Sin(slope), 0)
+            : new Vector3(0, MathF.Sin(slope), MathF.Cos(slope));
+        Quaternion nativeRotation = Quaternion.LookRotation(nativeForward, normal);
         f.Physics.qSteeringOrientation = nativeRotation;
         f.Motor.SetRotation(nativeRotation, true);
     }
@@ -105,7 +111,8 @@ void KccRoadFrame(Fixture f, Vector3 normal, bool nativePassiveAlignment = true)
     SimulateCommit(f);
 }
 
-void SetForwardLookahead(Fixture f, Vector3 previewNormal, Action<Vector3, Vector3>? inspect = null)
+void SetForwardLookahead(Fixture f, Vector3 previewNormal, Action<Vector3, Vector3, Vector3>? inspect = null,
+    float targetRise = 0)
 {
     Physics.RaycastHandler = (origin, direction, maxDistance, layerMask, query) => {
         Vector3 normal = f.Motor.GroundingStatus.GroundNormal;
@@ -113,31 +120,69 @@ void SetForwardLookahead(Fixture f, Vector3 previewNormal, Action<Vector3, Vecto
         float speed = Vector3.ProjectOnPlane(f.Motor.Velocity, normal).magnitude;
         float distance = Mathf.Clamp(speed * Time.fixedDeltaTime * 2f, .25f, 1.5f);
         Vector3 expectedPoint = WorldBottom(f) + forward * distance;
-        Vector3 expectedOrigin = expectedPoint + normal * .35f;
-        inspect?.Invoke(origin, expectedOrigin);
+        // Model the next mesh facet as a real plane raised in world space. The
+        // returned hit is the ray/plane intersection, not a fabricated hit at
+        // the expected point.
+        Vector3 targetPoint = expectedPoint + Vector3.up * targetRise;
         if (Vector3.Dot(direction, -normal) < .99f || maxDistance < .5f ||
             (layerMask.value & (1 << 8)) == 0 || query != QueryTriggerInteraction.Ignore)
             return (false, default);
-        return (true, new RaycastHit(f.Road, previewNormal, .35f, expectedPoint));
+        float denominator = Vector3.Dot(previewNormal, direction);
+        if (MathF.Abs(denominator) < .0001f) return (false, default);
+        float hitDistance = Vector3.Dot(previewNormal, targetPoint - origin) / denominator;
+        if (hitDistance < 0 || hitDistance > maxDistance) return (false, default);
+        Vector3 hitPoint = origin + direction * hitDistance;
+        Vector3 nextForward = new(-previewNormal.y, previewNormal.x, 0);
+        float alongFacet = Vector3.Dot(hitPoint - targetPoint, nextForward);
+        if (alongFacet < -.36f || alongFacet > 1.5f || MathF.Abs(hitPoint.z - targetPoint.z) > 2f)
+            return (false, default);
+        inspect?.Invoke(origin, targetPoint, hitPoint);
+        return (true, new RaycastHit(f.Road, previewNormal, hitDistance, hitPoint));
     };
 }
 
-void RoadStep(Fixture f, float degrees, Vector3 previewNormal, Action<Vector3, Vector3>? inspect = null,
-    float forwardTravel = .13f)
+void RoadStep(Fixture f, float degrees, Vector3 previewNormal, Action<Vector3, Vector3, Vector3>? inspect = null,
+    float forwardTravel = .13f, float targetRise = 0)
 {
-    Vector3 normal = Normal(degrees);
-    f.Motor.TransientPosition += Vector3.forward * forwardTravel;
-    SetForwardLookahead(f, previewNormal, inspect);
+    Vector3 normal = RoadNormal(degrees);
+    f.Motor.TransientPosition += RoadForward(degrees) * forwardTravel;
+    SetForwardLookahead(f, previewNormal, inspect, targetRise);
     KccRoadFrame(f, normal, nativePassiveAlignment: !IsAttached(f));
 }
 
-void DriveToActive(Fixture f, Action<Vector3, Vector3>? inspect = null)
+void DriveToActive(Fixture f, Action<Vector3, Vector3, Vector3>? inspect = null, bool studioTickEachStep = false)
 {
-    for (int angle = 30; angle <= 38; angle++)
-        RoadStep(f, angle, Normal(43), inspect);
+    f.Physics.qSteeringOrientation = Quaternion.LookRotation(-Vector3.right, Vector3.up);
+    f.Motor.SetRotation(f.Physics.qSteeringOrientation, true);
+    f.Motor.Velocity = -Vector3.right * 80f;
+    f.Motor.BaseVelocity = f.Motor.Velocity;
+    foreach (float angle in new[] { 0f, 0f, 18f, 36f })
+    {
+        RoadStep(f, angle, RoadNormal(55), inspect, forwardTravel: .18f, targetRise: .52f);
+        if (studioTickEachStep) Invoke("Tick");
+        if (angle < 36f)
+            Check(IsArmed(f) && !IsAttached(f) && !f.Plugin.SessionModified,
+                $"{angle:0}° facet remains passive while the ramp history is collected");
+    }
     var state = KartState(f) is null ? default : Policy(f);
     var diagnostic = $"state={state.Attached}/{state.Armed}; samples={state.StableSamples}; travel={state.ArmForwardTravel:0.00}; curve={state.ArmCurveProgress:0.0}; slope={state.LastSlopeAngle:0.0}; motor={Vector3.Angle(Vector3.up, f.Motor.CharacterUp):0.0}°; modified={f.Plugin.SessionModified}";
-    Check(IsAttached(f), $"adapter attaches only after smooth near-limit road history and lookahead ({diagnostic})");
+    Check(IsAttached(f) && Vector3.Angle(Policy(f).Normal, RoadNormal(36)) < 1,
+        $"adapter predicts the 55° facet and activates on the 36° facet before contact reaches 55° ({diagnostic})");
+}
+
+// Studio's render/update tick may run between the KCC callbacks while the
+// kart object belongs to an additive scene different from the active scene.
+{
+    var f = NewFixture();
+    f.Kart.gameObject.scene = new Scene(2);
+    DriveToActive(f, studioTickEachStep: true);
+    Check(IsAttached(f) && Policy(f).StableSamples >= 4 && Policy(f).ArmForwardTravel >= .5f,
+        "AfterCharacterUpdate → StudioTick → AfterCharacterUpdate retains arm history for a kart in another scene");
+    SceneManager.ActiveScene = new Scene(3);
+    Invoke("Tick");
+    Check(KartState(f) is null &&
+        Vector3.Angle(f.Physics.vUP_CharacterMotorAligned, Vector3.up) < 1,
+        "an actual active-scene transition clears attached state and restores upright native axes");
 }
 
 Vector3 RunNativeMainUpdate(Fixture f, Vector3 velocity, float dt = 1f / 60f)
@@ -201,16 +246,34 @@ Vector3 RunNativeMainUpdate(Fixture f, Vector3 velocity, float dt = 1f / 60f)
     var f = NewFixture(worldPosition: new Vector3(100, 25, -300));
     int lookaheadCasts = 0;
     bool translatedOriginVerified = true;
-    DriveToActive(f, (actual, expected) => {
+    bool raisedFacetIntersectionVerified = false;
+    DriveToActive(f, (actual, target, hit) => {
         lookaheadCasts++;
-        if (!NearVector(actual, expected, .025f) || actual.magnitude < 100) translatedOriginVerified = false;
+        Vector3 expectedOrigin = WorldBottom(f) +
+            Vector3.ProjectOnPlane(f.Physics.qSteeringOrientation * Vector3.forward,
+                f.Motor.GroundingStatus.GroundNormal).normalized * 1.5f +
+            f.Motor.GroundingStatus.GroundNormal * .35f;
+        if (!NearVector(actual, expectedOrigin, .025f) || actual.magnitude < 100) translatedOriginVerified = false;
+        Vector3 ray = (-f.Motor.GroundingStatus.GroundNormal).normalized;
+        bool onPlane = MathF.Abs(Vector3.Dot(RoadNormal(55), hit - target)) < .01f;
+        float rayDistance = Vector3.Dot(hit - actual, ray);
+        bool onRay = rayDistance >= 0 && rayDistance <= .9f &&
+            NearVector(actual + ray * rayDistance, hit, .01f);
+        if (onPlane && onRay && target.y - WorldBottom(f).y > .45f)
+            raisedFacetIntersectionVerified = true;
     });
-    Check(lookaheadCasts >= 5 && translatedOriginVerified,
-        "forward-lookahead casts originate at translated/rotated world capsule bottom");
-    Check(Vector3.Dot(f.Motor.CharacterUp, Normal(38)) > .99f &&
-        Vector3.Dot(f.Motor.Transform.rotation * Vector3.up, Normal(38)) > .99f,
-        "active frame updates KCC transient up before the system commits it to Transform");
+    Check(lookaheadCasts == 1 && translatedOriginVerified,
+        "one successful forward-lookahead cast at36° originates at translated world capsule bottom plus the bounded lead");
+    Check(raisedFacetIntersectionVerified,
+        "36° lookahead reaches the actual ray/plane intersection on the raised 55° facet within the native cast range");
+    Check(Vector3.Dot(f.Motor.CharacterUp, RoadNormal(36)) > .99f &&
+        Vector3.Dot(f.Motor.Transform.rotation * Vector3.up, RoadNormal(36)) > .99f,
+        "adapter engages on the36° facet before the55° contact and commits the KCC frame");
     Check(f.Plugin.SessionModified, "first active frame records actual physics modification");
+
+    KccRoadFrame(f, RoadNormal(55), nativePassiveAlignment: false);
+    Check(IsAttached(f) && Vector3.Angle(Policy(f).Normal, RoadNormal(55)) < 1,
+        "the 19° transition from predictive36° engagement to actual55° facet remains attached");
 
     Vector3 activeNormal = Policy(f).Normal;
     Vector3 bottom = WorldBottom(f);
@@ -237,8 +300,8 @@ Vector3 RunNativeMainUpdate(Fixture f, Vector3 velocity, float dt = 1f / 60f)
         var faceted = NewFixture();
         DriveToActive(faceted);
         Time.fixedDeltaTime = tick;
-        KccRoadFrame(faceted, Normal(53), nativePassiveAlignment: false);
-        Check(IsAttached(faceted) && Vector3.Angle(Policy(faceted).Normal, Normal(53)) < 1,
+        KccRoadFrame(faceted, RoadNormal(51), nativePassiveAlignment: false);
+        Check(IsAttached(faceted) && Vector3.Angle(Policy(faceted).Normal, RoadNormal(51)) < 1,
             $"active adapter follows a 15° stable mesh facet at {1f / tick:0} Hz");
 
         var supportLoss = NewFixture();
@@ -249,11 +312,11 @@ Vector3 RunNativeMainUpdate(Fixture f, Vector3 velocity, float dt = 1f / 60f)
             GroundNormal = Policy(supportLoss).Normal
         };
         Physics.RaycastHandler = (_, _, _, _, _) =>
-            (true, new RaycastHit(supportLoss.Road, Normal(53), .2f, WorldBottom(supportLoss)));
+            (true, new RaycastHit(supportLoss.Road, RoadNormal(51), .2f, WorldBottom(supportLoss)));
         KccRotationPhase(supportLoss);
         After(supportLoss);
         SimulateCommit(supportLoss);
-        Check(IsAttached(supportLoss) && Vector3.Angle(Policy(supportLoss).Normal, Normal(53)) < 1,
+        Check(IsAttached(supportLoss) && Vector3.Angle(Policy(supportLoss).Normal, RoadNormal(51)) < 1,
             $"same-road 15° continuity facet is accepted at {1f / tick:0} Hz");
     }
 

@@ -56,7 +56,8 @@ class AntigravityIntegrationTests(unittest.TestCase):
         self.assertIn("arms passively", description)
         self.assertIn("empirical 47° world-angle cap", description)
         self.assertIn("not a native world-angle limit", description)
-        self.assertIn("matching forward lookahead", description)
+        self.assertIn("same-track forward probe", description)
+        self.assertIn("smooth curve crossing", description)
 
     def test_shared_runtime_guard_covers_non_race_and_recovery_states(self):
         source = (pack.PROJECT.parent / "AirShiftFeature.cs").read_text(encoding="utf-8")

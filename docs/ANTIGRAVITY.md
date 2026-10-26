@@ -1,5 +1,38 @@
 # Antigravity: road adhesion for offline driving
 
+## Current test candidate: ground and wall contacts
+
+The user isolated native crashes to **Camera follows surface**. Its invocation
+is now disconnected even if an old configuration enables it; the control is
+removed from the Studio catalog pending a separate fix. The saved crash dumps
+remain private. No camera-crash fix or safe camera follow is claimed.
+
+The new **Drive on ground and walls** option is an explicit offline free-driving
+mode. It follows actual native ground/movement contacts rather than the
+curved-road arming gate. It accepts solid collision layers including walls,
+temporarily extends the kart's stable-ground layers, and restores the original
+mask on release. A valid static movement contact is marked stable and skips the
+game's wall-hit response; KCC collision movement/resolution still executes.
+Respawn layers, triggers, rigidbody objects and racers stay excluded. Accepted
+native drift hops retain bounded nearby-support grace. Ordinary curved-road
+mode remains available when the option is off.
+
+This mode is intentionally capable of wall driving and shortcuts; mandatory
+online/submission protection remains in force. The user explicitly requested
+this broader behavior after the conservative mode failed.
+
+Validation for this candidate is compilation against current installed interop
+only. At the user's request, no further harness tests were written or run.
+In-game behavior is awaiting the user's test; earlier assertion counts below
+describe earlier builds and do not establish that this candidate works.
+
+Installed candidate SHA-256:
+`1bcd7a7c8071db9d46c0395c32cba2a9627664208e39e4588d6576c74fb725b5`.
+DLL rollback backup: `local/backups/1792999362763653900`. Test configuration
+backup: `local/backups/1792999402849420800`. The local test profile has
+Antigravity and wall surfaces enabled, surface camera disabled. Source defaults
+remain opt-in. No game was launched automatically.
+
 The Antigravity module is intended for banked roads and continuous loops. It is
 opt-in under **Community Mods / Driving**. It does not make every collider
 driveable, disable collision, or change the world's gravity. It is experimental
@@ -98,6 +131,46 @@ This does not establish identical handling
 or lap times to the unmodified game.
 
 ## Validation boundary
+
+### Follow-up: 55-degree passive state and history lifetime
+
+The next screenshot showed road 55 degrees, target 47 degrees, native
+motor-relative limit 60 degrees, but still passive. The user identified a
+36-to-55-degree facet transition. Requiring current contact to cross the target
+before engagement misses the opportunity to anticipate that connected 19-degree
+step. Predictive engagement now permits a validated ahead normal crossing the
+target, with the existing minimum incline, history, speed, geometry, layer and
+normal-change checks. It does not permit a flat-to-vertical transition.
+
+More decisively, the follow-up recording `20261026-0558-43.2301534.mp4`
+already contained the diagnostic candidate built through the user's Studio.
+Multiple frames reported `StableContacts`, history **1/4**, travel/curve/normal
+progress **0**, and reset cause `none`, even with a valid same-road preview
+(55-degree normal, zero normal disagreement, height approximately 0.54 m) and
+speed 69.7. The history was not surviving the physics/render lifecycle.
+
+The adapter stored `controller.gameObject.scene.handle`, then compared it to
+`SceneManager.GetActiveScene().handle` in `Tick`. These are different identities
+when a kart belongs to an additive or persistent scene. This can discard state
+each rendered frame without a policy reset, matching the frozen history counter.
+The correction stores **kart scene and active scene separately**, comparing each
+only with its corresponding current identity. Scene transitions and destroyed
+controllers still invalidate state. Tests must exercise
+`AfterCharacterUpdate -> Tick -> AfterCharacterUpdate` with differing scene
+handles; earlier fixtures put both in the same scene and missed this defect.
+
+Read-only native observation captured stable 36-degree contact at speed 80 and
+53-degree contact at speed 79.8, with motor-up still world-up. The observed
+native upward cap was 60, so those measurements do not establish that cap as the
+cause of the passive-state failure. Actual matching road ray calls also returned
+valid hits. Their native-call capture is partial and cannot by itself identify
+every managed policy gate. Private observations are in ignored
+`local/antigravity-evidence/`. The new 5 Hz HUD names the failing gate and reports
+preview geometry, history and speed instead of just saying passive.
+
+Gameplay acceptance is still pending for the corrected history lifetime. The
+previous failed tests remain failed; passing headless checks is not proof of
+climbing or camera behavior.
 
 ### Second live test: failed; redesigned candidate
 
