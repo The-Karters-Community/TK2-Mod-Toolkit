@@ -7,26 +7,37 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 const BindingFlags HiddenStatic = BindingFlags.NonPublic | BindingFlags.Static;
+const BindingFlags HiddenInstance = BindingFlags.NonPublic | BindingFlags.Instance;
 int checks = 0;
 void Check(bool ok, string message)
 {
     checks++;
     if (!ok) throw new Exception(message);
 }
+bool Near(float a, float b, float epsilon = .03f) => MathF.Abs(a - b) <= epsilon;
+bool NearVector(Vector3 a, Vector3 b, float epsilon = .02f) => (a - b).magnitude <= epsilon;
+Vector3 Normal(float degrees) => new(MathF.Sin(degrees * Mathf.Deg2Rad), MathF.Cos(degrees * Mathf.Deg2Rad), 0);
 
 FieldInfo StaticField(string name) => typeof(AntigravityFeature).GetField(name, HiddenStatic)!;
-IDictionary Dictionary(string name) => (IDictionary)StaticField(name).GetValue(null)!;
-int StateCount() => Dictionary("States").Count;
+IDictionary States() => (IDictionary)StaticField("States").GetValue(null)!;
+object? Invoke(string method, params object?[] args) => typeof(AntigravityFeature)
+    .GetMethod(method, HiddenStatic)!.Invoke(null, args);
 void ClearState()
 {
-    Dictionary("States").Clear();
-    Dictionary("PendingReleaseRotation").Clear();
+    States().Clear();
+    ((IDictionary)StaticField("PendingReleaseRotation").GetValue(null)!).Clear();
 }
-void Invoke(string method, params object?[] args) => typeof(AntigravityFeature)
-    .GetMethod(method, HiddenStatic)!.Invoke(null, args);
-Vector3 LoopNormal(float degrees) => new(0, MathF.Cos(degrees * MathF.PI / 180f), MathF.Sin(degrees * MathF.PI / 180f));
+object? KartState(Fixture f) => States().Contains(f.Kart.InstanceId) ? States()[f.Kart.InstanceId] : null;
+AntigravityPolicy.State Policy(Fixture f)
+{
+    object entry = KartState(f) ?? throw new Exception("expected adapter state");
+    return (AntigravityPolicy.State)entry.GetType().GetField("Policy", HiddenInstance)!.GetValue(entry)!;
+}
+bool IsAttached(Fixture f) => KartState(f) is not null && Policy(f).Attached;
+bool IsArmed(Fixture f) => KartState(f) is not null && Policy(f).Armed;
+float ContactGrace(Fixture f) => Policy(f).ContactGraceElapsed;
 
-Fixture NewFixture(bool enabled = true)
+Fixture NewFixture(bool enabled = true, Vector3? worldPosition = null)
 {
     ClearState();
     Plugin.OfflineLabAllowed = true;
@@ -35,6 +46,7 @@ Fixture NewFixture(bool enabled = true)
     AirShiftFeature.Mode = AirShiftFeature.RunMode.Live;
     AirShiftFeature.Calls = 0;
     Time.fixedDeltaTime = 1f / 60f;
+    Time.unscaledTime = 0;
     SceneManager.ActiveScene = new Scene(1);
     Physics.RaycastHandler = null;
 
@@ -42,81 +54,239 @@ Fixture NewFixture(bool enabled = true)
     Plugin.Instance = f.Plugin;
     f.Plugin.AntigravityEnabled.Value = enabled;
     f.Kart.gameObject.scene = new Scene(1);
-    f.Physics = new PixelKartPhysics { kartController = f.Kart };
+    if (worldPosition is Vector3 initialPosition) f.Kart.transform.position = initialPosition;
+    f.Physics = new PixelKartPhysics { kartController = f.Kart, vLastVelocity = Vector3.zero };
     f.Kart.kartPhysics = f.Physics;
-    f.Motor = new KinematicCharacterMotor { Transform = f.Kart.transform, Velocity = new Vector3(0, 0, 20), BaseVelocity = new Vector3(0, 0, 20) };
+    f.Motor = new KinematicCharacterMotor {
+        Transform = f.Kart.transform,
+        Velocity = new Vector3(0, 0, 20),
+        BaseVelocity = new Vector3(0, 0, 20),
+        TransientPosition = f.Kart.transform.position,
+        CharacterTransformToCapsuleBottom = new Vector3(0, -.8f, 0),
+        MaxStableSlopeAngle = 45f
+    };
     f.Kart.Motor = f.Motor;
     f.Road = new Collider { gameObject = new GameObject { layer = 8 } };
     f.Motor.StableGroundLayers = 1 << 8;
-    ReportGround(f, Vector3.up);
+    ReportGround(f, Vector3.up, found: true);
     return f;
 }
 
-void Update(Fixture f) => Invoke("AfterCharacterUpdate", f.Kart, Time.fixedDeltaTime);
-void MotorRotationPhase(Fixture f)
+void ReportGround(Fixture f, Vector3 normal, bool found, Collider? collider = null)
 {
-    // KCC calls the controller rotation callback, then refreshes transient rotation and CharacterUp.
+    bool stable = found && Vector3.Angle(f.Motor.CharacterUp, normal) < f.Motor.MaxStableSlopeAngle;
+    f.Motor.GroundingStatus = new GroundingStatus {
+        FoundAnyGround = found, IsStableOnGround = stable,
+        GroundCollider = collider ?? f.Road, GroundNormal = normal
+    };
+}
+
+Vector3 WorldBottom(Fixture f) => f.Motor.TransientPosition +
+    f.Motor.TransientRotation * f.Motor.CharacterTransformToCapsuleBottom;
+void KccRotationPhase(Fixture f)
+{
     object?[] rotationCall = { f.Kart, f.Motor.TransientRotation };
     Invoke("UpdateRotationPostfix", rotationCall);
     f.Motor.TransientRotation = (Quaternion)rotationCall[1]!;
 }
-void ReportGround(Fixture f, Vector3 normal, float nativeStableAngle = 60f)
+void After(Fixture f) => Invoke("AfterCharacterUpdate", f.Kart, Time.fixedDeltaTime);
+void SimulateCommit(Fixture f) => f.Motor.SimulateCommit();
+void KccRoadFrame(Fixture f, Vector3 normal, bool nativePassiveAlignment = true)
 {
-    bool stable = Vector3.Angle(normal, f.Motor.CharacterUp) <= nativeStableAngle;
-    f.Motor.GroundingStatus = new GroundingStatus { FoundAnyGround = true, IsStableOnGround = stable,
-        GroundCollider = f.Road, GroundNormal = normal };
-}
-void KccUpdate(Fixture f, Vector3 normal)
-{
-    // Phase1 refreshes transient axes from Transform before probing the current road.
-    f.Motor.TransientRotation = f.Motor.Transform.rotation;
-    ReportGround(f, normal);
-    // Phase2 invokes the controller rotation callback before its movement callbacks.
-    MotorRotationPhase(f);
-    Update(f);
-    // KinematicCharacterSystem.Simulate commits transient position/rotation after the callback.
-    f.Motor.SimulateCommit();
-}
-void Acquire(Fixture f) { KccUpdate(f, Vector3.up); Check(StateCount() == 1, "eligible local offline native stable road acquires adapter state"); }
-void DriveToNormal(Fixture f, float degrees)
-{
-    if (StateCount() == 0)
-        f.Physics.qSteeringOrientation = Quaternion.LookRotation(Vector3.right, Vector3.up);
-    for (float angle = 10; angle <= degrees; angle += 10)
+    KccRotationPhase(f);
+    if (nativePassiveAlignment)
     {
-        KccUpdate(f, LoopNormal(angle));
-        Check(StateCount() == 1, $"native phase support continues through {angle} degree road normal (motor up {Vector3.Angle(f.Motor.CharacterUp, LoopNormal(angle)):0.0}°, speed {f.Motor.Velocity.magnitude:0.0})");
-        Check(Vector3.Dot(f.Motor.CharacterUp, LoopNormal(angle)) > .99f,
-            $"native transient motor frame adopts {angle} degree road normal before movement");
-        Check(Quaternion.Angle(f.Motor.Transform.rotation,
-            Quaternion.LookRotation(f.Kart.transform.forward, f.Motor.CharacterUp)) < 1,
-            $"KCC simulation commit preserves the {angle} degree surface frame on the transform");
+        Quaternion nativeRotation = Quaternion.LookRotation(Vector3.forward, normal);
+        f.Physics.qSteeringOrientation = nativeRotation;
+        f.Motor.SetRotation(nativeRotation, true);
     }
+    ReportGround(f, normal, found: true);
+    After(f);
+    SimulateCommit(f);
 }
-Vector3 Vec(Quaternion q, Vector3 v) => q * v;
 
-// The default-off callback exits before instance lookup, kart properties, or game physics access.
+void SetForwardLookahead(Fixture f, Vector3 previewNormal, Action<Vector3, Vector3>? inspect = null)
+{
+    Physics.RaycastHandler = (origin, direction, maxDistance, layerMask, query) => {
+        Vector3 normal = f.Motor.GroundingStatus.GroundNormal;
+        Vector3 forward = Vector3.ProjectOnPlane(f.Physics.qSteeringOrientation * Vector3.forward, normal).normalized;
+        float speed = Vector3.ProjectOnPlane(f.Motor.Velocity, normal).magnitude;
+        float distance = Mathf.Clamp(speed * Time.fixedDeltaTime * 2f, .25f, 1.5f);
+        Vector3 expectedPoint = WorldBottom(f) + forward * distance;
+        Vector3 expectedOrigin = expectedPoint + normal * .35f;
+        inspect?.Invoke(origin, expectedOrigin);
+        if (Vector3.Dot(direction, -normal) < .99f || maxDistance < .5f ||
+            (layerMask.value & (1 << 8)) == 0 || query != QueryTriggerInteraction.Ignore)
+            return (false, default);
+        return (true, new RaycastHit(f.Road, previewNormal, .35f, expectedPoint));
+    };
+}
+
+void RoadStep(Fixture f, float degrees, Vector3 previewNormal, Action<Vector3, Vector3>? inspect = null,
+    float forwardTravel = .13f)
+{
+    Vector3 normal = Normal(degrees);
+    f.Motor.TransientPosition += Vector3.forward * forwardTravel;
+    SetForwardLookahead(f, previewNormal, inspect);
+    KccRoadFrame(f, normal, nativePassiveAlignment: !IsAttached(f));
+}
+
+void DriveToActive(Fixture f, Action<Vector3, Vector3>? inspect = null)
+{
+    for (int angle = 30; angle <= 38; angle++)
+        RoadStep(f, angle, Normal(43), inspect);
+    var state = KartState(f) is null ? default : Policy(f);
+    var diagnostic = $"state={state.Attached}/{state.Armed}; samples={state.StableSamples}; travel={state.ArmForwardTravel:0.00}; curve={state.ArmCurveProgress:0.0}; slope={state.LastSlopeAngle:0.0}; motor={Vector3.Angle(Vector3.up, f.Motor.CharacterUp):0.0}°; modified={f.Plugin.SessionModified}";
+    Check(IsAttached(f), $"adapter attaches only after smooth near-limit road history and lookahead ({diagnostic})");
+}
+
+Vector3 RunNativeMainUpdate(Fixture f, Vector3 velocity, float dt = 1f / 60f)
+{
+    object?[] prefix = { f.Physics, velocity, null };
+    Invoke("MainVelocityPrefix", prefix);
+    Vector3 changed = (Vector3)prefix[1]!;
+    f.Physics.UpdateVelocity(ref changed, dt); // Test body includes the native inline Y cap; it never calls the gravity helper.
+    object?[] postfix = { f.Physics, changed, dt, prefix[2] };
+    Invoke("MainVelocityPostfix", postfix);
+    changed = (Vector3)postfix[1]!;
+    object?[] finalizer = { f.Physics, postfix[3], null };
+    Invoke("MainVelocityFinalizer", finalizer);
+    return changed;
+}
+
+// Disabled path exits before kart identity/native physics access.
 {
     var f = NewFixture(enabled: false);
     f.Physics.ThrowOnNativeAccess = true;
-    Update(f);
-    Check(StateCount() == 0, "disabled module creates no adapter state");
-    Check(f.Kart.GetInstanceIDCalls == 0 && f.Kart.NativePropertyReads == 0,
-        "disabled callback does not look up the kart id or read its native physics properties");
-    Check(AirShiftFeature.Calls == 0, "disabled callback exits before mode guard or scene work");
-    Check(!f.Plugin.SessionModified && f.Plugin.AntigravityEnabled.Value == false,
-        "disabled callback does not mark the session or alter configuration");
+    After(f);
+    Check(States().Count == 0 && f.Kart.GetInstanceIDCalls == 0 && f.Kart.NativePropertyReads == 0,
+        "disabled feature performs no kart-id or native-property access");
+    Check(!f.Plugin.SessionModified && AirShiftFeature.Calls == 0,
+        "disabled callback changes no session state and exits before the offline guard");
 }
 
-// Local stable-road acquisition and ownership/contact exclusions use the real feature callback.
+// Passive arming on flat/shallow road does not write frame, axes, or velocity.
 {
     var f = NewFixture();
     f.Physics.vAccelerationForwardDirection = Vector3.right;
-    Acquire(f);
-    Check(f.Plugin.SessionModified, "first adapter frame records that local physics changed");
+    var rotation = f.Motor.TransientRotation;
+    var axes = f.Physics.vForward_SteeringChar_AlignedToSurfacce_Normalized;
+    var acceleration = f.Physics.vAccelerationForwardDirection;
+    var velocity = f.Motor.BaseVelocity;
+    for (int i = 0; i < 5; i++)
+    {
+        f.Motor.TransientPosition += Vector3.forward * .13f;
+        KccRoadFrame(f, Vector3.up);
+        Check(IsArmed(f) && !IsAttached(f), "flat stable road records passive armed state");
+    }
+    Check(!f.Plugin.SessionModified, "passive arming does not mark the session modified");
+    Check(Quaternion.Angle(rotation, f.Motor.TransientRotation) < .01f &&
+        NearVector(axes, f.Physics.vForward_SteeringChar_AlignedToSurfacce_Normalized) &&
+        NearVector(acceleration, f.Physics.vAccelerationForwardDirection) &&
+        NearVector(velocity, f.Motor.BaseVelocity),
+        "passive arming leaves native frame, axes, acceleration cache, and velocity unchanged");
+
+    f = NewFixture(worldPosition: new Vector3(100, 25, -300));
+    for (int angle = 10; angle <= 14; angle++)
+    {
+        f.Motor.TransientPosition += Vector3.forward * .2f;
+        KccRoadFrame(f, Normal(angle));
+        Check(IsArmed(f) && !IsAttached(f), $"native passive motor frame at {angle}° remains unmodified by feature");
+    }
+    Check(!f.Plugin.SessionModified, "14 degree road remains passive after ample forward travel");
+}
+
+// The adapter uses world-space capsule geometry for both lookahead and active support continuity.
+{
+    var f = NewFixture(worldPosition: new Vector3(100, 25, -300));
+    int lookaheadCasts = 0;
+    bool translatedOriginVerified = true;
+    DriveToActive(f, (actual, expected) => {
+        lookaheadCasts++;
+        if (!NearVector(actual, expected, .025f) || actual.magnitude < 100) translatedOriginVerified = false;
+    });
+    Check(lookaheadCasts >= 5 && translatedOriginVerified,
+        "forward-lookahead casts originate at translated/rotated world capsule bottom");
+    Check(Vector3.Dot(f.Motor.CharacterUp, Normal(38)) > .99f &&
+        Vector3.Dot(f.Motor.Transform.rotation * Vector3.up, Normal(38)) > .99f,
+        "active frame updates KCC transient up before the system commits it to Transform");
+    Check(f.Plugin.SessionModified, "first active frame records actual physics modification");
+
+    Vector3 activeNormal = Policy(f).Normal;
+    Vector3 bottom = WorldBottom(f);
+    bool contactOriginVerified = false;
+    f.Motor.GroundingStatus = new GroundingStatus {
+        FoundAnyGround = true, IsStableOnGround = false, GroundCollider = f.Road,
+        GroundNormal = activeNormal
+    };
+    Physics.RaycastHandler = (origin, direction, maxDistance, mask, query) => {
+        var expected = bottom + activeNormal * .1f;
+        contactOriginVerified = NearVector(origin, expected, .02f) && origin.magnitude > 100 &&
+            Vector3.Dot(direction, -activeNormal) > .99f && maxDistance < .36f && query == QueryTriggerInteraction.Ignore;
+        return (true, new RaycastHit(f.Road, activeNormal, .3f, bottom - activeNormal * .2f));
+    };
+    KccRotationPhase(f);
+    After(f);
+    SimulateCommit(f);
+    Check(IsAttached(f) && ContactGrace(f) > 0,
+        "high-speed active kart with very-close same-track support survives one contact-loss tick without jump");
+    Check(contactOriginVerified, "contact continuity ray uses translated world capsule bottom and local surface up");
+
+    foreach (float tick in new[] { 1f / 120f, 1f / 60f })
+    {
+        var faceted = NewFixture();
+        DriveToActive(faceted);
+        Time.fixedDeltaTime = tick;
+        KccRoadFrame(faceted, Normal(53), nativePassiveAlignment: false);
+        Check(IsAttached(faceted) && Vector3.Angle(Policy(faceted).Normal, Normal(53)) < 1,
+            $"active adapter follows a 15° stable mesh facet at {1f / tick:0} Hz");
+
+        var supportLoss = NewFixture();
+        DriveToActive(supportLoss);
+        Time.fixedDeltaTime = tick;
+        supportLoss.Motor.GroundingStatus = new GroundingStatus {
+            FoundAnyGround = true, IsStableOnGround = false, GroundCollider = supportLoss.Road,
+            GroundNormal = Policy(supportLoss).Normal
+        };
+        Physics.RaycastHandler = (_, _, _, _, _) =>
+            (true, new RaycastHit(supportLoss.Road, Normal(53), .2f, WorldBottom(supportLoss)));
+        KccRotationPhase(supportLoss);
+        After(supportLoss);
+        SimulateCommit(supportLoss);
+        Check(IsAttached(supportLoss) && Vector3.Angle(Policy(supportLoss).Normal, Normal(53)) < 1,
+            $"same-road 15° continuity facet is accepted at {1f / tick:0} Hz");
+    }
+
+    var disconnected = NewFixture(worldPosition: new Vector3(100, 25, -300));
+    DriveToActive(disconnected);
+    var otherRoad = new Collider { gameObject = new GameObject { layer = 8 } };
+    Vector3 otherNormal = Policy(disconnected).Normal;
+    disconnected.Motor.GroundingStatus = new GroundingStatus {
+        FoundAnyGround = true, IsStableOnGround = false, GroundCollider = otherRoad,
+        GroundNormal = otherNormal
+    };
+    Physics.RaycastHandler = (_, _, _, _, _) =>
+        (true, new RaycastHit(otherRoad, otherNormal, .2f, WorldBottom(disconnected)));
+    KccRotationPhase(disconnected);
+    After(disconnected);
+    SimulateCommit(disconnected);
+    Check(!IsAttached(disconnected),
+        "active contact probe on a different eligible collider cannot preserve the old road frame");
+}
+
+// Wrong track, walls, respawn layers, triggers, dynamic bodies, online, and airborne states cannot attach.
+{
+    var f = NewFixture();
+    for (int angle = 30; angle <= 34; angle++)
+    {
+        f.Motor.TransientPosition += Vector3.forward * .13f;
+        SetForwardLookahead(f, Normal(90));
+        KccRoadFrame(f, Normal(angle));
+    }
+    Check(!IsAttached(f) && IsArmed(f), "abrupt wall lookahead cannot activate an otherwise armed kart");
 
     foreach (var invalid in new Action<Fixture>[] {
-        x => x.Road.gameObject.layer = 9, // wall/respawn layer outside the native stable-ground mask
+        x => x.Road.gameObject.layer = 9,
         x => x.Kart.wallLayerToCollDetect = 1 << 8,
         x => x.Kart.wallRespawn_Flat_ColliderLayer = 1 << 8,
         x => x.Kart.wallRespawn_Always_ColliderLayer = 1 << 8,
@@ -127,149 +297,149 @@ Vector3 Vec(Quaternion q, Vector3 v) => q * v;
     {
         var rejected = NewFixture();
         invalid(rejected);
-        Update(rejected);
-        Check(StateCount() == 0, "wall/respawn, trigger, dynamic, or player collider cannot acquire the feature");
+        After(rejected);
+        Check(!IsAttached(rejected), "ineligible road collider does not activate surface alignment");
     }
 
-    var nonlocal = NewFixture();
-    nonlocal.Kart.parentPlayer!.ePlayerType = Ant_Player.EPlayerType.E_AI;
-    Update(nonlocal);
-    Check(StateCount() == 0 && nonlocal.Kart.GetInstanceIDCalls == 0,
-        "AI kart cannot acquire local surface adhesion");
+    var ai = NewFixture();
+    ai.Kart.parentPlayer!.ePlayerType = Ant_Player.EPlayerType.E_AI;
+    After(ai);
+    Check(States().Count == 0 && ai.Kart.GetInstanceIDCalls == 0, "AI kart cannot arm");
 
     var online = NewFixture();
     Plugin.OfflineLabAllowed = false;
     Ant_CurrentGameConfiguration.IsOnlineGame_InRoom_WithInternet = true;
-    Update(online);
-    Check(StateCount() == 0, "online race cannot acquire local adhesion");
+    After(online);
+    Check(States().Count == 0, "online race cannot arm or attach");
+
+    var airborne = NewFixture();
+    airborne.Motor.GroundingStatus = new GroundingStatus();
+    int probes = 0;
+    Physics.RaycastHandler = (_, _, _, _, _) => { probes++; return (true, new RaycastHit(airborne.Road, Vector3.right, .1f)); };
+    After(airborne);
+    Check(States().Count == 0 && probes == 0, "detached airborne kart cannot acquire from any wall probe");
 }
 
-// Transform-only rotation does not update the KCC transient frame or make a steep surface stable.
+// Main PixelKartPhysics.UpdateVelocity is the actual inline cap boundary before KCC movement.
 {
-    var f = NewFixture();
-    var vertical = LoopNormal(90);
-    var rotation = Quaternion.LookRotation(Vector3.right, vertical);
-    f.Motor.Transform.rotation = rotation;
-    ReportGround(f, vertical);
-    Check(Vector3.Dot(f.Motor.CharacterUp, Vector3.up) > .99f,
-        "writing Transform alone leaves the KCC CharacterUp frame unchanged");
-    Check(!f.Motor.GroundingStatus.IsStableOnGround,
-        "native-style support rejects a steep contact while transient motor up remains upright");
-    f.Motor.SetRotation(rotation, true);
-    ReportGround(f, vertical);
-    Check(Vector3.Dot(f.Motor.CharacterUp, vertical) > .99f && f.Motor.GroundingStatus.IsStableOnGround,
-        "native SetRotation adopts transient orientation and refreshes support frame");
+    var passive = NewFixture();
+    for (int i = 0; i < 5; i++)
+    {
+        passive.Motor.TransientPosition += Vector3.forward * .13f;
+        KccRoadFrame(passive, Vector3.up);
+    }
+    Check(!IsAttached(passive), "cap test passive fixture is armed but not active");
+    passive.Physics.fKartMaximum_Y_Velocity = 10;
+    passive.Physics.vLastVelocity = Vector3.zero;
+    passive.Physics.NativeAddedVelocity = new Vector3(0, 30, 0);
+    Vector3 vanilla = RunNativeMainUpdate(passive, new Vector3(0, 0, 20));
+    Check(Near(vanilla.y, 10) && passive.Physics.bLimitVerticalUpVelocity,
+        "passive frame leaves the native inline world-Y cap enabled and unchanged");
+    Check(!passive.Plugin.SessionModified && passive.Physics.NativeGravityHelperCalls == 0,
+        "passive vanilla cap path does not modify session or call the gravity helper");
+
+    var active = NewFixture();
+    DriveToActive(active);
+    active.Physics.fKartMaximum_Y_Velocity = 10;
+    active.Physics.vLastVelocity = Vector3.zero;
+    active.Physics.NativeAddedVelocity = new Vector3(0, 30, 0);
+    Vector3 before = new(0, 0, 20);
+    Vector3 afterMain = RunNativeMainUpdate(active, before);
+    Check(afterMain.y > active.Physics.fKartMaximum_Y_Velocity && active.Physics.bLimitVerticalUpVelocity,
+        "active uphill frame bypasses the inline world-Y cap before KCC movement and restores the flag afterward");
+    Check(active.Physics.NativeUpdateVelocityCalls == 1 && active.Physics.NativeGravityHelperCalls == 0,
+        "main native body executes once and does not invoke the separate gravity helper");
+
+    object?[] characterVelocity = { active.Kart, afterMain };
+    Invoke("CharacterVelocityPostfix", characterVelocity);
+    var beforeMove = (Vector3)characterVelocity[1]!;
+    Check(MathF.Abs(Vector3.Dot(beforeMove, Policy(active).Normal)) < .02f &&
+        Near(beforeMove.magnitude, afterMain.magnitude),
+        "pre-movement KCC velocity callback aligns active ground velocity tangent without adding speed");
+    Vector3 beforeMovement = active.Motor.Transform.position;
+    active.Motor.TransientPosition += beforeMove * Time.fixedDeltaTime;
+    SimulateCommit(active);
+    Check(active.Motor.Transform.position.y > beforeMovement.y,
+        "native KCC movement receives the redirected velocity before its position commit");
+
+    active.Physics.bLimitVerticalUpVelocity = false;
+    RunNativeMainUpdate(active, new Vector3(0, 0, 20));
+    Check(!active.Physics.bLimitVerticalUpVelocity,
+        "active cap guard restores an originally false native flag exactly");
 }
 
-// Matching visuals must not hide a stale native motor frame.
+// The main-update finalizer restores the cap on exceptions and nested reentry.
 {
     var f = NewFixture();
-    var normal = LoopNormal(30);
-    var forward = new Vector3(1, 0, 0);
-    var desired = Quaternion.LookRotation(forward, normal);
-    f.Motor.Transform.rotation = desired;
-    Invoke("ApplyFrame", f.Physics, f.Motor, forward, normal, f.Motor.Velocity, true);
-    Check(Vector3.Dot(f.Motor.CharacterUp, normal) > .99f,
-        "matching Transform does not suppress adoption of the requested transient motor frame");
-    f.Motor.SimulateCommit();
-    Check(Quaternion.Angle(f.Motor.Transform.rotation, desired) < .01f,
-        "the native-style final commit retains the corrected rotation");
+    DriveToActive(f);
+    object?[] outer = { f.Physics, new Vector3(0, 0, 20), null };
+    Invoke("MainVelocityPrefix", outer);
+    Check(!f.Physics.bLimitVerticalUpVelocity, "outer active velocity prefix temporarily disables the native cap");
+    object?[] inner = { f.Physics, new Vector3(0, 0, 20), null };
+    Invoke("MainVelocityPrefix", inner);
+    object?[] innerFinalizer = { f.Physics, inner[2], null };
+    Invoke("MainVelocityFinalizer", innerFinalizer);
+    Check(!f.Physics.bLimitVerticalUpVelocity, "nested finalizer restores the exact inner prior false value");
+    object?[] outerFinalizer = { f.Physics, outer[2], null };
+    Invoke("MainVelocityFinalizer", outerFinalizer);
+    Check(f.Physics.bLimitVerticalUpVelocity, "outer finalizer restores the original true value");
+
+    object?[] throwingPrefix = { f.Physics, new Vector3(0, 0, 20), null };
+    Invoke("MainVelocityPrefix", throwingPrefix);
+    f.Physics.ThrowOnNativeUpdateVelocity = true;
+    Exception? thrown = null;
+    try
+    {
+        var velocity = (Vector3)throwingPrefix[1]!;
+        f.Physics.UpdateVelocity(ref velocity, Time.fixedDeltaTime);
+    }
+    catch (Exception ex) { thrown = ex; }
+    finally { f.Physics.ThrowOnNativeUpdateVelocity = false; }
+    var exception = thrown ?? throw new Exception("expected fake native exception");
+    object?[] exceptionFinalizer = { f.Physics, throwingPrefix[2], exception };
+    object? returned = Invoke("MainVelocityFinalizer", exceptionFinalizer);
+    Check(ReferenceEquals(returned, exception) && f.Physics.bLimitVerticalUpVelocity,
+        "Harmony finalizer preserves the thrown exception and restores the original cap flag");
+    Check(thrown is not null, "fake native inline update actually exercised the exception path");
 }
 
-// Stale native acceleration caches cannot reverse the transported forward at a >90 degree normal.
+// Inlined main-update gravity is reoriented only for a latched native hop; helpers are used only as a native probe.
 {
     var f = NewFixture();
-    var normal = LoopNormal(100);
-    var expectedForward = Vector3.ProjectOnPlane(Vector3.right, normal).normalized;
-    f.Motor.Velocity = expectedForward * 20;
-    f.Motor.BaseVelocity = f.Motor.Velocity;
-    f.Physics.vAccelerationForwardDirection = -expectedForward;
-    DriveToNormal(f, 100);
-    Check(Vector3.Dot(f.Physics.vAccelerationForwardDirection.normalized, expectedForward) > .99f,
-        "adapter rebuilds acceleration from current local forward instead of a reversed world-projected cache");
-}
-
-// Stable-contact velocity already projected onto the new road normal is not transported twice.
-{
-    var f = NewFixture();
-    Acquire(f);
-    var nextNormal = LoopNormal(10).normalized;
-    var alreadyTangent = Vector3.ProjectOnPlane(Vector3.forward, nextNormal).normalized * 25;
-    f.Motor.Velocity = alreadyTangent;
-    f.Motor.BaseVelocity = alreadyTangent;
-    KccUpdate(f, nextNormal);
-    Check(Vector3.Dot(f.Motor.CharacterUp, nextNormal) > .99f,
-        "accepted native rotation updates transient motor up before the movement phase");
-    Check(MathF.Abs(Vector3.Dot(f.Motor.BaseVelocity, nextNormal)) < .02f,
-        "stable normal change keeps native base velocity tangent to the new surface");
-    Check(MathF.Abs(f.Motor.BaseVelocity.magnitude - alreadyTangent.magnitude) < .02f,
-        "stable normal correction preserves existing velocity magnitude");
-}
-
-// Airborne state alone never raycasts or acquires an arbitrary wall.
-{
-    var f = NewFixture();
+    DriveToActive(f);
     f.Motor.GroundingStatus = new GroundingStatus();
-    int raycasts = 0;
-    Physics.RaycastHandler = (_, _, _, _, _) => { raycasts++; return (true, new RaycastHit(f.Road, Vector3.right, 1)); };
-    Update(f);
-    Check(StateCount() == 0 && raycasts == 0,
-        "detached airborne kart cannot use the continuity probe to pick up a wall or road");
+    f.Physics.NativeAddedVelocity = Vector3.down * 2;
+    f.Physics.NativeGravityDelta = Vector3.down * 2;
+    Vector3 beforeJump = new(0, 0, 20);
+    Vector3 firstMain = RunNativeMainUpdate(f, beforeJump);
+    Check(Near((firstMain - beforeJump).y, -2) && f.Physics.NativeGravityHelperCalls == 0,
+        "main update before the native jump uses its inline world gravity and does not probe the helper");
+    beforeJump = firstMain;
+    object?[] jumpPrefix = { f.Physics, beforeJump, null };
+    Invoke("JumpPrefix", jumpPrefix);
+    Vector3 afterJump = beforeJump + Vector3.up * 5;
+    object?[] jumpPostfix = { f.Physics, afterJump, jumpPrefix[2] };
+    Invoke("JumpPostfix", jumpPostfix);
+    var redirectedJump = (Vector3)jumpPostfix[1]!;
+    Check(MathF.Abs((redirectedJump - beforeJump).magnitude - 5) < .03f,
+        "native jump impulse is redirected after the main physics update without changing impulse magnitude");
+
+    var afterGravity = RunNativeMainUpdate(f, redirectedJump);
+    var added = afterGravity - redirectedJump;
+    Check(Near(added.magnitude, 2) && Vector3.Dot(added, -Policy(f).Up) > 1.9f,
+        "main-update inline world-down gravity delta is reoriented along the active surface only during hop grace");
+    Check(f.Physics.NativeGravityHelperCalls == 1,
+        "gravity helper runs once as a scratch native-delta probe, not from the simulated native main body");
 }
 
-// A native jump starts finite grace even when drift state is false, and redirects only its added delta.
+// Pause, replay, respawn, disable, and runtime faults release active state safely.
 {
-    var f = NewFixture();
-    f.Motor.Velocity = new Vector3(20, 0, 0);
-    f.Motor.BaseVelocity = f.Motor.Velocity;
-    DriveToNormal(f, 90);
-    f.Physics.bIsDrifting = false;
-
-    Vector3 velocity = new(20, 0, 0);
-    object?[] prefix = { f.Physics, velocity, null };
-    Invoke("JumpPrefix", prefix);
-    var nativeBefore = (Vector3)prefix[2]!;
-    velocity += Vector3.up * 5f;
-    object?[] postfix = { f.Physics, velocity, nativeBefore };
-    Invoke("JumpPostfix", postfix);
-    var redirected = (Vector3)postfix[1]!;
-    Check(MathF.Abs((redirected - nativeBefore).magnitude - 5f) < .02f,
-        "native jump redirect preserves the game-produced impulse magnitude");
-    Check(((Vector3)redirected).z > 4.9f,
-        "native jump added impulse is redirected along the attached wall normal");
-
-    // KCC can retain the last stable report for the force-unground jump phase.
-    f.Motor.MustUngroundValue = true;
-    Physics.RaycastHandler = (_, _, _, _, _) => (true, new RaycastHit(f.Road, LoopNormal(90), 1.1f));
-    KccUpdate(f, LoopNormal(90));
-    Check(StateCount() == 1 && f.Physics.bIsDrifting == false,
-        "post-jump continuity remains attached through the latched native hop without drift held");
-    var stateEntries = Dictionary("States").Values.GetEnumerator(); stateEntries.MoveNext();
-    var kartState = stateEntries.Current!;
-    var policy = (AntigravityPolicy.State)kartState.GetType().GetField("Policy", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(kartState)!;
-    Check((bool)kartState.GetType().GetField("AcceptedHop", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(kartState)!,
-        "stale stable status cannot clear the native jump latch while KCC must unground");
-    Check(policy.HopElapsed > 0 && policy.Attached,
-        "native jump latch starts the bounded hop clock on a valid nearby road probe");
-
-    f.Motor.MustUngroundValue = false;
-    KccUpdate(f, LoopNormal(90)); // Fresh native stable contact confirms landing and consumes the latch.
-    var landedEntries = Dictionary("States").Values.GetEnumerator(); landedEntries.MoveNext();
-    var landed = landedEntries.Current!;
-    Check(!(bool)landed.GetType().GetField("AcceptedHop", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(landed)!,
-        "a fresh native stable contact consumes the hop latch");
-}
-
-// Online, pause, and recovery guards release to current heading without rewinding position or velocity.
-{
-    foreach (var mode in new[] { "online", "paused", "respawning", "replay" })
+    foreach (var mode in new[] { "online", "paused", "respawning", "replay", "disabled" })
     {
         var f = NewFixture();
-        Acquire(f);
+        DriveToActive(f);
         var currentHeading = new Vector3(1, 0, 0);
-        f.Kart.transform.rotation = Quaternion.LookRotation(currentHeading, Vector3.up);
-        f.Kart.transform.position = new Vector3(7, 8, 9);
-        var position = f.Kart.transform.position;
+        f.Motor.SetRotation(Quaternion.LookRotation(currentHeading, Vector3.up), true);
         f.Motor.Velocity = new Vector3(30, 2, 40);
         f.Motor.BaseVelocity = f.Motor.Velocity;
         var velocity = f.Motor.BaseVelocity;
@@ -278,49 +448,27 @@ Vector3 Vec(Quaternion q, Vector3 v) => q * v;
             Plugin.OfflineLabAllowed = false;
             Ant_CurrentGameConfiguration.IsOnlineGame_InRoom_WithInternet = true;
         }
-        else
-        {
-            AirShiftFeature.Mode = mode == "paused" ? AirShiftFeature.RunMode.Paused :
-                mode == "respawning" ? AirShiftFeature.RunMode.Respawning : AirShiftFeature.RunMode.Replay;
-        }
-        Update(f);
-        Check(StateCount() == 0, $"{mode} guard releases adapter state");
-        Check(f.Motor.BaseVelocity.Equals(velocity), $"{mode} release preserves the current velocity vector");
-        Check(f.Kart.transform.position.Equals(position), $"{mode} release does not move or rewind kart position");
-
+        else if (mode == "disabled") f.Plugin.AntigravityEnabled.Value = false;
+        else AirShiftFeature.Mode = mode == "paused" ? AirShiftFeature.RunMode.Paused :
+            mode == "respawning" ? AirShiftFeature.RunMode.Respawning : AirShiftFeature.RunMode.Replay;
+        After(f);
+        Check(!IsAttached(f), $"{mode} mode releases the active surface frame");
+        Check(NearVector(f.Motor.BaseVelocity, velocity), $"{mode} release preserves current velocity");
         object?[] rotationCall = { f.Kart, Quaternion.LookRotation(Vector3.up, Vector3.forward) };
         Invoke("UpdateRotationPostfix", rotationCall);
         var releasedRotation = (Quaternion)rotationCall[1]!;
-        Check(Vector3.Angle(Vec(releasedRotation, Vector3.up), Vector3.up) < 1,
-            $"{mode} release returns the current heading to upright after the safe rotation boundary");
-        Check(Vector3.Dot(Vec(releasedRotation, Vector3.forward), currentHeading) > .99f,
-            $"{mode} release keeps the current heading rather than a pre-attachment heading");
+        Check(Vector3.Angle(releasedRotation * Vector3.up, Vector3.up) < 1,
+            $"{mode} release is upright at the next KCC rotation boundary");
+        Check(Vector3.Dot(releasedRotation * Vector3.forward, currentHeading) > .99f,
+            $"{mode} release keeps the current direction");
     }
-}
 
-// Runtime exceptions disable the feature and release all tracked karts.
-{
-    var f = NewFixture();
-    Acquire(f);
-    f.Motor.ThrowOnGroundingRead = true;
-    Update(f);
-    Check(StateCount() == 0 && !f.Plugin.AntigravityEnabled.Value,
-        "fault disables the feature and releases tracked state");
-    Check(f.Plugin.Log.Errors.Count == 1, "fault is recorded for diagnosis");
-}
-
-// Config disable and native race reset both release tracked frame state.
-{
-    var f = NewFixture();
-    Acquire(f);
-    f.Plugin.AntigravityEnabled.Value = false;
-    Update(f);
-    Check(StateCount() == 0, "turning the feature off releases the attached frame");
-
-    f = NewFixture();
-    Acquire(f);
-    Invoke("RaceResetPostfix");
-    Check(StateCount() == 0, "native race reset releases the attached frame");
+    var fault = NewFixture();
+    DriveToActive(fault);
+    fault.Motor.ThrowOnGroundingRead = true;
+    After(fault);
+    Check(!IsAttached(fault) && !fault.Plugin.AntigravityEnabled.Value && fault.Plugin.Log.Errors.Count == 1,
+        "adapter exception disables the feature and clears active state");
 }
 
 Console.WriteLine($"Antigravity runtime adapter: {checks} assertions passed.");

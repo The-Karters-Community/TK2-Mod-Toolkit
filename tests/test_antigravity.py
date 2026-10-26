@@ -9,6 +9,7 @@ class AntigravityIntegrationTests(unittest.TestCase):
         identity = "Antigravity"
         defaults = pack.defaults()
         self.assertIs(defaults[identity + "/Enabled"], False)
+        self.assertIs(defaults[identity + "/CameraFollowsSurface"], True)
 
         feature = next(feature for feature in pack.catalog_features() if feature["id"] == identity)
         self.assertTrue(feature["gameplay"])
@@ -36,6 +37,26 @@ class AntigravityIntegrationTests(unittest.TestCase):
         self.assertNotIn("AccessTools.FieldRef", source)
         self.assertNotIn("AccessTools.Field(", source)
         self.assertIn("plugin.SessionModified = true;", source)
+
+    def test_velocity_hooks_use_native_movement_boundaries(self):
+        source = (pack.PROJECT.parent / "AntigravityFeature.cs").read_text(encoding="utf-8")
+        hooks = source.split("internal static FeatureHook[] Hooks()", 1)[1].split("};", 1)[0]
+        self.assertIn('typeof(PixelKartPhysics), "UpdateVelocity"', hooks)
+        self.assertIn("KinematicCharacterController_ICharacterController_UpdateVelocity", hooks)
+        self.assertNotIn('"UpdateGravityWhenNotGrounded"', hooks)
+        self.assertIn('"UpdateSlopeVelocity"', hooks)
+        self.assertIn("Prefix: nameof(SlopePrefix)", hooks)
+        self.assertNotIn('"LimitVerticalVelocity"', hooks)
+        self.assertIn("MainVelocityPrefix", source)
+        self.assertIn("MainVelocityFinalizer", source)
+
+    def test_catalog_describes_passive_arm_and_native_slope_activation(self):
+        feature = next(feature for feature in pack.catalog_features() if feature["id"] == "Antigravity")
+        description = feature["description"].lower()
+        self.assertIn("arms passively", description)
+        self.assertIn("empirical 47° world-angle cap", description)
+        self.assertIn("not a native world-angle limit", description)
+        self.assertIn("matching forward lookahead", description)
 
     def test_shared_runtime_guard_covers_non_race_and_recovery_states(self):
         source = (pack.PROJECT.parent / "AirShiftFeature.cs").read_text(encoding="utf-8")

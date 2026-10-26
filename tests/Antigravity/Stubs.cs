@@ -18,6 +18,7 @@ internal static class Mathf
         return delta;
     }
     internal static float Clamp(float value, float min, float max) => Math.Clamp(value, min, max);
+    internal static int Clamp(int value, int min, int max) => Math.Clamp(value, min, max);
 }
 
 internal struct Vector3

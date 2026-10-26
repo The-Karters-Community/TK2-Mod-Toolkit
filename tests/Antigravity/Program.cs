@@ -12,155 +12,318 @@ void Check(bool ok, string message)
 bool Near(float a, float b, float epsilon = .02f) => MathF.Abs(a - b) <= epsilon;
 Vector3 Normal(float degrees) => new(MathF.Sin(degrees * Mathf.Deg2Rad), MathF.Cos(degrees * Mathf.Deg2Rad), 0);
 Vector3 LoopNormal(float degrees) => new(0, MathF.Cos(degrees * Mathf.Deg2Rad), MathF.Sin(degrees * Mathf.Deg2Rad));
+
 AntigravityPolicy.Sample Sample(float degrees = 0, float speed = 20,
     AntigravityPolicy.ContactKind contact = AntigravityPolicy.ContactKind.NativeStableRoad,
     float dt = 1f / 60, Vector3? position = null, float probeSeparation = 0,
     float steeringDeltaDegrees = 0, Vector3? contactNormal = null, Vector3? referenceForward = null,
+    Vector3? nativeUp = null, float nativeMaxSlope = 45, float forwardProgress = 0,
+    bool hasLookahead = false, Vector3? lookaheadNormal = null, float lookaheadHeight = 0,
+    bool sameTrack = false, bool activeContactCandidate = false,
     bool enabled = true, bool local = true, bool offline = true, bool groundMask = true,
     bool trigger = false, bool player = false, bool dynamicBody = false,
     bool launch = false, bool hop = false) => new(dt, speed, position ?? Vector3.zero,
-        contactNormal ?? Normal(degrees), referenceForward ?? new Vector3(0, 0, 1), probeSeparation,
-        steeringDeltaDegrees, contact, enabled, local, offline,
-        groundMask, trigger, player, dynamicBody, launch, hop);
+        contactNormal ?? Normal(degrees), referenceForward ?? Vector3.forward, probeSeparation,
+        steeringDeltaDegrees, contact, enabled, local, offline, groundMask, trigger, player,
+        dynamicBody, launch, hop, nativeUp ?? Vector3.up, nativeMaxSlope, forwardProgress,
+        hasLookahead, lookaheadNormal ?? Vector3.zero, lookaheadHeight, sameTrack,
+        activeContactCandidate);
+
 AntigravityPolicy.Decision Step(ref AntigravityPolicy.State state,
     AntigravityPolicy.Sample sample, AntigravityPolicy.Settings? settings = null)
 {
     var selected = settings ?? AntigravityPolicy.Settings.Default;
     return AntigravityPolicy.Step(ref state, in sample, in selected);
 }
-AntigravityPolicy.State AttachedAtFlat()
+
+AntigravityPolicy.Decision Activate(ref AntigravityPolicy.State state, float speed = 20,
+    bool passivelyTiltedMotor = false, float startAngle = 30, float finalAngle = 38,
+    bool validLookahead = true, bool sameTrack = true, float lookaheadHeight = 0,
+    Vector3? referenceForward = null, Vector3? previewNormal = null,
+    float nativeLimit = 45, float progress = .13f)
 {
-    var state = new AntigravityPolicy.State();
-    var attached = Step(ref state, Sample());
-    Check(attached.Attached, "stable eligible native road acquires the frame");
-    Check(Near(attached.Up.y, 1), "acquired frame begins aligned with the stable road normal");
-    return state;
+    AntigravityPolicy.Decision result = default;
+    int sampleIndex = 0;
+    Vector3 forward = referenceForward ?? Vector3.forward;
+    for (float angle = startAngle; angle <= finalAngle + .001f; angle += 1f)
+    {
+        sampleIndex++;
+        Vector3 normal = forward.x > .9f ? LoopNormal(angle) : Normal(angle);
+        Vector3 motorUp = passivelyTiltedMotor ? normal : Vector3.up;
+        Vector3 lookahead = previewNormal ?? (forward.x > .9f ? LoopNormal(42) : Normal(42));
+        result = Step(ref state, Sample(speed: speed, dt: .05f,
+            position: new Vector3(0, 0, (sampleIndex - 1) * progress), contactNormal: normal,
+            referenceForward: referenceForward, nativeUp: motorUp, nativeMaxSlope: nativeLimit,
+            forwardProgress: sampleIndex == 1 ? 0 : progress,
+            hasLookahead: validLookahead, lookaheadNormal: lookahead,
+            lookaheadHeight: lookaheadHeight, sameTrack: sameTrack));
+    }
+    return result;
 }
 
-// Acquisition is limited to stable native road contacts.
+// Arming is passive. It requires continuous stable-ground samples and forward travel.
 {
     Check(!OnlineProtectionPolicy.IsWhitelistedModule("Antigravity"),
         "antigravity remains outside the gameplay allowlist");
     Check(OnlineProtectionPolicy.RequiresBlocking(new[] { ("Antigravity", "Enabled", true) }, Array.Empty<string>()),
         "online-protection policy blocks submissions/rooms for enabled antigravity");
+
     var state = new AntigravityPolicy.State();
-    Check(Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe)).Reason ==
-        AntigravityPolicy.DetachReason.InvalidContact, "continuous probe cannot acquire while detached");
-    Check(Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.None)).Reason ==
-        AntigravityPolicy.DetachReason.InvalidContact, "wall/respawn/trigger categories cannot acquire");
-}
+    var result = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.NativeStableRoad,
+        degrees: 0, nativeUp: Vector3.up));
+    Check(!result.Attached && result.Armed && state.Armed,
+        "flat eligible road arms without activating a surface frame");
+    Check(result.Up.sqrMagnitude == 0 && !state.Attached,
+        "armed state emits no frame that could alter native orientation or axes");
 
-// Stable normals follow a complete continuous loop at ordinary per-frame changes.
-{
-    var state = new AntigravityPolicy.State();
-    var current = Step(ref state, Sample());
-    AntigravityPolicy.Decision latest = default;
-    var previousForward = current.Forward;
-    for (int angle = 5; angle <= 360; angle += 5)
-    {
-        latest = Step(ref state, Sample(contactNormal: LoopNormal(angle)));
-        Check(latest.Attached, $"continuous loop normal at {angle} degrees remains attached");
-        Check(Near(latest.Up.magnitude, 1), "transported up remains normalized");
-        Check(MathF.Abs(Vector3.Dot(latest.Up, latest.Forward)) < .002f,
-            "transported forward remains tangent to the road");
-        Check(Vector3.Dot(previousForward, latest.Forward) > .99f,
-            $"forward remains continuous at {angle} degrees instead of flipping from world projection");
-        previousForward = latest.Forward;
-    }
-    Check(Vector3.Angle(latest.Up, Vector3.up) < 1, "full loop returns the transported frame to its starting normal");
-}
-
-// Native steering yaw is applied around the transported local up axis, including at vertical and inverted poses.
-{
-    foreach (var angle in new[] { 90, 180, 270 })
-    {
-        var state = new AntigravityPolicy.State();
-        var start = Step(ref state, Sample(contactNormal: LoopNormal(angle), referenceForward: Vector3.right));
-        Check(start.Attached, $"frame acquires at {angle} degree wall/ceiling pose with a valid tangent heading");
-        var steered = Step(ref state, Sample(contactNormal: LoopNormal(angle), referenceForward: Vector3.right,
-            steeringDeltaDegrees: 15));
-        Check(steered.Attached && Near(Vector3.Angle(start.Forward, steered.Forward), 15),
-            $"native yaw applies at {angle} degrees without world-up projection");
-        Check(MathF.Abs(Vector3.Dot(steered.Up, steered.Forward)) < .002f,
-            "steering keeps forward tangent to the current surface");
-    }
-}
-
-// Curvature is rate bounded, and the per-tick cap also applies at long timesteps.
-{
-    var state = AttachedAtFlat();
-    Check(Step(ref state, Sample(90)).Reason == AntigravityPolicy.DetachReason.CurvatureLimit,
-        "abrupt floor-to-wall normal transition is rejected");
-    state = AttachedAtFlat();
-    Check(Step(ref state, Sample(13, dt: 1f / 60)).Reason == AntigravityPolicy.DetachReason.CurvatureLimit,
-        "turn over 720 degrees per second is rejected at 60 Hz");
-    state = AttachedAtFlat();
-    Check(Step(ref state, Sample(21, dt: 1)).Reason == AntigravityPolicy.DetachReason.CurvatureLimit,
-        "long timestep cannot exceed the 20 degree per tick cap");
-    state = AttachedAtFlat();
-    Check(Step(ref state, Sample(10, dt: 1f / 60)).Attached,
-        "10 degree per tick loop sample passes the configured 20 degree tick cap");
-}
-
-// Steep surfaces require the attach threshold and use a lower detach threshold.
-{
-    var state = new AntigravityPolicy.State();
-    Check(Step(ref state, Sample(90, speed: 11.99f)).Reason == AntigravityPolicy.DetachReason.LowSpeed,
-        "steep surface cannot attach below 12 m/s");
-    Check(Step(ref state, Sample(90, speed: 12)).Attached, "steep surface can attach at 12 m/s");
-    Check(Step(ref state, Sample(90, speed: 8)).Attached, "attached steep surface remains at the 8 m/s detach boundary");
-    Check(Step(ref state, Sample(90, speed: 7.99f)).Reason == AntigravityPolicy.DetachReason.LowSpeed,
-        "steep surface detaches below 8 m/s");
     state = new AntigravityPolicy.State();
-    Check(Step(ref state, Sample(speed: 0)).Attached,
-        "flat road does not inherit the steep-surface speed gate");
+    result = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe));
+    Check(!result.Armed && result.Reason == AntigravityPolicy.DetachReason.InvalidContact,
+        "continuous probe cannot arm or acquire when detached");
+    result = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.None));
+    Check(result.Reason == AntigravityPolicy.DetachReason.InvalidContact,
+        "airborne, wall, respawn, and trigger categories cannot arm");
 }
 
-// Jump is a bounded drift-hop grace, not an unconditional detach or a way to acquire in air.
+// A shallow 14-degree road remains passive even with repeated progress and a same-track preview.
 {
-    var state = AttachedAtFlat();
-    var hop = default(AntigravityPolicy.Decision);
-    for (int i = 1; i <= 24; i++)
-        hop = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
-            position: new Vector3(i * (20f / 24), 0, 0), probeSeparation: 1, hop: true));
-    Check(hop.Attached && Near(hop.HopElapsed, .4f),
-        "drift-hop keeps the acquired frame through 20 metres of tangent travel in 0.4 seconds");
-    for (int i = 25; i <= 28 && hop.Attached; i++)
-        hop = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
-            position: new Vector3(i * (20f / 24), 0, 0), probeSeparation: 1, hop: true));
-    Check(!hop.Attached && hop.Reason == AntigravityPolicy.DetachReason.HopExpired,
-        $"hop grace expires after 0.45 seconds even while drift remains held ({hop.Attached}, {hop.Reason}, {hop.HopElapsed})");
-    state = AttachedAtFlat();
-    Check(Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
-        dt: .5f, probeSeparation: 1, hop: true)).Reason == AntigravityPolicy.DetachReason.HopExpired,
-        "large valid timestep contributes its full duration and cannot prolong hop grace");
-    state = AttachedAtFlat();
-    Check(Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
-        position: new Vector3(20, 0, 0), probeSeparation: 2.51f, hop: true)).Reason == AntigravityPolicy.DetachReason.TooFar,
-        "hop grace ends when normal probe support separation exceeds 2.5 metres");
-    state = AttachedAtFlat();
-    Check(Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
-        probeSeparation: 1, hop: false)).Reason == AntigravityPolicy.DetachReason.InvalidContact,
-        "contact loss without an active drift-hop candidate detaches");
-    state = AttachedAtFlat();
-    Check(Step(ref state, Sample(90, contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
-        probeSeparation: 1, hop: true)).Reason == AntigravityPolicy.DetachReason.CurvatureLimit,
-        "abrupt probe normal cannot preserve the cached frame during a hop");
-    state = AttachedAtFlat();
-    Check(Step(ref state, Sample(180, contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
-        probeSeparation: 1, hop: true)).Reason == AntigravityPolicy.DetachReason.CurvatureLimit,
-        "opposite probe normal cannot preserve the cached frame during a hop");
-    state = AttachedAtFlat();
-    for (int angle = 5; angle <= 90; angle += 5)
-        hop = Step(ref state, Sample(angle, contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
-            dt: 1f / 60, probeSeparation: 1, hop: true));
-    Check(hop.Attached && Near(hop.HopElapsed, .3f),
-        "valid curved probe normals transport during hop without refreshing its deadline");
-    Check(Vector3.Angle(hop.Up, Normal(90)) < 1,
-        "hop frame follows the current continuous probe normal through the curve");
+    var state = new AntigravityPolicy.State();
+    AntigravityPolicy.Decision latest = default;
+    for (int angle = 10; angle <= 14; angle++)
+    {
+        latest = Step(ref state, Sample(angle, dt: .05f,
+            position: new Vector3(0, 0, angle * .2f), forwardProgress: angle == 10 ? 0 : .2f,
+            hasLookahead: true, lookaheadNormal: Normal(18), lookaheadHeight: .1f, sameTrack: true));
+        Check(!latest.Attached && latest.Armed,
+            $"shallow {angle}° road stays armed and passive");
+    }
+    Check(!state.Attached && state.StableSamples >= 4,
+        "sufficient flat-road travel and stable samples do not cause shallow activation");
+
+    state = new AntigravityPolicy.State();
+    latest = Activate(ref state, validLookahead: false);
+    Check(!latest.Attached && latest.Armed,
+        "near-slope stable history remains passive when no eligible lookahead exists");
+    state = new AntigravityPolicy.State();
+    latest = Activate(ref state, sameTrack: false);
+    Check(!latest.Attached && latest.Armed,
+        "lookahead on a different road collider cannot activate the frame");
+    state = new AntigravityPolicy.State();
+    latest = Activate(ref state, lookaheadHeight: .56f);
+    Check(!latest.Attached && latest.Armed,
+        "lookahead outside the bounded road-height tolerance cannot activate");
+    state = new AntigravityPolicy.State();
+    latest = Activate(ref state, startAngle: 30, finalAngle: 36, previewNormal: Normal(45));
+    Check(!latest.Attached && latest.Armed,
+        "lookahead at the activation band cannot engage before the current road reaches that band");
+    state = new AntigravityPolicy.State();
+    latest = Activate(ref state, referenceForward: Vector3.right, previewNormal: Vector3.right);
+    Check(!latest.Attached && latest.Armed,
+        "a same-track lookahead with an abrupt wall normal cannot activate");
 }
 
-// Every classification/ownership guard applies both to acquisition and an attached frame.
+// Smooth uphill progression activates only near the actual native slope boundary.
+{
+    var state = new AntigravityPolicy.State();
+    var result = Activate(ref state, passivelyTiltedMotor: true);
+    Check(result.Attached && state.Attached && !state.Armed,
+        "gradual near-limit curve activates after stable history, actual travel, and same-road lookahead");
+    Check(Vector3.Angle(result.Up, Normal(38)) < 1,
+        "active frame follows the current road normal even when native motor up passively tracks the road");
+    Check(state.StableSamples >= 4 && state.ArmForwardTravel >= .5f && state.ArmCurveProgress >= 2f,
+        "activation records minimum stable samples, forward travel, and curve progress");
+
+    state = new AntigravityPolicy.State();
+    result = Activate(ref state, speed: 8);
+    Check(!result.Attached && result.Armed,
+        "near-limit lookahead cannot activate below the attach-speed threshold");
+
+    state = new AntigravityPolicy.State();
+    result = Activate(ref state, nativeLimit: 32, startAngle: 26, finalAngle: 30);
+    Check(!result.Attached && !result.Armed && result.Reason == AntigravityPolicy.DetachReason.UnsupportedSlopeLimit,
+        "native slope limits too low for a safe lead band are rejected explicitly");
+
+    var settings = AntigravityPolicy.Settings.Default;
+    Check(Near(AntigravityPolicy.WorldActivationThreshold(45, in settings), 37) &&
+        Near(AntigravityPolicy.WorldActivationThreshold(85, in settings), 47) &&
+        Near(AntigravityPolicy.WorldActivationThreshold(90, in settings), 47),
+        "world activation threshold uses native limit minus lead, capped at the empirical 47° world calibration");
+    foreach (float nativeLimit in new[] { 85f, 90f })
+    {
+        state = new AntigravityPolicy.State();
+        result = Activate(ref state, nativeLimit: nativeLimit, startAngle: 40, finalAngle: 46,
+            previewNormal: Normal(53));
+        Check(!result.Attached && result.Armed,
+            $"native limit {nativeLimit:0}° cannot activate before 47° world slope even with forward lookahead");
+        result = Step(ref state, Sample(48, dt: .05f, position: new Vector3(0, 0, 7 * .13f),
+            forwardProgress: .13f, nativeMaxSlope: nativeLimit,
+            hasLookahead: true, lookaheadNormal: Normal(53), sameTrack: true));
+        Check(result.Attached && Vector3.Angle(result.Normal, Normal(48)) < 1,
+            $"native limit {nativeLimit:0}° activates at the empirical 47° world calibration, not nativeLimit−8°");
+    }
+
+    state = new AntigravityPolicy.State();
+    result = Activate(ref state, startAngle: 30, finalAngle: 34, progress: .1f);
+    Check(!result.Attached && result.Armed,
+        "stable sample count without the required half metre of actual forward travel stays passive");
+}
+
+// Broken continuity or a floor-to-wall jump cannot turn an armed kart into an active one.
+{
+    var state = new AntigravityPolicy.State();
+    Step(ref state, Sample(0));
+    var abrupt = Step(ref state, Sample(90, contact: AntigravityPolicy.ContactKind.None));
+    Check(!abrupt.Attached && !abrupt.Armed && !state.Armed,
+        "abrupt floor-to-wall loss clears a passive arm without attaching");
+
+    state = new AntigravityPolicy.State();
+    var result = Step(ref state, Sample(90, nativeUp: Vector3.up));
+    Check(!result.Attached && result.Reason == AntigravityPolicy.DetachReason.InvalidContact,
+        "a wall contact outside native stable support cannot arm in midair");
+
+    state = new AntigravityPolicy.State();
+    result = Step(ref state, Sample(10, launch: true));
+    Check(!result.Attached && !result.Armed && result.Reason == AntigravityPolicy.DetachReason.LaunchOrTeleport,
+        "launch and teleport clear passive arming");
+}
+
+// Road-facet normal changes are bounded geometrically, not by fixedDeltaTime.
+{
+    foreach (float dt in new[] { 1f / 120f, 1f / 60f })
+    {
+        var armed = new AntigravityPolicy.State();
+        var first = Step(ref armed, Sample(20, dt: dt, nativeUp: Normal(20)));
+        var facet = Step(ref armed, Sample(35, dt: dt, nativeUp: Normal(35),
+            position: Vector3.forward * .2f, forwardProgress: .2f));
+        Check(first.Armed && facet.Armed && !facet.Attached && armed.StableSamples == 2,
+            $"15° same-road facet remains a valid passive arm step at {1f / dt:0} Hz");
+
+        armed = new AntigravityPolicy.State();
+        Activate(ref armed);
+        Vector3 previousNormal = armed.Normal;
+        var activeFacet = Step(ref armed, Sample(dt: dt, contactNormal: Normal(53),
+            nativeUp: previousNormal, referenceForward: armed.Forward));
+        Check(activeFacet.Attached && Vector3.Angle(activeFacet.Normal, Normal(53)) < 1,
+            $"15° native-stable facet remains attached at {1f / dt:0} Hz");
+
+        armed = new AntigravityPolicy.State();
+        Activate(ref armed);
+        var probeFacet = Step(ref armed, Sample(dt: dt,
+            contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
+            contactNormal: Normal(53), nativeUp: armed.Up, referenceForward: armed.Forward,
+            probeSeparation: .1f, sameTrack: true, activeContactCandidate: true));
+        Check(probeFacet.Attached && Vector3.Angle(probeFacet.Normal, Normal(53)) < 1,
+            $"15° same-track contact facet remains supported at {1f / dt:0} Hz");
+    }
+
+    var active = new AntigravityPolicy.State();
+    Activate(ref active);
+    var abruptWall = Step(ref active, Sample(dt: 1f / 120,
+        contactNormal: Vector3.right, nativeUp: active.Normal, referenceForward: active.Forward));
+    Check(!abruptWall.Attached && abruptWall.Reason == AntigravityPolicy.DetachReason.CurvatureLimit,
+        "a 90° wall normal is still rejected independent of the tick rate");
+}
+
+// Once active, transported forward remains continuous around a complete loop.
+{
+    var state = new AntigravityPolicy.State();
+    var current = Activate(ref state, referenceForward: Vector3.right);
+    Check(current.Attached, "loop fixture first reaches near-slope active state");
+    var previousForward = current.Forward;
+    Vector3 previousNormal = current.Normal;
+    for (int angle = 43; angle <= 333; angle += 5)
+    {
+        var normal = LoopNormal(angle);
+        current = Step(ref state, Sample(speed: 20, dt: 1f / 60,
+            contactNormal: normal, nativeUp: previousNormal,
+            referenceForward: Vector3.right));
+        Check(current.Attached, $"smooth native support follows loop at {angle}°");
+        Check(Near(current.Up.magnitude, 1) && MathF.Abs(Vector3.Dot(current.Up, current.Forward)) < .002f,
+            "transported up stays normalized and forward stays tangent");
+        Check(Vector3.Dot(previousForward, current.Forward) > .99f,
+            $"forward remains continuous at {angle}° without a vertical-frame flip");
+        previousForward = current.Forward;
+        previousNormal = normal;
+    }
+    Check(Vector3.Angle(current.Up, LoopNormal(333)) < 1,
+        "transported frame remains aligned through the inverted portion of the loop");
+    foreach (int angle in new[] { 338, 343, 348, 353, 358, 360 })
+    {
+        var normal = LoopNormal(angle);
+        current = Step(ref state, Sample(speed: 20, dt: 1f / 60,
+            contactNormal: normal, nativeUp: previousNormal, referenceForward: Vector3.right));
+        Check(!current.Attached && current.Armed,
+            $"active frame returns to passive arming as the road flattens at {angle}°");
+        previousNormal = normal;
+    }
+    for (int angle = 1; angle <= 14; angle++)
+    {
+        var normal = LoopNormal(angle);
+        current = Step(ref state, Sample(speed: 20, dt: 1f / 60,
+            contactNormal: normal, nativeUp: previousNormal, referenceForward: Vector3.right));
+        previousNormal = normal;
+    }
+    Check(!current.Attached && current.Armed && !state.Attached,
+        "a full loop back to a 14° road settles passive instead of remaining activated");
+}
+
+// Native contacts use normal hysteresis; short same-track support loss is separately bounded.
+{
+    var state = new AntigravityPolicy.State();
+    Activate(ref state);
+    var grace = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
+        dt: .04f, probeSeparation: .2f, contactNormal: state.Normal, referenceForward: state.Forward,
+        nativeUp: state.Up, sameTrack: true, activeContactCandidate: true));
+    Check(grace.Attached && Near(grace.ContactGraceElapsed, .04f) && Near(grace.HopElapsed, 0),
+        "short high-speed contact loss preserves an active frame with separate contact grace");
+    grace = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
+        dt: .04f, probeSeparation: .2f, contactNormal: state.Normal, referenceForward: state.Forward,
+        nativeUp: state.Up, sameTrack: true, activeContactCandidate: true));
+    Check(grace.Attached && Near(grace.ContactGraceElapsed, .08f),
+        "active-contact grace reaches its bounded time edge");
+    grace = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
+        dt: .005f, probeSeparation: .2f, contactNormal: state.Normal, referenceForward: state.Forward,
+        nativeUp: state.Up, sameTrack: true, activeContactCandidate: true));
+    Check(!grace.Attached && grace.Reason == AntigravityPolicy.DetachReason.HopExpired,
+        "active-contact grace expires after 0.08 seconds without a jump");
+
+    state = new AntigravityPolicy.State();
+    Activate(ref state);
+    grace = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
+        dt: .01f, probeSeparation: .251f, contactNormal: state.Normal, referenceForward: state.Forward,
+        nativeUp: state.Up, sameTrack: true, activeContactCandidate: true));
+    Check(!grace.Attached && grace.Reason == AntigravityPolicy.DetachReason.TooFar,
+        "active-contact grace cannot retain support beyond 0.25 metres");
+
+    state = new AntigravityPolicy.State();
+    Activate(ref state);
+    grace = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
+        dt: .01f, probeSeparation: .1f, contactNormal: state.Normal, referenceForward: state.Forward,
+        nativeUp: state.Up, sameTrack: false, activeContactCandidate: true));
+    Check(!grace.Attached && grace.Reason == AntigravityPolicy.DetachReason.InvalidContact,
+        "active-contact grace cannot bridge to another track");
+
+    state = new AntigravityPolicy.State();
+    Activate(ref state);
+    grace = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
+        dt: .01f, probeSeparation: .1f, contactNormal: state.Normal, referenceForward: state.Forward,
+        nativeUp: state.Up, sameTrack: true, hop: true));
+    Check(grace.Attached && Near(grace.HopElapsed, .01f) && Near(grace.ContactGraceElapsed, 0),
+        "native jump or drift candidate uses its separate drift-hop timer");
+    for (int i = 1; i < 9; i++)
+        grace = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
+            dt: .05f, probeSeparation: 1f, contactNormal: state.Normal, referenceForward: state.Forward,
+            nativeUp: state.Up, sameTrack: true, hop: true));
+    Check(grace.Attached && Near(grace.HopElapsed, .41f),
+        "drift-hop grace retains an active frame for its independent bounded duration");
+    grace = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.ContinuousRoadProbe,
+        dt: .05f, probeSeparation: 1f, contactNormal: state.Normal, referenceForward: state.Forward,
+        nativeUp: state.Up, sameTrack: true, hop: true));
+    Check(!grace.Attached && grace.Reason == AntigravityPolicy.DetachReason.HopExpired,
+        "drift-hop grace expires after 0.45 seconds even if the button remains held");
+}
+
+// All ownership, collider, launch, and finite-value guards apply to both armed and active state.
 {
     foreach (var invalid in new[] {
         Sample(groundMask: false), Sample(trigger: true), Sample(player: true), Sample(dynamicBody: true),
@@ -168,65 +331,65 @@ AntigravityPolicy.State AttachedAtFlat()
     })
     {
         var state = new AntigravityPolicy.State();
-        Check(!Step(ref state, invalid).Attached, "guard rejects ineligible acquisition");
-        state = AttachedAtFlat();
         var result = Step(ref state, invalid);
-        Check(!result.Attached && !state.Attached, "guard detaches and clears an active frame");
+        Check(!result.Attached && !result.Armed, "guard rejects an ineligible passive acquisition");
+        state = new AntigravityPolicy.State();
+        Activate(ref state);
+        result = Step(ref state, invalid);
+        Check(!result.Attached && !result.Armed && !state.Attached,
+            "guard detaches and clears an active frame");
     }
 }
 
-// Finite settings and sample validation prevent NaN/infinity from poisoning the frame.
+// Settings and malformed inputs remain finite and release without rewinding movement.
 {
     var settings = new AntigravityPolicy.Settings(float.NaN, float.PositiveInfinity,
         float.NaN, float.NegativeInfinity, float.PositiveInfinity, float.NaN, float.NegativeInfinity);
     foreach (var value in new[] { settings.AttachSpeed, settings.DetachSpeed, settings.MaxTurnPerTick,
-        settings.MaxTurnPerSecond, settings.MaxHopSeconds, settings.MaxHopDistance, settings.SteepAngle })
+        settings.MaxTurnPerSecond, settings.MaxHopSeconds, settings.MaxHopDistance, settings.SteepAngle,
+        settings.ActivationLeadDegrees, settings.MinActivationAngle, settings.MinForwardTravel,
+        settings.MinCurveProgress, settings.MaxLookaheadNormalTurn, settings.MaxLookaheadHeight,
+        settings.MaxContactGraceSeconds, settings.MaxContactGraceDistance })
         Check(float.IsFinite(value), "settings constructor clamps non-finite inputs to finite values");
     Check(settings.DetachSpeed <= settings.AttachSpeed, "detach threshold cannot exceed attach threshold");
-    var defaults = AntigravityPolicy.Settings.Default;
-    Check(Near(defaults.AttachSpeed, 12) && Near(defaults.DetachSpeed, 8) &&
-        Near(defaults.MaxTurnPerTick, 20) && Near(defaults.MaxTurnPerSecond, 720) &&
-        Near(defaults.MaxHopSeconds, .45f) && Near(defaults.MaxHopDistance, 2.5f),
-        "default thresholds match the reviewed attach, curvature and hop limits");
-    var state = new AntigravityPolicy.State();
-    Check(Step(ref state, Sample(degrees: float.NaN)).Reason == AntigravityPolicy.DetachReason.InvalidNormal,
-        "non-finite normal detaches safely");
-    state = new AntigravityPolicy.State();
-    var invalidTime = Sample(dt: float.NaN);
-    Check(Step(ref state, invalidTime).Reason == AntigravityPolicy.DetachReason.InvalidNormal,
-        "non-finite timestep detaches safely");
-}
 
-// Detach releases from the current heading, not the pre-attachment heading or position.
-{
-    var currentForward = new Vector3(1, 0, 0);
+    var state = new AntigravityPolicy.State();
+    var invalid = Step(ref state, Sample(degrees: float.NaN));
+    Check(!invalid.Attached && !invalid.Armed, "non-finite normal cannot poison arming or frame state");
+    state = new AntigravityPolicy.State();
+    invalid = Step(ref state, Sample(dt: float.NaN));
+    Check(!invalid.Attached && !invalid.Armed, "non-finite timestep cannot poison arming or frame state");
+
+    var currentForward = Vector3.right;
     var currentVelocity = new Vector3(30, 0, 40);
     var release = AntigravityPolicy.ReleaseAtCurrentHeading(currentForward, currentVelocity);
-    Check(Near(release.Up.x, 0) && Near(release.Up.y, 1) && Near(release.Up.z, 0),
-        "release returns to world-up orientation");
-    Check(Near(release.Forward.x, 1) && Near(release.Forward.z, 0),
-        "release retains the current heading after the loop");
-    Check(Near(release.Right.magnitude, 1) && MathF.Abs(Vector3.Dot(release.Right, release.Forward)) < .001f,
-        "release produces a normalized perpendicular right axis");
-    Check(Near(release.Velocity.x, currentVelocity.x) && Near(release.Velocity.y, currentVelocity.y) &&
-        Near(release.Velocity.z, currentVelocity.z) && Near(release.Velocity.magnitude, currentVelocity.magnitude),
-        "release leaves current velocity and its magnitude unchanged");
+    Check(Near(release.Up.y, 1) && Near(release.Forward.x, 1),
+        "release returns upright while retaining the current heading");
+    Check(Near(release.Velocity.magnitude, currentVelocity.magnitude) &&
+        Near(release.Velocity.z, currentVelocity.z),
+        "release preserves current velocity without storing or rewinding position");
     Check(!typeof(AntigravityPolicy.ReleaseFrame).GetFields().Any(field => field.Name.Contains("Position")),
-        "release frame carries no old position that could rewind the kart");
+        "release frame contains no prior position that could rewind the kart");
 }
 
-// Surface redirection changes only the native added delta, preserving its magnitude and prior velocity.
+// Native steering and jump redirection preserve their intended frame and magnitude.
 {
+    var state = new AntigravityPolicy.State();
+    var attached = Activate(ref state, referenceForward: Vector3.right);
+    var steered = Step(ref state, Sample(speed: 20, dt: .05f,
+        contactNormal: attached.Normal, nativeUp: attached.Normal,
+        referenceForward: Vector3.right, steeringDeltaDegrees: 15));
+    Check(steered.Attached && Near(Vector3.Angle(attached.Forward, steered.Forward), 15),
+        "native yaw applies around the local transported up axis");
+
     var before = new Vector3(0, 0, 12);
     var nativeDelta = new Vector3(0, 10, 0);
     var redirected = AntigravityPolicy.RedirectAddedDelta(before, before + nativeDelta,
-        Vector3.up, new Vector3(1, 0, 0));
+        Vector3.up, Vector3.right);
     var redirectedDelta = redirected - before;
-    Check(Near(redirectedDelta.magnitude, nativeDelta.magnitude),
-        "redirect preserves native jump/gravity delta magnitude");
-    Check(Near(redirectedDelta.x, 10) && Near(redirectedDelta.y, 0),
-        "redirect rotates native delta into the acquired frame");
-    Check(Near(redirected.z, before.z), "redirect leaves pre-existing velocity unchanged");
+    Check(Near(redirectedDelta.magnitude, nativeDelta.magnitude) &&
+        Near(redirectedDelta.x, 10) && Near(redirected.z, before.z),
+        "jump redirect rotates only the native added delta and preserves its magnitude");
 }
 
 Console.WriteLine($"Antigravity policy: {checks} assertions passed.");

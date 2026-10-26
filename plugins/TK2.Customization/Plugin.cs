@@ -16,7 +16,7 @@ public sealed partial class Plugin : BasePlugin
     internal static Plugin? Instance;
     internal readonly Harmony Harmony = new("local.tk2.customization");
     internal ConfigEntry<bool> UiEnabled = null!, AudioEnabled = null!, CameraEnabled = null!, PhysicsEnabled = null!;
-    internal ConfigEntry<bool> AntigravityEnabled = null!;
+    internal ConfigEntry<bool> AntigravityEnabled = null!, AntigravityCameraEnabled = null!;
     internal ConfigEntry<float> HudScale = null!, Volume = null!, Fov = null!, FallAcceleration = null!, AirTime = null!;
     internal ConfigEntry<string> CanvasFilter = null!;
     internal ConfigEntry<bool> PreserveKartFraming = null!;
@@ -49,6 +49,8 @@ public sealed partial class Plugin : BasePlugin
         AirTime = Config.Bind("Physics", "MinimumAirTime", 0.4f, new ConfigDescription("Minimum airborne seconds.", new AcceptableValueRange<float>(0f, 3f)));
         AntigravityEnabled = Config.Bind("Antigravity", "Enabled", false,
             "Experimental surface adhesion for local offline races. Requires eligible road contact and remains unavailable online. In-game validation pending.");
+        AntigravityCameraEnabled = Config.Bind("Antigravity", "CameraFollowsSurface", true,
+            "Smoothly align the racing camera with an actively engaged surface frame; camera collision remains enabled.");
         BindPack();
 
         TryFeature("Wwise volume", () => PatchExact(typeof(PTK_AudioListenerManager), "SetVolume",

@@ -26,11 +26,14 @@ foreach (var feature in new[] { "AirShiftFeature", "MineTrapFeature", "Antigravi
             var name = (string?)spec.GetProperty(kind)!.GetValue(hook);
             if (name == null) continue;
             var handler = type.GetMethod(name, flags) ?? throw new Exception($"Missing handler {feature}.{name}");
+            if (kind == "Finalizer" && handler.ReturnType != typeof(Exception))
+                throw new Exception($"Finalizer must return the original exception: {feature}.{name} returns {handler.ReturnType}");
             foreach (var parameter in handler.GetParameters()) {
                 var n = parameter.Name!;
                 Type expected;
                 if (n == "__instance") expected = target.DeclaringType!;
                 else if (n == "__result") expected = target.ReturnType;
+                else if (n == "__exception") expected = typeof(Exception);
                 else if (n.StartsWith("__") && int.TryParse(n.AsSpan(2), out int index)) expected = parameters[index].ParameterType;
                 else if (n == "__state") continue;
                 else throw new Exception($"Unverified Harmony parameter {feature}.{name}.{n}");

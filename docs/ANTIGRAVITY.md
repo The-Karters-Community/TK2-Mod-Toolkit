@@ -7,8 +7,10 @@ until checked in a user-driven race on suitable road geometry.
 
 ## Driving rules
 
-- Acquire the surface frame from native stable road contact. An airborne kart
-  cannot acquire a wall or ceiling by enabling the module.
+- Collect road history passively without changing physics. Engage near the
+  engagement angle only after at least four stable samples, 0.5 m of forward
+  travel and 2 degrees of gradual curve progression, with matching road ahead.
+  An airborne kart cannot acquire a wall or ceiling by enabling the module.
 - Keep the motor's original stable-ground layers and slope limit. Validate road
   support against wall/respawn masks, triggers, other players and dynamic bodies.
 - Follow gradual surface changes with a transported local up/forward frame;
@@ -21,6 +23,9 @@ until checked in a user-driven race on suitable road geometry.
 - Preserve native acceleration, boost, jump/drift processing and collision.
   Frame transport must not create speed. Checkpoints, race time, respawn routes
   and replay data are not rewritten.
+- Return to passive driving below the engagement band, with hysteresis. The
+  optional **Camera follows surface** control preserves native pitch and FOV,
+  blends the gravity frame and retracts against near-plane volume obstructions.
 - Disable behavior for online sessions, other racers, replay playback, menus,
   recovery and unsupported special movement. Mandatory online protection treats
   this as a gameplay module. Once a race is changed, disabling the module does
@@ -30,12 +35,22 @@ These constraints reduce unintended shortcuts; they cannot certify every custom
 track's geometry or make altered physics competitively equivalent to the game.
 Native recovery volumes can still prevent a loop from being driveable.
 
-The current conservative limits are 20 degrees of normal change per tick and
-720 degrees per second, a 0.45-second hop window and 2.5 metres of maximum
+The engagement angle is the lesser of the native slope setting minus 8 degrees
+and 47 degrees, with a minimum 25-degree current road incline. The 47-degree
+ceiling is an empirical margin before the user's observed 55-degree driving
+limit. Native slope stability is measured relative to motor-up, so its setting
+alone cannot establish a world-angle driving limit. Low native limits fail closed.
+The current conservative limits are 20 degrees between adjacent contact normals,
+a 0.45-second hop window and 2.5 metres of maximum
 road-probe separation. The separation limit measures distance from the road,
 not forward travel. Steep means 70 degrees or more from world-up; its speed
 thresholds use tangential road speed (12 m/s acquisition, 8 m/s retention),
-excluding the hop's outward velocity. These are internal limits rather than
+excluding the hop's outward velocity. Engagement requires 12 m/s. Ordinary
+contact-seam grace is separately bounded to 0.08 seconds and 0.25 m. Modest
+facet steps are accepted independently of physics tick rate: connected quads do
+not need to form a mathematically smooth surface. Abrupt 90-degree corners
+remain ineligible.
+These are internal limits rather than
 user-facing ways to relax the contact checks. **Show status** can hide the
 small road-contact indicator.
 
@@ -77,11 +92,88 @@ direction rather than re-projecting a native cache that can reverse past a
 vertical section. Stable-contact velocity is aligned without rotating an
 already-aligned velocity a second time; airborne hop transport preserves the
 existing outward component. Native hop/gravity deltas retain their magnitudes.
-The native slope-speed contribution and world-Y velocity cap are bypassed only
-while attached to a steep surface. This does not establish identical handling
+The native slope-speed contribution is bypassed while active on steep surfaces;
+the world-Y velocity cap is scoped around the main velocity call while active.
+This does not establish identical handling
 or lap times to the unmodified game.
 
 ## Validation boundary
+
+### Second live test: failed; redesigned candidate
+
+The user reported the rotation-commit correction still stopped at the usual
+angle limit and activated on slight inclines. The supplied 14.63-second
+recording, `20261026-0517-39.9974624.mp4`, shows the tunnel track
+**CTR99 - Sewer Speedway (v1.21) - Cathret**. The indicator reports roughly
+14 degrees of road/policy/motor angle, then repeatedly reports released support.
+Neither of the first two builds established working wall or loop driving.
+Historical test counts below describe those builds, not gameplay acceptance.
+
+Two further integration defects were identified:
+
+- The contact probe used `CharacterTransformToCapsuleBottom` as a world point.
+  The current native getter returns the field at offset `0x174` unchanged;
+  `SetCapsuleDimensions` constructs that field from the capsule's local center
+  and local height. A world probe must start from
+  `TransientPosition + TransientRotation * CharacterTransformToCapsuleBottom`.
+  Origin-centred fake fixtures had concealed this error.
+- The native main `PixelKartPhysics.UpdateVelocity(ref Vector3,float)` at
+  `0x180603100` contains its own upward-Y cap and airborne gravity calculation.
+  Hooks on the similarly named helper methods do not intercept those inlined
+  operations. The controller velocity callback at `0x1805f7e40` calls the main
+  physics update and then the actual `TriggerPhysicsJump` method before KCC
+  movement. Corrective work must respect that ordering.
+
+The redesign separates passive road-history collection from active adhesion.
+Ordinary banked driving must remain unmodified. Engagement requires progressive
+eligible road normals, actual forward travel, and approach to the calibrated
+engagement angle; a sharp floor-to-wall corner cannot establish adhesion. Active
+surface continuity uses world-space probes, with separate bounded allowances
+for contact seams and accepted native drift hops. Camera adaptation is limited
+to active adhesion and must retain native pitch and field of view, with a
+near-plane volume obstruction check after all camera offsets.
+
+Reference designs: [Custom Gravity](https://catlikecoding.com/unity/tutorials/movement/custom-gravity/)
+for movement and camera frames, and [Orbit Camera](https://catlikecoding.com/unity/tutorials/movement/orbit-camera/)
+for near-plane box obstruction testing. These explain techniques, not TK2's
+native implementation. The new adapter still requires an offline tunnel test;
+headless tests cannot establish camera comfort or traversable track geometry.
+
+The new adapter scopes `bLimitVerticalUpVelocity` around the actual main
+velocity method, restoring its exact original value in both postfix and
+finalizer. It samples the unchanged native airborne-gravity helper with a zero
+accumulator to replace only the inlined world-down delta during an accepted
+hop; native friction adds a separate contribution rather than modifying that
+gravity delta. Grounded tangent alignment occurs at the controller velocity
+callback before KCC movement and skips native forced ungrounding.
+
+Fresh camera inspection at `0x1805067a0` starts from the visual instance's
+`vSteeringForward_Not_Aligned`, explicitly clears its Y component, and returns
+native camera offsets, rotation and FOV. The camera adapter applies transported
+gravity alignment to that frame's native pose, then performs bounded nonalloc
+near-plane collision queries. It retains native pitch and FOV rather than
+replacing the view with a surface-facing look rotation.
+
+Redesigned-candidate validation:
+
+- Plugin build against installed interop: zero warnings/errors.
+- Policy harness: 271 assertions, including 15-degree facets at 60/120 Hz,
+  passive 14-degree driving, calibrated engagement and abrupt-wall rejection.
+- Runtime adapter: 89 assertions, including translated/rotated world probes,
+  real-order inline cap handling, nested/exception restoration and native hop
+  gravity-delta replacement before KCC movement.
+- Camera harness: 59 checks; Python: 149 tests; frontend: 23 tests.
+- Installed-interop hook resolution: 18 targets/all Harmony parameters,
+  including exception finalizer validation. No native game bodies executed.
+- Source HTML/assets/catalog smoke passed. Rendered GUI automation remains
+  unavailable because its kernel assets path could not initialize.
+
+Installed with the game stopped; the installed DLL matches the tested artifact:
+`afee55a27101b59a80412a2cf77817c29f3591f393604cc60e3b03420c362d89`.
+Rollback backup: `local/backups/1792993683201624800`. Existing configuration was
+preserved. The game was not launched automatically. A user-driven tunnel test
+of this candidate remains required; the reported 55-degree stop was from the
+previously loaded plugin, before this candidate was installed.
 
 ### First live test and rotation-commit correction
 

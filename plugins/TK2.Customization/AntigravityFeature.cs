@@ -18,8 +18,15 @@ internal static class AntigravityFeature
         internal AntigravityPolicy.State Policy;
         internal int SceneHandle;
         internal bool HasNativeYaw;
+        internal bool Applied;
         internal float LastNativeYaw;
         internal bool AcceptedHop;
+        internal Collider? SupportCollider;
+    }
+
+    private struct MainVelocityPatchState
+    {
+        internal bool Patched, RestoreCap, OriginalCap;
     }
 
     private static readonly Dictionary<int, KartState> States = new();
@@ -36,18 +43,19 @@ internal static class AntigravityFeature
             new[] { typeof(float) }, Postfix: nameof(AfterCharacterUpdate)),
         new FeatureHook(typeof(PixelEasyCharMoveKartController), nameof(PixelEasyCharMoveKartController.KinematicCharacterController_ICharacterController_UpdateRotation),
             new[] { typeof(Quaternion).MakeByRefType(), typeof(float) }, Postfix: nameof(UpdateRotationPostfix)),
+        new FeatureHook(typeof(PixelEasyCharMoveKartController), nameof(PixelEasyCharMoveKartController.KinematicCharacterController_ICharacterController_UpdateVelocity),
+            new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, Postfix: nameof(CharacterVelocityPostfix)),
         new FeatureHook(typeof(PixelKartPhysics), "CalculatePhysicsAxisDirections",
             new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, Postfix: nameof(AxisDirectionsPostfix)),
         new FeatureHook(typeof(PixelKartPhysics), "UpdateSteeringCentiperalForceAndOrient",
             new[] { typeof(Vector3), typeof(Vector3).MakeByRefType(), typeof(Vector3).MakeByRefType(), typeof(float).MakeByRefType(), typeof(float), typeof(float), typeof(float), typeof(float) }, Postfix: nameof(SteeringPostfix)),
-        new FeatureHook(typeof(PixelKartPhysics), "UpdateGravityWhenNotGrounded",
-            new[] { typeof(Vector3).MakeByRefType(), typeof(Vector3).MakeByRefType(), typeof(float) }, Prefix: nameof(GravityPrefix), Postfix: nameof(GravityPostfix)),
         new FeatureHook(typeof(PixelKartPhysics), "TriggerPhysicsJump",
             new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, Prefix: nameof(JumpPrefix), Postfix: nameof(JumpPostfix)),
         new FeatureHook(typeof(PixelKartPhysics), "UpdateSlopeVelocity",
             new[] { typeof(Vector3).MakeByRefType(), typeof(Vector3).MakeByRefType(), typeof(float).MakeByRefType(), typeof(float) }, Prefix: nameof(SlopePrefix)),
-        new FeatureHook(typeof(PixelKartPhysics), "LimitVerticalVelocity",
-            new[] { typeof(Vector3).MakeByRefType() }, Prefix: nameof(VerticalLimitPrefix)),
+        new FeatureHook(typeof(PixelKartPhysics), "UpdateVelocity",
+            new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, Prefix: nameof(MainVelocityPrefix),
+            Postfix: nameof(MainVelocityPostfix), Finalizer: nameof(MainVelocityFinalizer)),
         new FeatureHook(typeof(PlayerRaceLogic), nameof(PlayerRaceLogic.OnRaceResetted), Type.EmptyTypes, Postfix: nameof(RaceResetPostfix))
     };
 
@@ -95,19 +103,32 @@ internal static class AntigravityFeature
             var grounding = motor.GroundingStatus;
             Collider ground = grounding.GroundCollider;
             bool nativeStable = grounding.FoundAnyGround && grounding.IsStableOnGround && ground != null && !motor.MustUnground();
-            bool drifting = physics.bIsDrifting;
             bool launching = physics.bCatapultUsedLowerLateralFriction || physics.IsTeleportingFromAtoB();
             Vector3 normal = nativeStable ? grounding.GroundNormal : Vector3.zero;
             AntigravityPolicy.ContactKind contact = nativeStable
                 ? AntigravityPolicy.ContactKind.NativeStableRoad : AntigravityPolicy.ContactKind.None;
             float probeSeparation = 0f;
             Collider? candidate = nativeStable ? ground : null;
+            bool sameEligibleTrack = false;
             bool acceptedHop = entry?.AcceptedHop == true;
-            if (!nativeStable && policyState.Attached && (drifting || acceptedHop) && !launching &&
-                TryContinuityProbe(__instance, motor, policyState.Normal, out candidate, out var probeNormal, out probeSeparation))
+            bool driftHopCandidate = !nativeStable && policyState.Attached && acceptedHop && !launching;
+            bool activeContactCandidate = !nativeStable && policyState.Attached && !driftHopCandidate && !launching;
+            float probeLimit = driftHopCandidate ? Settings.MaxHopDistance : Settings.MaxContactGraceDistance;
+            Collider? referenceRoad = entry?.SupportCollider ?? ground;
+            if (!nativeStable && policyState.Attached && !launching &&
+                TryContinuityProbe(__instance, motor, policyState.Normal, probeLimit,
+                    out candidate, out var probeNormal, out probeSeparation))
             {
                 contact = AntigravityPolicy.ContactKind.ContinuousRoadProbe;
                 normal = probeNormal;
+                if (!EligibleCollider(candidate!, __instance) ||
+                    !SameEligibleTrack(referenceRoad!, candidate!))
+                {
+                    candidate = null;
+                    contact = AntigravityPolicy.ContactKind.None;
+                    normal = Vector3.zero;
+                }
+                else sameEligibleTrack = true;
             }
 
             LayerMask stableLayers = motor.StableGroundLayers;
@@ -122,17 +143,65 @@ internal static class AntigravityFeature
             Vector3 velocity = motor.Velocity;
             Vector3 nativeHeading = physics.qSteeringOrientation * Vector3.forward;
             float tangentialSpeed = Vector3.ProjectOnPlane(velocity, normal.sqrMagnitude > .0001f ? normal.normalized : motor.CharacterUp).magnitude;
+            Vector3 position = motor.TransientPosition;
+            float forwardProgress = policyState.Armed
+                ? AntigravityPolicy.ForwardProgress(position - policyState.LastPosition,
+                    policyState.ArmForward, policyState.ArmNormal) : 0f;
+            bool hasLookahead = false;
+            Vector3 lookaheadNormal = Vector3.zero;
+            float lookaheadHeightError = 0f;
+            float nativeSlopeLimit = motor.MaxStableSlopeAngle;
+            Vector3 nativeUp = motor.CharacterUp;
+            float worldActivationThreshold = AntigravityPolicy.WorldActivationThreshold(nativeSlopeLimit, in Settings);
+            if (!policyState.Attached && nativeStable && ground != null &&
+                worldActivationThreshold >= Settings.MinActivationAngle &&
+                Vector3.Angle(Vector3.up, normal) >= Mathf.Max(Settings.MinActivationAngle, worldActivationThreshold - 25f))
+            {
+                hasLookahead = TryForwardLookahead(__instance, motor, ground, normal, nativeHeading,
+                    tangentialSpeed, Time.fixedDeltaTime, out lookaheadNormal,
+                    out lookaheadHeightError, out sameEligibleTrack);
+            }
             var sample = new AntigravityPolicy.Sample(Time.fixedDeltaTime, tangentialSpeed,
-                motor.Transform.position, normal, nativeHeading, probeSeparation, 0f, contact,
+                position, normal, nativeHeading, probeSeparation, 0f, contact,
                 true, true, !Ant_CurrentGameConfiguration.IsOnlineGame_InRoom_WithInternet,
-                inMask, trigger, playerCollider, dynamicBody, launching, drifting || acceptedHop);
-            Vector3 previousNormal = policyState.Normal;
-            bool previouslyAttached = policyState.Attached;
+                inMask, trigger, playerCollider, dynamicBody, launching, acceptedHop,
+                nativeUp, nativeSlopeLimit, forwardProgress, hasLookahead, lookaheadNormal,
+                lookaheadHeightError, sameEligibleTrack,
+                activeContactCandidate && contact == AntigravityPolicy.ContactKind.ContinuousRoadProbe);
             var decision = AntigravityPolicy.Step(ref policyState, in sample, in Settings);
             if (!decision.Attached)
             {
-                if (entry != null) Release(id, true);
-                SetStatus(StatusFor(decision.Reason));
+                if (decision.Armed)
+                {
+                    if (entry?.Applied == true)
+                    {
+                        Release(id, true);
+                        entry = null;
+                    }
+                    if (entry == null)
+                    {
+                        if (States.Count >= 4) { ReleaseAll(); PendingReleaseRotation.Clear(); }
+                        entry = new KartState { Controller = __instance, Motor = motor,
+                            SceneHandle = __instance.gameObject.scene.handle, Policy = policyState,
+                            SupportCollider = ground };
+                        if (TryNativeYaw(physics.qSteeringOrientation, out float armYaw))
+                        { entry.LastNativeYaw = armYaw; entry.HasNativeYaw = true; }
+                        States[id] = entry;
+                    }
+                    else
+                    {
+                        entry.Policy = policyState;
+                        entry.SupportCollider = ground;
+                        if (TryNativeYaw(physics.qSteeringOrientation, out float armYaw))
+                        { entry.LastNativeYaw = armYaw; entry.HasNativeYaw = true; }
+                    }
+                    SetArmedStatus(decision.ArmSlopeAngle, nativeSlopeLimit);
+                }
+                else
+                {
+                    if (entry != null) Release(id, true);
+                    SetStatus(StatusFor(decision.Reason));
+                }
                 return;
             }
             if (nativeStable && entry != null) entry.AcceptedHop = false;
@@ -150,17 +219,11 @@ internal static class AntigravityFeature
                 { entry.LastNativeYaw = yaw; entry.HasNativeYaw = true; }
                 States[id] = entry;
             }
+            if (!entry.Applied && TryNativeYaw(physics.qSteeringOrientation, out float activeYaw))
+            { entry.LastNativeYaw = activeYaw; entry.HasNativeYaw = true; }
+            entry.Applied = true;
             entry.Policy = policyState;
-
-            // Parallel transport the entire existing velocity vector. Quaternion rotation
-            // preserves its norm and introduces no steering speed.
-            if (previouslyAttached && Vector3.Angle(previousNormal, decision.Normal) > .001f)
-            {
-                motor.BaseVelocity = contact == AntigravityPolicy.ContactKind.NativeStableRoad
-                    ? AntigravityPolicy.AlignVelocityTangent(motor.BaseVelocity, decision.Normal, decision.Forward)
-                    : AntigravityPolicy.TransportVelocity(previousNormal, decision.Normal, motor.BaseVelocity);
-                plugin.SessionModified = true;
-            }
+            if (nativeStable) entry.SupportCollider = ground;
             if (ApplyFrame(physics, motor, decision.Forward, decision.Up, velocity, true))
                 plugin.SessionModified = true;
             SetAttachedStatus(policyState, contact, motor, grounding.FoundAnyGround,
@@ -169,12 +232,13 @@ internal static class AntigravityFeature
         catch (Exception ex) { Fail(id, plugin, ex); }
     }
 
-    private static bool TryContinuityProbe(PixelEasyCharMoveKartController controller, KinematicCharacterMotor motor, Vector3 up,
+    private static bool TryContinuityProbe(PixelEasyCharMoveKartController controller, KinematicCharacterMotor motor, Vector3 up, float maxDistance,
         out Collider? candidate, out Vector3 normal, out float separation)
     {
         candidate = null; normal = Vector3.zero; separation = 0f;
-        Vector3 origin = motor.CharacterTransformToCapsuleBottom + up * .1f;
-        if (!Physics.Raycast(origin, -up, out var hit, AntigravityPolicy.Settings.Default.MaxHopDistance + .1f,
+        Vector3 bottom = WorldCapsuleBottom(motor);
+        Vector3 origin = bottom + up * .1f;
+        if (!Physics.Raycast(origin, -up, out var hit, maxDistance + .1f,
             motor.StableGroundLayers, QueryTriggerInteraction.Ignore)) return false;
         Collider collider = hit.collider;
         if (!EligibleCollider(collider, controller)) return false;
@@ -182,6 +246,43 @@ internal static class AntigravityFeature
         normal = hit.normal;
         separation = Mathf.Max(0f, hit.distance - .1f);
         return true;
+    }
+
+    private static Vector3 WorldCapsuleBottom(KinematicCharacterMotor motor) =>
+        motor.TransientPosition + motor.TransientRotation * motor.CharacterTransformToCapsuleBottom;
+
+    private static bool TryForwardLookahead(PixelEasyCharMoveKartController controller,
+        KinematicCharacterMotor motor, Collider currentRoad, Vector3 normal, Vector3 referenceForward,
+        float tangentSpeed, float deltaTime, out Vector3 lookaheadNormal,
+        out float heightError, out bool sameTrack)
+    {
+        lookaheadNormal = Vector3.zero;
+        heightError = float.PositiveInfinity;
+        sameTrack = false;
+        Vector3 forward = Vector3.ProjectOnPlane(referenceForward, normal).normalized;
+        if (forward.sqrMagnitude < .0001f) return false;
+        float distance = Mathf.Clamp(tangentSpeed * deltaTime * 2f, .25f, 1.5f);
+        Vector3 expectedRoadPoint = WorldCapsuleBottom(motor) + forward * distance;
+        Vector3 origin = expectedRoadPoint + normal * .35f;
+        float maxCastDistance = .35f + Settings.MaxLookaheadHeight;
+        if (!Physics.Raycast(origin, -normal, out var hit, maxCastDistance,
+            motor.StableGroundLayers, QueryTriggerInteraction.Ignore)) return false;
+        if (!EligibleCollider(hit.collider, controller)) return false;
+        if (!SameEligibleTrack(currentRoad, hit.collider)) return false;
+        heightError = Mathf.Abs(Vector3.Dot(hit.point - expectedRoadPoint, normal));
+        if (heightError > Settings.MaxLookaheadHeight) return false;
+        lookaheadNormal = hit.normal;
+        sameTrack = true;
+        return true;
+    }
+
+    private static bool SameEligibleTrack(Collider current, Collider candidate)
+    {
+        if (current == null || candidate == null) return false;
+        if (current == candidate) return true;
+        var a = current as MeshCollider;
+        var b = candidate as MeshCollider;
+        return a != null && b != null && a.sharedMesh != null && a.sharedMesh == b.sharedMesh;
     }
 
     internal static bool IsEligibleLayer(int layer, int stableGroundMask, int wallMask, int flatRespawnMask, int alwaysRespawnMask)
@@ -244,6 +345,69 @@ internal static class AntigravityFeature
             Plugin.Instance.SessionModified = true;
     }
 
+    private static void MainVelocityPrefix(PixelKartPhysics __instance, ref Vector3 __0, out MainVelocityPatchState __state)
+    {
+        __state = default;
+        if (!TryGetAttached(__instance, out _)) return;
+        bool original = __instance.bLimitVerticalUpVelocity;
+        __state = new MainVelocityPatchState { Patched = true, RestoreCap = true, OriginalCap = original };
+        __instance.bLimitVerticalUpVelocity = false;
+    }
+
+    private static void MainVelocityPostfix(PixelKartPhysics __instance, ref Vector3 __0, float __1,
+        ref MainVelocityPatchState __state)
+    {
+        if (!__state.Patched) return;
+        try
+        {
+            if (TryGetAttachedHop(__instance, out var entry) && entry.Motor != null &&
+                !entry.Motor.GroundingStatus.FoundAnyGround)
+            {
+                Vector3 scratchVelocity = Vector3.zero;
+                Vector3 nativeGravityDelta = Vector3.zero;
+                __instance.UpdateGravityWhenNotGrounded(ref scratchVelocity, ref nativeGravityDelta, __1);
+                Vector3 surfaceGravityDelta = AntigravityPolicy.RedirectAddedDelta(
+                    Vector3.zero, nativeGravityDelta, Vector3.down, -entry.Policy.Up);
+                Vector3 corrected = __0 - nativeGravityDelta + surfaceGravityDelta;
+                if ((corrected - __0).sqrMagnitude > .000001f && Plugin.Instance != null)
+                    Plugin.Instance.SessionModified = true;
+                __0 = corrected;
+            }
+        }
+        catch (Exception ex)
+        {
+            if (Plugin.Instance != null) Fail(__instance.kartController?.GetInstanceID() ?? 0, Plugin.Instance, ex);
+        }
+        finally { RestoreMainVelocityCap(__instance, ref __state); }
+    }
+
+    private static Exception? MainVelocityFinalizer(PixelKartPhysics __instance,
+        ref MainVelocityPatchState __state, Exception? __exception)
+    {
+        RestoreMainVelocityCap(__instance, ref __state);
+        return __exception;
+    }
+
+    private static void RestoreMainVelocityCap(PixelKartPhysics physics, ref MainVelocityPatchState state)
+    {
+        if (!state.RestoreCap) return;
+        physics.bLimitVerticalUpVelocity = state.OriginalCap;
+        state.RestoreCap = false;
+    }
+
+    private static void CharacterVelocityPostfix(PixelEasyCharMoveKartController __instance, ref Vector3 __0)
+    {
+        if (!CanReadController(__instance) || !TryGet(__instance, out var entry) ||
+            !entry.Policy.Attached || !entry.Applied) return;
+        var motor = entry.Motor;
+        var grounding = motor.GroundingStatus;
+        if (!grounding.FoundAnyGround || !grounding.IsStableOnGround || motor.MustUnground()) return;
+        Vector3 aligned = AntigravityPolicy.AlignVelocityTangent(__0, entry.Policy.Normal, entry.Policy.Forward);
+        if ((aligned - __0).sqrMagnitude <= .000001f) return;
+        __0 = aligned;
+        if (Plugin.Instance != null) Plugin.Instance.SessionModified = true;
+    }
+
     private static bool ApplyFrame(PixelKartPhysics physics, KinematicCharacterMotor motor,
         Vector3 forward, Vector3 up, Vector3 velocity, bool updateTransform)
     {
@@ -286,19 +450,6 @@ internal static class AntigravityFeature
         return true;
     }
 
-    private static void GravityPrefix(PixelKartPhysics __instance, ref Vector3 __1, out Vector3 __state)
-    {
-        __state = __1;
-    }
-
-    private static void GravityPostfix(PixelKartPhysics __instance, ref Vector3 __1, Vector3 __state)
-    {
-        if (!TryGetAttachedHop(__instance, out var entry)) return;
-        Vector3 redirected = AntigravityPolicy.RedirectAddedDelta(__state, __1, Vector3.down, -entry.Policy.Up);
-        if ((redirected - __1).sqrMagnitude > .000001f && Plugin.Instance != null) Plugin.Instance.SessionModified = true;
-        __1 = redirected;
-    }
-
     private static void JumpPrefix(PixelKartPhysics __instance, ref Vector3 __0, out Vector3 __state)
     {
         __state = __0;
@@ -314,18 +465,9 @@ internal static class AntigravityFeature
         __0 = redirected;
     }
 
-    private static bool SlopePrefix(PixelKartPhysics __instance)
-    {
-        return !IsSteepAttached(__instance);
-    }
-
-    private static bool VerticalLimitPrefix(PixelKartPhysics __instance)
-    {
-        return !IsSteepAttached(__instance);
-    }
-
-    private static bool IsSteepAttached(PixelKartPhysics physics) =>
-        TryGetAttached(physics, out var entry) && Vector3.Angle(Vector3.up, entry.Policy.Up) >= Settings.SteepAngle;
+    private static bool SlopePrefix(PixelKartPhysics __instance) =>
+        !TryGetAttached(__instance, out var entry) ||
+        Vector3.Angle(Vector3.up, entry.Policy.Up) < Settings.SteepAngle;
 
     private static bool TryGetAttachedHop(PixelKartPhysics physics, out KartState entry) =>
         TryGetAttached(physics, out entry) && (entry.Policy.HopElapsed > 0f || entry.AcceptedHop);
@@ -359,6 +501,23 @@ internal static class AntigravityFeature
         controller != null && controller.parentPlayer != null &&
         controller.parentPlayer.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL;
 
+    internal static bool TryGetActiveFrame(Ant_Player player, out Vector3 up, out Vector3 forward)
+    {
+        up = Vector3.zero;
+        forward = Vector3.zero;
+        var plugin = Plugin.Instance;
+        if (player == null || plugin?.AntigravityEnabled.Value != true || !Plugin.OfflineLabAllowed || States.Count == 0)
+            return false;
+        foreach (var entry in States.Values)
+        {
+            if (entry.Controller == null || entry.Controller.parentPlayer != player || !entry.Policy.Attached) continue;
+            up = entry.Policy.Up;
+            forward = entry.Policy.Forward;
+            return up.sqrMagnitude > .9f && forward.sqrMagnitude > .9f;
+        }
+        return false;
+    }
+
     internal static void DrawStatus()
     {
         if (ShowStatus?.Value == true && Plugin.Instance?.AntigravityEnabled.Value == true &&
@@ -390,12 +549,21 @@ internal static class AntigravityFeature
         SetStatus($"Antigravity: {support} road {roadTilt:0}° / policy {policyTilt:0}° / motor {motorTilt:0}° (Δ{frameError:0}°){landingError}{hop}");
     }
 
+    private static void SetArmedStatus(float slopeAngle, float nativeLimit)
+    {
+        if (Time.unscaledTime < NextAttachedStatusTime) return;
+        NextAttachedStatusTime = Time.unscaledTime + .2f;
+        float target = AntigravityPolicy.WorldActivationThreshold(nativeLimit, in Settings);
+        SetStatus($"Antigravity: armed/passive road {slopeAngle:0}° / calibrated engage near {target:0}° / native CharacterUp limit {nativeLimit:0}°");
+    }
+
     private static string StatusFor(AntigravityPolicy.DetachReason reason) => reason switch
     {
         AntigravityPolicy.DetachReason.LowSpeed => "Antigravity: steep surface needs more speed",
         AntigravityPolicy.DetachReason.HopExpired => "Antigravity: hop grace expired",
         AntigravityPolicy.DetachReason.TooFar => "Antigravity: road contact too far away",
         AntigravityPolicy.DetachReason.CurvatureLimit => "Antigravity: road normal changed too quickly",
+        AntigravityPolicy.DetachReason.UnsupportedSlopeLimit => "Antigravity: native slope limit is too low for safe activation",
         _ => "Antigravity: released; waiting for eligible road"
     };
 
@@ -437,6 +605,7 @@ internal static class AntigravityFeature
 
     private static void ReleaseKart(KartState entry, bool safeCharacterBoundary = false)
     {
+        if (!entry.Applied) return;
         if (entry.Controller == null || entry.Motor == null || entry.Controller.kartPhysics == null) return;
         var release = AntigravityPolicy.ReleaseAtCurrentHeading(entry.Controller.transform.forward, entry.Motor.Velocity);
         ApplyAxes(entry.Controller.kartPhysics, release.Forward, release.Up, release.Velocity);

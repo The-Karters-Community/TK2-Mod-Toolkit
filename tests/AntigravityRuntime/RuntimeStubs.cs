@@ -31,7 +31,7 @@ namespace UnityEngine
 
     internal sealed class Rigidbody { internal bool isKinematic; }
 
-    internal sealed class Collider
+    internal class Collider
     {
         internal GameObject gameObject = new();
         internal bool isTrigger;
@@ -40,13 +40,16 @@ namespace UnityEngine
         internal T? GetComponentInParent<T>() where T : class => PlayerOwned ? new PixelEasyCharMoveKartController() as T : null;
     }
 
+    internal sealed class MeshCollider : Collider { internal object? sharedMesh = null; }
+
     internal readonly struct RaycastHit
     {
         internal readonly Collider collider;
         internal readonly Vector3 normal;
         internal readonly float distance;
-        internal RaycastHit(Collider collider, Vector3 normal, float distance)
-        { this.collider = collider; this.normal = normal; this.distance = distance; }
+        internal readonly Vector3 point;
+        internal RaycastHit(Collider collider, Vector3 normal, float distance, Vector3 point = default)
+        { this.collider = collider; this.normal = normal; this.distance = distance; this.point = point; }
     }
 
     internal enum QueryTriggerInteraction { UseGlobal, Ignore, Collide }
@@ -99,11 +102,12 @@ namespace KinematicCharacterController
         internal bool ThrowOnGroundingRead;
         internal GroundingStatus GroundingStatus { get { if (ThrowOnGroundingRead) throw new Exception("grounding access fault"); return _groundingStatus; } set => _groundingStatus = value; }
         internal LayerMask StableGroundLayers = 1 << 8;
-        internal Vector3 Velocity, BaseVelocity, CharacterTransformToCapsuleBottom = Vector3.zero;
+        internal Vector3 Velocity, BaseVelocity, CharacterTransformToCapsuleBottom = Vector3.zero, TransientPosition;
         internal Quaternion TransientRotation { get; set; } = new(0, 0, 0, 1);
         // In KCC CharacterUp follows the accepted transient frame, not an independent test value.
         internal Vector3 CharacterUp => TransientRotation * Vector3.up;
-        internal bool MustUngroundValue;
+        internal float MaxStableSlopeAngle = 45f;
+        internal bool MustUngroundValue = false;
         internal Transform Transform = new();
         internal bool MustUnground() => MustUngroundValue;
         internal void SetRotation(Quaternion rotation, bool bypassInterpolation)
@@ -111,7 +115,11 @@ namespace KinematicCharacterController
             Transform.rotation = rotation;
             TransientRotation = rotation;
         }
-        internal void SimulateCommit() => Transform.rotation = TransientRotation;
+        internal void SimulateCommit()
+        {
+            Transform.position = TransientPosition;
+            Transform.rotation = TransientRotation;
+        }
     }
 }
 
@@ -203,6 +211,7 @@ internal sealed class PixelEasyCharMoveKartController
     internal int GetInstanceID() { GetInstanceIDCalls++; return InstanceId; }
     internal void KinematicCharacterController_ICharacterController_AfterCharacterUpdate(float deltaTime) { }
     internal void KinematicCharacterController_ICharacterController_UpdateRotation(ref UnityEngine.Quaternion rotation, float deltaTime) { }
+    internal void KinematicCharacterController_ICharacterController_UpdateVelocity(ref UnityEngine.Vector3 velocity, float deltaTime) { }
 }
 
 internal sealed class PixelKartPhysics
@@ -210,6 +219,12 @@ internal sealed class PixelKartPhysics
     internal PixelEasyCharMoveKartController? kartController;
     internal UnityEngine.Quaternion qSteeringOrientation = new(0, 0, 0, 1);
     internal bool bAlignToGround = true;
+    internal bool bLimitVerticalUpVelocity = true;
+    internal float fKartMaximum_Y_Velocity = 25f;
+    internal Vector3 vLastVelocity;
+    internal Vector3 NativeAddedVelocity, NativeGravityDelta;
+    internal int NativeUpdateVelocityCalls, NativeGravityHelperCalls;
+    internal bool ThrowOnNativeUpdateVelocity;
     internal bool bIsDrifting = false, bCatapultUsedLowerLateralFriction = false;
     internal bool bUseAccelerationVectorAsMidForwardMidVelocity = false, bIsMovingBackward = false;
     internal UnityEngine.Vector3 vForward_SteeringChar_NotAligned = UnityEngine.Vector3.forward;
@@ -223,8 +238,19 @@ internal sealed class PixelKartPhysics
     internal void UpdateSteeringCentiperalForceAndOrient(UnityEngine.Vector3 acceleration,
         ref UnityEngine.Vector3 velocity, ref UnityEngine.Vector3 direction, ref float speed,
         float a, float b, float c, float d) { }
+    internal void UpdateVelocity(ref UnityEngine.Vector3 kinematicCharacter_RefVelocity, float deltaTime)
+    {
+        NativeUpdateVelocityCalls++;
+        if (ThrowOnNativeUpdateVelocity) throw new InvalidOperationException("native inline update fault");
+        kinematicCharacter_RefVelocity += NativeAddedVelocity;
+        if (bLimitVerticalUpVelocity && kinematicCharacter_RefVelocity.y > vLastVelocity.y &&
+            kinematicCharacter_RefVelocity.y > 0 && kinematicCharacter_RefVelocity.y > fKartMaximum_Y_Velocity)
+            kinematicCharacter_RefVelocity.y = fKartMaximum_Y_Velocity;
+        vLastVelocity = kinematicCharacter_RefVelocity;
+    }
     internal void CalculatePhysicsAxisDirections(ref UnityEngine.Vector3 forward, float angle) { }
-    internal void UpdateGravityWhenNotGrounded(ref UnityEngine.Vector3 acceleration, ref UnityEngine.Vector3 direction, float deltaTime) { }
+    internal void UpdateGravityWhenNotGrounded(ref UnityEngine.Vector3 acceleration, ref UnityEngine.Vector3 direction, float deltaTime)
+    { NativeGravityHelperCalls++; direction = NativeGravityDelta; }
     internal void TriggerPhysicsJump(ref UnityEngine.Vector3 velocity, float jumpSpeed) { }
     internal void UpdateSlopeVelocity(ref UnityEngine.Vector3 velocity, ref UnityEngine.Vector3 direction, ref float speed, float deltaTime) { }
     internal void LimitVerticalVelocity(ref UnityEngine.Vector3 velocity) { }

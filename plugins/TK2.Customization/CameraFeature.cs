@@ -41,7 +41,12 @@ internal static class CameraFeature
             if (player == null || player.ePlayerType != Ant_Player.EPlayerType.E_HUMAN_LOCAL ||
                 player.visualInstanceSyncedParams == null || __3 < 1 || __3 > 175) return;
             _lastRaceTime = Time.unscaledTime;
-            if (!plugin.CameraEnabled.Value) { Frames.Clear(); return; }
+            if (!plugin.CameraEnabled.Value)
+            {
+                Frames.Clear();
+                ApplyAntigravityCamera(plugin, __instance, player, ref __1, ref __2, __3);
+                return;
+            }
             int id = __instance.GetInstanceID();
             if (!Frames.TryGetValue(id, out var f))
             {
@@ -72,12 +77,29 @@ internal static class CameraFeature
             }
             __2 *= Quaternion.Euler(f.Pitch, f.Yaw, f.Roll);
             __3 = f.Fov;
+            // Apply after framing offsets so the final near-plane volume is always clamped.
+            ApplyAntigravityCamera(plugin, __instance, player, ref __1, ref __2, __3);
         }
         catch (Exception ex)
         {
             plugin.CameraEnabled.Value = false;
             Frames.Clear();
             plugin.Log.LogError($"Camera customization stopped: {ex.Message}");
+        }
+    }
+
+    private static void ApplyAntigravityCamera(Plugin plugin, PixelGameKartCamera camera,
+        Ant_Player player, ref Vector3 position, ref Quaternion rotation, float fov)
+    {
+        try { AntigravityCamera.Apply(camera, player, ref position, ref rotation, fov); }
+        catch (Exception ex)
+        {
+            AntigravityCamera.Reset(camera.GetInstanceID());
+            if (plugin.AntigravityCameraEnabled.Value)
+            {
+                plugin.AntigravityCameraEnabled.Value = false;
+                plugin.Log.LogError($"Antigravity camera stopped after runtime failure: {ex.Message}");
+            }
         }
     }
 }

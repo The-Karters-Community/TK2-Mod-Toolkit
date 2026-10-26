@@ -1,3 +1,30 @@
+## 2026-10-26 - Antigravity curved-road redesign
+
+- Recorded the second tunnel test and supplied video as failed gameplay
+  validation. The earlier rotation correction alone did not solve climbing.
+- Found and corrected a local/world coordinate mix-up in road probes. Both
+  continuity and lookahead now transform the capsule-bottom offset using the
+  motor's transient position and rotation.
+- Split passive road history from active adhesion: require gradual eligible
+  curve progression, forward travel and matching road ahead; engage only within
+  a calibrated engagement band and release below a hysteresis band. The
+  world-angle threshold is capped at 47 degrees, eight before the user's
+  observed 55-degree stop; native motor-relative stability is checked separately.
+  Accept modest 20-degree facet steps independently of physics tick rate.
+  Ordinary slopes, jumps and sharp floor-to-wall transitions cannot acquire it.
+- Target the native main velocity boundary for scoped upward-cap handling and
+  native-delta gravity redirection. Align grounded velocity before KCC movement,
+  preserving magnitude and leaving accepted native jumps outward.
+- Added optional surface camera alignment with transported loop orientation,
+  native pitch/FOV retention and bounded near-plane volume obstruction checks.
+- Luna implemented movement/camera changes and automated tests; the main task
+  reviewed current native evidence and the user's recording. See
+  `ANTIGRAVITY.md` for provenance, reference designs and validation limitations.
+- Passed: 271 policy / 89 adapter / 59 camera assertions, 149 Python and 23
+  frontend tests, 18 installed-interop hook signatures; zero-warning plugin
+  build and source UI smoke. Installed artifact hash `afee55a27101b59a80412a2cf77817c29f3591f393604cc60e3b03420c362d89`,
+  backed up at `local/backups/1792993683201624800`. New live tunnel test pending.
+
 ## 2026-10-26 - Antigravity motor-frame correction
 
 - User's first live tunnel test failed: policy status said active but climbing
