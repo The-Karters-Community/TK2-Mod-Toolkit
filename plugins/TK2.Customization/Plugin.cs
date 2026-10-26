@@ -55,6 +55,8 @@ public sealed partial class Plugin : BasePlugin
             "Offline free driving: follow static solid ground and wall contacts. Respawn volumes, triggers, moving bodies and racers remain excluded.");
         AntigravityDisableSplineTeleports = Config.Bind("Antigravity", "DisableSplineTeleports", false,
             "Temporary offline loop test: block new local Bezier spline-path movement while Antigravity is enabled. Respawns and instant teleports are not changed.");
+        Log.LogInfo($"Antigravity config loaded: enabled={AntigravityEnabled.Value} wallSurfaces={AntigravityAnySurface.Value} " +
+            $"camera={AntigravityCameraEnabled.Value} splineBlock={AntigravityDisableSplineTeleports.Value}");
         BindPack();
 
         TryFeature("Wwise volume", () => PatchExact(typeof(PTK_AudioListenerManager), "SetVolume",

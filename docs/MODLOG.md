@@ -5,6 +5,12 @@
   0.25-second/1-metre static-surface reacquisition window across mesh seams.
 - The ordinary curved-road policy is unchanged.
 
+## 2026-10-26 - Record loaded Antigravity mode
+
+- Added one startup log line for the loaded Antigravity booleans. This
+  distinguishes a persisted Studio setting from a mode change made after the
+  game process loaded its configuration.
+
 ## 2026-10-26 - Add bounded Antigravity diagnostics
 
 - Added opt-in detailed HUD/logging for raw contact, applied frame, motor tilt,
