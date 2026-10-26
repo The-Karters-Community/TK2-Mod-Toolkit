@@ -121,6 +121,8 @@ internal static partial class AntigravityFeature
         entry.Policy.Up = entry.Policy.Normal = normal;
         entry.Policy.Forward = forward;
         entry.SupportCollider = surface;
+        float worldTilt = Vector3.Angle(Vector3.up, normal);
+        UpdateCameraEngagement(entry, normal);
         if (directContact)
         { entry.AcceptedHop = false; entry.Policy.HopElapsed = entry.Policy.ContactGraceElapsed = 0f; }
         if (TryNativeYaw(physics.qSteeringOrientation, out float yaw))
@@ -130,7 +132,8 @@ internal static partial class AntigravityFeature
         if (Time.unscaledTime >= NextAttachedStatusTime)
         {
             NextAttachedStatusTime = Time.unscaledTime + .2f;
-            SetStatus($"Antigravity: solid surface {Vector3.Angle(Vector3.up, normal):0}° / layer {surface.gameObject.layer} / camera off");
+            string camera = entry.CameraEngaged ? "camera ready" : "camera flat";
+            SetStatus($"Antigravity: solid surface {worldTilt:0}° / layer {surface.gameObject.layer} / {camera}");
         }
     }
 }

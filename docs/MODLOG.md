@@ -1,3 +1,9 @@
+## 2026-10-26 - Restrict surface camera to actual banks
+
+- Camera follow now enters only at 15 degrees of surface tilt and leaves below
+  8 degrees. Generic flat-road contact no longer activates presentation mode.
+- Built for a further in-game user test; no harness tests were added or run.
+
 ## 2026-10-26 - Minimal surface camera and smoother quad seams
 
 - Reintroduced default-off **Camera follows surface** as a presentation-only

@@ -28,6 +28,8 @@ racing-camera routine around the kart focus, then smooths the gravity frame.
 It does not write private camera fields, replace the game camera, or use Unity
 physics casts/overlap queries. An exception disables only this option and keeps
 the native camera output for that frame. Gameplay validation is still required.
+It enters at a 15-degree world tilt and exits only below 8 degrees, so normal
+road and small banking retain the game's ordinary camera.
 
 Direct-surface contact normals are also rate-limited to 240 degrees per second
 to remove abrupt orientation changes across joined inclined quads.

@@ -30,6 +30,9 @@ internal static partial class AntigravityFeature
         internal bool AcceptedHop;
         internal Collider? SupportCollider;
         internal bool SurfaceMode, LayersOverridden;
+        // Presentation has a higher bar than generic solid contact. This avoids
+        // the camera entering on ordinary flat or lightly banked road pieces.
+        internal bool CameraEngaged;
         internal int OriginalStableLayers;
     }
 
@@ -41,6 +44,8 @@ internal static partial class AntigravityFeature
     private static readonly Dictionary<int, KartState> States = new();
     private static readonly Dictionary<int, KartState> PendingReleaseRotation = new();
     private static readonly AntigravityPolicy.Settings Settings = AntigravityPolicy.Settings.Default;
+    private const float CameraEnterTilt = 15f;
+    private const float CameraExitTilt = 8f;
     internal static void Install(Plugin plugin)
     {
         ShowStatus = plugin.Config.Bind("Antigravity", "ShowStatus", true, "Show current surface-contact status while testing.");
@@ -245,6 +250,7 @@ internal static partial class AntigravityFeature
             { entry.LastNativeYaw = activeYaw; entry.HasNativeYaw = true; }
             entry.Applied = true;
             entry.Policy = policyState;
+            UpdateCameraEngagement(entry, policyState.Up);
             if (nativeStable) entry.SupportCollider = ground;
             if (ApplyFrame(physics, motor, decision.Forward, decision.Up, velocity, true))
                 plugin.SessionModified = true;
@@ -525,6 +531,14 @@ internal static partial class AntigravityFeature
         controller != null && controller.parentPlayer != null &&
         controller.parentPlayer.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL;
 
+    private static void UpdateCameraEngagement(KartState entry, Vector3 up)
+    {
+        float worldTilt = Vector3.Angle(Vector3.up, up);
+        entry.CameraEngaged = entry.CameraEngaged
+            ? worldTilt >= CameraExitTilt
+            : worldTilt >= CameraEnterTilt;
+    }
+
     internal static bool TryGetActiveFrame(Ant_Player player, out Vector3 up, out Vector3 forward)
     {
         up = Vector3.zero;
@@ -534,7 +548,8 @@ internal static partial class AntigravityFeature
             return false;
         foreach (var entry in States.Values)
         {
-            if (entry.Controller == null || entry.Controller.parentPlayer != player || !entry.Policy.Attached) continue;
+            if (entry.Controller == null || entry.Controller.parentPlayer != player ||
+                !entry.Policy.Attached || !entry.CameraEngaged) continue;
             up = entry.Policy.Up;
             forward = entry.Policy.Forward;
             return up.sqrMagnitude > .9f && forward.sqrMagnitude > .9f;
