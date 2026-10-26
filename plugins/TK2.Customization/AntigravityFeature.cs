@@ -44,8 +44,6 @@ internal static partial class AntigravityFeature
     private static readonly Dictionary<int, KartState> States = new();
     private static readonly Dictionary<int, KartState> PendingReleaseRotation = new();
     private static readonly AntigravityPolicy.Settings Settings = AntigravityPolicy.Settings.Default;
-    private const float CameraEnterTilt = 15f;
-    private const float CameraExitTilt = 8f;
     internal static void Install(Plugin plugin)
     {
         ShowStatus = plugin.Config.Bind("Antigravity", "ShowStatus", true, "Show current surface-contact status while testing.");
@@ -55,6 +53,8 @@ internal static partial class AntigravityFeature
     internal static FeatureHook[] Hooks() => new[] {
         new FeatureHook(typeof(PixelEasyCharMoveKartController), nameof(PixelEasyCharMoveKartController.KinematicCharacterController_ICharacterController_AfterCharacterUpdate),
             new[] { typeof(float) }, Postfix: nameof(AfterCharacterUpdate)),
+        new FeatureHook(typeof(PixelEasyCharMoveKartController), nameof(PixelEasyCharMoveKartController.KinematicCharacterController_ICharacterController_BeforeCharacterUpdate),
+            new[] { typeof(float) }, Prefix: nameof(BeforeCharacterUpdatePrefix)),
         new FeatureHook(typeof(PixelEasyCharMoveKartController), nameof(PixelEasyCharMoveKartController.KinematicCharacterController_ICharacterController_UpdateRotation),
             new[] { typeof(Quaternion).MakeByRefType(), typeof(float) }, Postfix: nameof(UpdateRotationPostfix)),
         new FeatureHook(typeof(PixelEasyCharMoveKartController), nameof(PixelEasyCharMoveKartController.KinematicCharacterController_ICharacterController_UpdateVelocity),
@@ -250,7 +250,7 @@ internal static partial class AntigravityFeature
             { entry.LastNativeYaw = activeYaw; entry.HasNativeYaw = true; }
             entry.Applied = true;
             entry.Policy = policyState;
-            UpdateCameraEngagement(entry, policyState.Up);
+            UpdateCameraEngagement(entry, policyState.Up, motor.MaxStableSlopeAngle);
             if (nativeStable) entry.SupportCollider = ground;
             if (ApplyFrame(physics, motor, decision.Forward, decision.Up, velocity, true))
                 plugin.SessionModified = true;
@@ -258,6 +258,21 @@ internal static partial class AntigravityFeature
                 grounding.IsStableOnGround, grounding.GroundNormal);
         }
         catch (Exception ex) { Fail(id, plugin, ex); }
+    }
+
+    // KCC evaluates its stable-slope limit before AfterCharacterUpdate. Feed the
+    // already-established surface frame back at this boundary so a loop remains
+    // a stable surface when its world tilt crosses the native ~60-degree limit.
+    private static void BeforeCharacterUpdatePrefix(PixelEasyCharMoveKartController __instance, float __0)
+    {
+        var plugin = Plugin.Instance;
+        if (plugin?.AntigravityEnabled.Value != true || !plugin.AntigravityAnySurface.Value ||
+            !AirShiftFeature.Running(__instance) || !States.TryGetValue(__instance.GetInstanceID(), out var entry) ||
+            !entry.SurfaceMode || !entry.Policy.Attached || entry.Motor == null)
+            return;
+        Vector3 forward = Vector3.ProjectOnPlane(entry.Policy.Forward, entry.Policy.Up).normalized;
+        if (forward.sqrMagnitude < .5f || entry.Policy.Up.sqrMagnitude < .5f) return;
+        entry.Motor.TransientRotation = Quaternion.LookRotation(forward, entry.Policy.Up.normalized);
     }
 
     private static bool TryContinuityProbe(PixelEasyCharMoveKartController controller, KinematicCharacterMotor motor, Vector3 up, float maxDistance,
@@ -531,12 +546,14 @@ internal static partial class AntigravityFeature
         controller != null && controller.parentPlayer != null &&
         controller.parentPlayer.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL;
 
-    private static void UpdateCameraEngagement(KartState entry, Vector3 up)
+    private static void UpdateCameraEngagement(KartState entry, Vector3 up, float nativeSlopeLimit)
     {
         float worldTilt = Vector3.Angle(Vector3.up, up);
+        float enter = Mathf.Clamp(nativeSlopeLimit - 8f, 15f, 75f);
+        float exit = Mathf.Clamp(enter - 8f, 8f, enter);
         entry.CameraEngaged = entry.CameraEngaged
-            ? worldTilt >= CameraExitTilt
-            : worldTilt >= CameraEnterTilt;
+            ? worldTilt >= exit
+            : worldTilt >= enter;
     }
 
     internal static bool TryGetActiveFrame(Ant_Player player, out Vector3 up, out Vector3 forward)

@@ -1,3 +1,12 @@
+## 2026-10-26 - Apply loop frame before native slope evaluation
+
+- Surface-camera entry now follows the native motor limit minus 8 degrees
+  (about 52 degrees at the observed 60-degree default), with hysteresis.
+- Reapplied the established local surface frame at the controller's
+  `BeforeCharacterUpdate` boundary so KCC evaluates loop contact in the local
+  frame instead of stopping at its world-up slope limit.
+- Built for an in-game 360-degree loop test; no harness tests were added/run.
+
 ## 2026-10-26 - Restrict surface camera to actual banks
 
 - Camera follow now enters only at 15 degrees of surface tilt and leaves below

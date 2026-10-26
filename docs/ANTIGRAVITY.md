@@ -28,11 +28,17 @@ racing-camera routine around the kart focus, then smooths the gravity frame.
 It does not write private camera fields, replace the game camera, or use Unity
 physics casts/overlap queries. An exception disables only this option and keeps
 the native camera output for that frame. Gameplay validation is still required.
-It enters at a 15-degree world tilt and exits only below 8 degrees, so normal
-road and small banking retain the game's ordinary camera.
+It enters at eight degrees before the motor's native stable-slope limit (about
+52 degrees with the observed 60-degree default) and exits eight degrees below
+that, so normal road and small banking retain the game's ordinary camera.
 
 Direct-surface contact normals are also rate-limited to 240 degrees per second
 to remove abrupt orientation changes across joined inclined quads.
+
+The surface frame is reapplied at `BeforeCharacterUpdate`, before KCC evaluates
+its stable-slope limit. This is required for a continuous loop: applying it only
+after the update lets the native 60-degree check stop the kart before the
+inverted section.
 
 ## Current test candidate: ground and wall contacts
 

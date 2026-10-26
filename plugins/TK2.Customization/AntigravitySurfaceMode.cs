@@ -122,7 +122,7 @@ internal static partial class AntigravityFeature
         entry.Policy.Forward = forward;
         entry.SupportCollider = surface;
         float worldTilt = Vector3.Angle(Vector3.up, normal);
-        UpdateCameraEngagement(entry, normal);
+        UpdateCameraEngagement(entry, normal, motor.MaxStableSlopeAngle);
         if (directContact)
         { entry.AcceptedHop = false; entry.Policy.HopElapsed = entry.Policy.ContactGraceElapsed = 0f; }
         if (TryNativeYaw(physics.qSteeringOrientation, out float yaw))
