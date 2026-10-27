@@ -52,6 +52,9 @@ FEATURES = [
 ]
 
 FEATURES.extend([
+    {"id": "MidairDrift", "name": "Mid-air Jump Drift", "category": "Driving", "description": "Hold a fresh jump press and steer as you touch down or leave a ramp: hop into a powerslide immediately. Includes a 0.333-second jump buffer and 0.167-second edge grace. Mini-turbos stay manual; a high enough jump automatically performs the native trick and earns its landing boost. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
+        ("ShowStatus", "Show mid-air drift status", "bool", True, None, None),
+    ]},
     {"id": "MineTraps", "name": "Mine Traps", "category": "Items", "description": "Use the dormant MINA_09 as a large local trap. Choose a forward physics throw or a surface placement behind the kart; mines can also replace item-box rewards. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
         ("ItemBoxRewards", "Include in item-box rewards", "bool", True, None, None),
         ("ItemBoxChancePercent", "Item-box chance (%)", "float", 20, 0, 100, "Chance to replace an item box's first reward with mines."),
@@ -185,7 +188,7 @@ def defaults():
 
 PACKS = [
     {"id": "garage", "name": "Toolkit Essentials", "description": "Online protection, camera, interface, audio, graphics and race performance controls.", "features": ["OnlineProtection", "UI", "HudOpacity", "DisableVignette", "GamepadOverlay", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
-    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "Antigravity", "AirShift", "PracticeRewind", "MineTraps"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
+    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "Antigravity", "AirShift", "MidairDrift", "PracticeRewind", "MineTraps"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
 
@@ -243,6 +246,7 @@ def module_sources():
         "Physics": ["FastFallFeature.cs", "ShortcutInput.cs", "Plugin.cs"],
         "Antigravity": ["AntigravityFeature.cs", "AntigravitySurfaceMode.cs", "AntigravitySplineTeleport.cs", "AntigravityPolicy.cs", "AntigravityCamera.cs", "AntigravityCameraMath.cs", "CameraFeature.cs", "FeatureHook.cs", "AirShiftFeature.cs", "AirDashMath.cs", "Plugin.cs"],
         "AirShift": ["FeatureHook.cs", "AirShiftFeature.cs", "AirDashMath.cs", "ShortcutInput.cs", "Plugin.cs"],
+        "MidairDrift": ["FeatureHook.cs", "MidairDriftFeature.cs", "MidairDriftState.cs", "AirShiftFeature.cs", "Plugin.cs", "StudioBehaviour.cs"],
         "PracticeRewind": ["FeatureHook.cs", "PracticeRewindFeature.cs", "PracticeHistory.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirDashMath.cs", "FastFallFeature.cs", "ShortcutInput.cs", "StudioBehaviour.cs", "Plugin.cs"],
         "MineTraps": ["FeatureHook.cs", "MineTrapFeature.cs", "ShortcutInput.cs", "AirShiftFeature.cs", "AirDashMath.cs", "Plugin.cs", "StudioBehaviour.cs"],
         "CommunityCommands": ["CommunityMods.cs", "CommunityCommandParser.cs"],

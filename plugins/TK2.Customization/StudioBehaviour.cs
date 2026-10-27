@@ -87,6 +87,7 @@ public sealed class StudioBehaviour : MonoBehaviour
         PerformanceDiagnostics.Tick();
         TrackBoundaries.Tick();
         PracticeRewindFeature.Tick();
+        MidairDriftFeature.Tick();
         MineTrapFeature.Tick();
         RunFeature(ref _mkFaulted, "MK modules", LegacyMK.Tick);
         RunFeature(ref _communityFaulted, "community commands", CommunityMods.Tick);
@@ -204,6 +205,7 @@ public sealed class StudioBehaviour : MonoBehaviour
         TrackBoundaries.Draw();
         PracticeRewindFeature.DrawStatus();
         AirShiftFeature.DrawStatus();
+        MidairDriftFeature.DrawStatus();
         AntigravityFeature.DrawStatus();
         MineTrapFeature.DrawStatus();
     }

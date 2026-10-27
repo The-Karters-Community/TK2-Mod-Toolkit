@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 
-if (args.Length != 2) throw new ArgumentException("Usage: RuntimeHooks <built-plugin.dll> <game-directory>");
+if (args.Length < 2) throw new ArgumentException("Usage: RuntimeHooks <built-plugin.dll> <game-directory> [feature ...]");
 var pluginPath = Path.GetFullPath(args[0]);
 var game = Path.GetFullPath(args[1]);
 var directories = new[] { Path.GetDirectoryName(pluginPath)!, Path.Combine(game, "BepInEx", "interop"), Path.Combine(game, "BepInEx", "core") };
@@ -15,7 +15,8 @@ AssemblyLoadContext.Default.Resolving += (_, name) => {
 var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(pluginPath);
 const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance;
 int count = 0;
-foreach (var feature in new[] { "AirShiftFeature", "MineTrapFeature", "AntigravityFeature" }) {
+var features = args.Length > 2 ? args.Skip(2).ToArray() : new[] { "AirShiftFeature", "MineTrapFeature", "AntigravityFeature", "MidairDriftFeature" };
+foreach (var feature in features) {
     var type = assembly.GetType("TK2.Customization." + feature, true)!;
     var hooks = (Array)type.GetMethod("Hooks", flags)!.Invoke(null, null)!;
     foreach (var hook in hooks) {

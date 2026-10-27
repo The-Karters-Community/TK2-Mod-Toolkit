@@ -310,6 +310,7 @@ internal sealed class DrivingSnapshot
         // Stop current jump effects before restoring a stable sample. No stale buffered jump is replayed.
         if (p.jumpCoroutine != null) { p.StopCoroutine(p.jumpCoroutine); p.jumpCoroutine = null; }
         if (p.extraJumpCoroutine != null) { p.StopCoroutine(p.extraJumpCoroutine); p.extraJumpCoroutine = null; }
+        MidairDriftFeature.Forget(p);
         p.ClearJumpInputBuffer(); p.jumpClickedHistoryWhileDriving.Clear();
         p.bTriggerJumpInPhysicsStep = p.bPendingTrickFromAcceptedJump = false;
         p.bUngroundWithJumpEffect = p.bExtraJumpEffectRunningAllowAlwaysTrick = false;

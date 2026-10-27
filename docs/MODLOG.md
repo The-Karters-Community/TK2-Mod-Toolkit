@@ -470,3 +470,35 @@
   `08652BB01D5F9D737C20419F60501F13C07EFA9D0982DD6FB1CD0A54B2D61DFF`.
   Backup: `local/backups/1792446930281748800`. In-game forward movement, model
   size, mine-position VFX and damage still need confirmation.
+
+# Mid-air Jump Drift (2026-10-27)
+
+- Added an opt-in offline Studio module using a fresh held jump press, a
+  10/30-second landing buffer and 1/6-second edge grace. Native jump impulses,
+  manual drift turbos, height-qualified tricks and landing rewards remain native.
+- Reviewed CTR's `jump_TenBuffer`/`jump_CoyoteTimerMS`/cooldown path. Exported
+  current TK2 native bodies with Ghidra into ignored
+  `local/midair-drift-evidence/`. Current GameAssembly provenance:
+  `1104a3b50e15c4316c90f3f98c0441871140b8ca8eee53a6bd6380c744be6d39`.
+  No version/hash execution gate was added.
+- Native controller JumpInput inlines the physics request. Hooked the real
+  acceptance boundary `CheckAndDecideIfAllowedToJumpInPhysics` instead. It clears
+  drift on acceptance; the new postfix starts the native drift helper in the
+  same step, restoring its temporary forced-direction field immediately.
+- Trick eligibility is armed at takeoff and its timeout extended only within
+  native trick detection. Height checks and jump/landing timestamps stay native.
+  Character drift lean is masked only during its visual update, with finalizers
+  restoring both temporary fields. Snapshot restore clears module input.
+- Build: zero warnings/errors. Six actual hook signatures verified. Aerial
+  harness: 30,032 assertions. UI: 23 tests and production build pass; browser
+  smoke shows the module and status checkbox. Python: 147/150 pass; the three
+  Antigravity failures reproduce with HEAD's original catalog. Full RuntimeHooks
+  also hits a pre-existing Antigravity finalizer assertion; a feature selector
+  was added to run the new six-hook check independently.
+- The user-started game session had the matching built DLL installed and this
+  module enabled. Installed/build SHA-256:
+  `1ca92aea7490bd7b58bedc2e3b67516dbeae3aeac57f7b0d482416ce7f341542`.
+  Live logs confirmed capability installation and six trick-qualified native
+  landing callbacks at the snapshot. No automated launch or driving. Feel,
+  sustained visual pose and three airborne manual turbos remain player checks.
+  See `docs/MIDAIR-JUMP-DRIFT.md` for controls, native addresses and limitations.

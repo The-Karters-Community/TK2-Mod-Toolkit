@@ -12,7 +12,7 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
         self.assertIn(('MineTraps', 'OwnerCanTrigger'), pack.RETIRED_SETTINGS)
         self.assertIn(('MineTraps', 'ArmDelay'), pack.RETIRED_SETTINGS)
         self.assertIn(('MineTraps', 'ThrowForceMultiplier'), pack.RETIRED_SETTINGS)
-        for identity in ('AirShift', 'PracticeRewind', 'MineTraps'):
+        for identity in ('AirShift', 'PracticeRewind', 'MineTraps', 'MidairDrift'):
             self.assertIs(defaults[identity + '/Enabled'], False)
             self.assertEqual(sum(p['features'].count(identity) for p in pack.catalog_packs()), 1)
             feature = next(f for f in pack.catalog_features() if f['id'] == identity)
@@ -26,6 +26,17 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
             sources = module_packages._source_dependencies([feature])
             for helper in ('DrivingSnapshot.cs', 'AirShiftFeature.cs', 'AirDashMath.cs', 'FastFallFeature.cs'):
                 self.assertIn('plugins/TK2.Customization/' + helper, sources)
+
+    def test_midair_drift_settings_and_sources_roundtrip(self):
+        from studio import settings
+        values = settings.read(pack.initial_config().encode())['settings']
+        self.assertIs(values['MidairDrift/Enabled'], False)
+        self.assertIs(values['MidairDrift/ShowStatus'], True)
+        feature = next(f for f in pack.catalog_features() if f['id'] == 'MidairDrift')
+        sources = module_packages._source_dependencies([feature])
+        for helper in ('MidairDriftFeature.cs', 'MidairDriftState.cs', 'FeatureHook.cs', 'AirShiftFeature.cs'):
+            self.assertIn('plugins/TK2.Customization/' + helper, sources)
+        self.assertEqual(pack.validate({'MidairDrift/Enabled': True})[('MidairDrift', 'Enabled')], 'true')
 
     def test_controls_survive_config_roundtrip(self):
         from studio import settings

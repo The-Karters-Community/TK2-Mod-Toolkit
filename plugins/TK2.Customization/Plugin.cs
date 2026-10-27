@@ -67,6 +67,7 @@ public sealed partial class Plugin : BasePlugin
         TryFeature("offline spline-teleport testing", () => AntigravitySplineTeleport.Install(this));
         TryFeature("fast-fall controller input", () => FastFallFeature.Install(this));
         TryFeature("air shift", () => AirShiftFeature.Install(this));
+        TryFeature("mid-air jump drift", () => MidairDriftFeature.Install(this));
         TryFeature("practice rewind", () => PracticeRewindFeature.Install(this));
         TryFeature("mine traps", () => MineTrapFeature.Install(this));
         InstallPack();
@@ -137,6 +138,7 @@ public sealed partial class Plugin : BasePlugin
         FastFallFeature.Restore();
         AntigravityFeature.RestoreAll();
         AirShiftFeature.Reset(); PracticeRewindFeature.Reset(); MineTrapFeature.Reset();
+        MidairDriftFeature.Reset();
         CommunityMods.Restore();
         NightmareAI.Restore();
         LegacyMK.Restore();
