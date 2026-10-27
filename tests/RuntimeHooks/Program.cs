@@ -27,8 +27,8 @@ foreach (var feature in features) {
             var name = (string?)spec.GetProperty(kind)!.GetValue(hook);
             if (name == null) continue;
             var handler = type.GetMethod(name, flags) ?? throw new Exception($"Missing handler {feature}.{name}");
-            if (kind == "Finalizer" && handler.ReturnType != typeof(Exception))
-                throw new Exception($"Finalizer must return the original exception: {feature}.{name} returns {handler.ReturnType}");
+            if (kind == "Finalizer" && handler.ReturnType != typeof(Exception) && handler.ReturnType != typeof(void))
+                throw new Exception($"Finalizer must preserve the exception or return void: {feature}.{name} returns {handler.ReturnType}");
             foreach (var parameter in handler.GetParameters()) {
                 var n = parameter.Name!;
                 Type expected;

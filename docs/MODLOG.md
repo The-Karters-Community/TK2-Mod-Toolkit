@@ -502,3 +502,15 @@
   landing callbacks at the snapshot. No automated launch or driving. Feel,
   sustained visual pose and three airborne manual turbos remain player checks.
   See `docs/MIDAIR-JUMP-DRIFT.md` for controls, native addresses and limitations.
+
+# Toolkit 0.6.27 release preparation (2026-10-27)
+
+- Updated Antigravity catalog checks for the current split adapter, default-off
+  surface camera, shared local-racer guards and documented collider exclusions.
+  Runtime hook validation now accepts Harmony's valid void finalizers as well as
+  exception-returning finalizers. No production gameplay was changed for this.
+- Validation: all 150 Python tests, 23 UI tests, 30,032 aerial practice assertions,
+  274 Antigravity policy assertions, 158 readable-logic assertions and 28 actual
+  runtime hook signatures passed. README now introduces the 0.6.27 features.
+- Windows package startup/update/rollback and public-download verification are
+  recorded separately in ignored `local/release-0.6.27/` receipts.

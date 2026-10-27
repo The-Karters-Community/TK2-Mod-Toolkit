@@ -9,7 +9,7 @@ class AntigravityIntegrationTests(unittest.TestCase):
         identity = "Antigravity"
         defaults = pack.defaults()
         self.assertIs(defaults[identity + "/Enabled"], False)
-        self.assertIs(defaults[identity + "/CameraFollowsSurface"], True)
+        self.assertIs(defaults[identity + "/CameraFollowsSurface"], False)
 
         feature = next(feature for feature in pack.catalog_features() if feature["id"] == identity)
         self.assertTrue(feature["gameplay"])
@@ -27,16 +27,20 @@ class AntigravityIntegrationTests(unittest.TestCase):
     def test_runtime_adapter_guards_before_state_lookup_and_resolves_named_hooks(self):
         feature_path = pack.PROJECT.parent / "AntigravityFeature.cs"
         source = feature_path.read_text(encoding="utf-8")
-        callback = source.split("private static void AfterCharacterUpdate(", 1)[1].split(
-            "private static bool TryContinuityProbe(", 1
+        lifecycle = (pack.PROJECT.parent / "AntigravityLifecycle.cs").read_text(encoding="utf-8")
+        callback = lifecycle.split("private static void AfterCharacterUpdate(", 1)[1].split(
+            "private static void BeforeCharacterUpdate(", 1
         )[0]
-        self.assertLess(callback.index("AntigravityEnabled.Value"), callback.index("GetInstanceID()"))
-        self.assertLess(callback.index("AirShiftFeature.Running(__instance)"), callback.index("GetInstanceID()"))
+        self.assertLess(callback.index("IsLocalRacer(__instance)"), callback.index("GetInstanceID()"))
+        self.assertLess(callback.index("AntigravityEnabled.Value"), callback.index("States.TryGetValue"))
+        self.assertLess(callback.index("RacerRunning(__instance)"), callback.index("States.TryGetValue"))
+        self.assertIn("Release(id, true)", callback)
         self.assertIn("internal static FeatureHook[] Hooks()", source)
         self.assertIn("FeatureHook.Install(plugin.Harmony, typeof(AntigravityFeature), Hooks())", source)
         self.assertNotIn("AccessTools.FieldRef", source)
         self.assertNotIn("AccessTools.Field(", source)
-        self.assertIn("plugin.SessionModified = true;", source)
+        surface = (pack.PROJECT.parent / "AntigravitySurfaceMode.cs").read_text(encoding="utf-8")
+        self.assertIn("SessionModified = true;", surface)
 
     def test_velocity_hooks_use_native_movement_boundaries(self):
         source = (pack.PROJECT.parent / "AntigravityFeature.cs").read_text(encoding="utf-8")
@@ -50,14 +54,18 @@ class AntigravityIntegrationTests(unittest.TestCase):
         self.assertIn("MainVelocityPrefix", source)
         self.assertIn("MainVelocityFinalizer", source)
 
-    def test_catalog_describes_passive_arm_and_native_slope_activation(self):
+    def test_catalog_describes_shared_local_surface_driving_and_exclusions(self):
         feature = next(feature for feature in pack.catalog_features() if feature["id"] == "Antigravity")
         description = feature["description"].lower()
-        self.assertIn("arms passively", description)
-        self.assertIn("empirical 47° world-angle cap", description)
-        self.assertIn("not a native world-angle limit", description)
-        self.assertIn("same-track forward probe", description)
-        self.assertIn("smooth curve crossing", description)
+        for phrase in ("offline", "human and ai", "static road and wall", "respawn", "triggers", "racer colliders"):
+            self.assertIn(phrase, description)
+        guards = (pack.PROJECT.parent / "AntigravityStateAccess.cs").read_text(encoding="utf-8")
+        self.assertIn("E_HUMAN_LOCAL", guards)
+        self.assertIn("E_AI_LOCAL", guards)
+        running = guards.split("internal static bool RacerRunning(", 1)[1].split("private static void UpdateCameraEngagement", 1)[0]
+        for condition in ("Plugin.OfflineLabAllowed", "Time.timeScale > 0f", "MenuManager.Instance == null",
+                          "E_RACE_RUNNING", "IsPlayingReplayData()", "bIsPlayerRespawning", "IsTeleportingFromAtoB()", "bIsInTankForm"):
+            self.assertIn(condition, running)
 
     def test_shared_runtime_guard_covers_non_race_and_recovery_states(self):
         source = (pack.PROJECT.parent / "AirShiftFeature.cs").read_text(encoding="utf-8")

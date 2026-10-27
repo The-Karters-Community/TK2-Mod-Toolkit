@@ -4,7 +4,19 @@
 
 <p align="center"><img src="assets/Logo.png" alt="The Karters 2 Turbo Charged" width="260"></p>
 
-The 0.6.26 plugin is rebuilt against **0.1.4.30 beta_dev (Windows x64)**. The validated loader is **BepInEx Unity IL2CPP x64 `6.0.0-be.788`**, commit `5b766a3`. Compatible game updates no longer block installation solely because the native game hash changed; individual hooks still need to work, and live Mirror Race rendering on the updated game remains unverified. Module hooks are attempted on updated builds without binary-hash or version allowlists; only actual hook/runtime failures stop the affected feature. This is a community project; gameplay-changing modules are intended for local/offline use. Online protection is mandatory and locked on.
+The 0.6.27 plugin is rebuilt against **0.1.4.30 beta_dev (Windows x64)**. The validated loader is **BepInEx Unity IL2CPP x64 `6.0.0-be.788`**, commit `5b766a3`. Compatible game updates no longer block installation solely because the native game hash changed; individual hooks still need to work, and live Mirror Race rendering on the updated game remains unverified. Module hooks are attempted on updated builds without binary-hash or version allowlists; only actual hook/runtime failures stop the affected feature. This is a community project; gameplay-changing modules are intended for local/offline use. Online protection is mandatory and locked on.
+
+## New in 0.6.27
+
+**Mid-air Jump Drift** adds a fresh held jump and steering input with a
+0.333-second landing buffer and 0.167-second edge grace. Start a hop and drift
+together, perform mini-turbos normally, and let the native trick and landing
+boost activate automatically when the height requirement is met. It defaults
+off and is offline only. See [controls and validation](docs/MIDAIR-JUMP-DRIFT.md).
+
+Antigravity now shares road and wall adhesion across local human and AI racers,
+with improved loop transitions, camera exit and AI steering. AI loop handling
+remains experimental; see [current behavior and limits](docs/ANTIGRAVITY.md).
 
 ## Standalone camera and inputs
 
