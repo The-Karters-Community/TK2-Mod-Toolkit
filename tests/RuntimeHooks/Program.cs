@@ -15,7 +15,7 @@ AssemblyLoadContext.Default.Resolving += (_, name) => {
 var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(pluginPath);
 const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance;
 int count = 0;
-var features = args.Length > 2 ? args.Skip(2).ToArray() : new[] { "AirShiftFeature", "MineTrapFeature", "AntigravityFeature", "MidairDriftFeature" };
+var features = args.Length > 2 ? args.Skip(2).ToArray() : new[] { "AirShiftFeature", "MineTrapFeature", "AntigravityFeature", "MidairDriftFeature", "CtrHandlingFeature", "CtrPhysicsFeature" };
 foreach (var feature in features) {
     var type = assembly.GetType("TK2.Customization." + feature, true)!;
     var hooks = (Array)type.GetMethod("Hooks", flags)!.Invoke(null, null)!;

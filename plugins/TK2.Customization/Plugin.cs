@@ -68,6 +68,8 @@ public sealed partial class Plugin : BasePlugin
         TryFeature("fast-fall controller input", () => FastFallFeature.Install(this));
         TryFeature("air shift", () => AirShiftFeature.Install(this));
         TryFeature("mid-air jump drift", () => MidairDriftFeature.Install(this));
+        TryFeature("CTR handling", () => CtrHandlingFeature.Install(this));
+        TryFeature("CTR driving physics", () => CtrPhysicsFeature.Install(this));
         TryFeature("practice rewind", () => PracticeRewindFeature.Install(this));
         TryFeature("mine traps", () => MineTrapFeature.Install(this));
         InstallPack();
@@ -139,6 +141,7 @@ public sealed partial class Plugin : BasePlugin
         AntigravityFeature.RestoreAll();
         AirShiftFeature.Reset(); PracticeRewindFeature.Reset(); MineTrapFeature.Reset();
         MidairDriftFeature.Reset();
+        CtrHandlingFeature.Reset(); CtrPhysicsFeature.Reset();
         CommunityMods.Restore();
         NightmareAI.Restore();
         LegacyMK.Restore();

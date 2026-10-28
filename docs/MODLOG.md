@@ -514,3 +514,10 @@
   runtime hook signatures passed. README now introduces the 0.6.27 features.
 - Windows package startup/update/rollback and public-download verification are
   recorded separately in ignored `local/release-0.6.27/` receipts.
+
+# CTR-inspired Handling test build (2026-10-28)
+
+- Added default-off offline local-human `CtrHandling` with source-derived seconds-based reserve/fire state, drift-charge awards, normal-pad outside timer, eligible hangtime award, brake clearing, fire speed scaling and status. Native item speed remains considered. Exact signed CTR overflow, physical pad freezing, super-pad classification, wall clearing and native CTR drift timing remain unsupported.
+- Scoped reversible 1.10 acceleration and 0.85 ground-friction multipliers are uncalibrated feel approximations, not a full CTR movement port. Source and limitations: `docs/CTR-HANDLING.md` and `docs/CTR-HANDLING-EVIDENCE.md`. Snapshot restore clears the module's own fire history.
+- 151 Python and 23 UI tests passed; CTR model assertions, 30,032 aerial practice assertions and 275 Antigravity/online-policy assertions passed. Seven current interop hook signatures resolve and plugin build has zero warnings/errors. Browser smoke found the default-off Studio card, status and speed scale.
+- The game was closed. Deployed using the reversible toolkit backup at `local/backups/1793216972253524000`. Installed and built plugin SHA-256 both `319830cefac1cb4c28137660f972c9b3f7918fe1e12eb9736694f750d65d079f`. No game was launched or driven. In-game behavior, feel and tuning remain unverified.

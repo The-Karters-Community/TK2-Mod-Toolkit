@@ -1,0 +1,13 @@
+# CTR-inspired Handling: test build
+
+Find **CTR-inspired Handling** in Studio's Mod library. It defaults off and runs only for a local human in offline races. Mandatory online and leaderboard protection remains active. Enable **Mid-air Jump Drift** separately if you want to test buffered jump drifts too. Turn off Automatic drift boost and other speed/physics tuning modules for the initial comparison.
+
+The module uses TK2's normal manual boost controls and visual effects. Drift boost charge contributes 0–2 seconds to a separate reserve model; its fire bonuses correspond to CTR's 8/10/12 steps. A qualifying native landing callback of at least 2/3 second awards one reserve second and selects fire from airtime. A normal boost-pad event adds up to one second with an outside timer. The strongest fire contributes to TK2's boost speed until reserves expire; braking clears it. The optional in-race status shows fire and reserves. `Fire speed scale` adjusts the speed contribution for testing; default is 1.
+
+Driving uses temporary 1.10 acceleration and 0.85 ground-friction multipliers on the native velocity calculation. Both are restored immediately after that call, including on exceptions. They are experimental starting values, not measured CTR conversions. TK2's existing steering, collisions, track surfaces, air movement, jumps and item effects remain the basis for handling.
+
+Known differences: TK2 drift-meter timing is retained, physical pad-contact freeze and CTR super-pad identification are not implemented, wall-hit reserve clearing is not implemented, and CTR's signed 16-bit reserve overflow is not reproduced. A pad's native speed floor or powerup behavior can affect speed. Snapshot/rewind restores clear CTR fire instead of restoring its history. Disable conflicting tuning or automatic boost modules for testing. Do not interpret this as a bit-exact CTR physics port.
+
+Current-build Ghidra evidence and addresses are recorded in [CTR handling evidence](CTR-HANDLING-EVIDENCE.md). The model is based on `ctr-native`'s `VehFire_Increment` and drift-meter branches, converted to seconds; fire speed uses the Speed-class 54 baseline as a ratio, not a proven unit conversion. Each gameplay hook resolves its full current signature, and the game hash is provenance only.
+
+Suggested first offline test: compare flat acceleration; a complete three-boost drift; a normal pad; a jump lasting over two thirds of a second; braking; then a ramp with Mid-air Jump Drift. Watch the status and report reserve changes, speed, controls, and any strange handling. Visible behavior, frame-rate behavior and calibration require user testing; hook resolution and compilation alone do not prove the feel.

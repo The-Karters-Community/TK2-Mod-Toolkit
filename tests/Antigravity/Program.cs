@@ -77,6 +77,8 @@ AntigravityPolicy.Decision Activate(ref AntigravityPolicy.State state, float spe
         "antigravity remains outside the gameplay allowlist");
     Check(OnlineProtectionPolicy.RequiresBlocking(new[] { ("Antigravity", "Enabled", true) }, Array.Empty<string>()),
         "online-protection policy blocks submissions/rooms for enabled antigravity");
+    Check(OnlineProtectionPolicy.RequiresBlocking(new[] { ("CtrHandling", "Enabled", true) }, Array.Empty<string>()),
+        "CTR handling remains blocked from online rooms and leaderboard submissions");
 
     var state = new AntigravityPolicy.State();
     var result = Step(ref state, Sample(contact: AntigravityPolicy.ContactKind.NativeStableRoad,

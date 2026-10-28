@@ -38,6 +38,17 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
             self.assertIn('plugins/TK2.Customization/' + helper, sources)
         self.assertEqual(pack.validate({'MidairDrift/Enabled': True})[('MidairDrift', 'Enabled')], 'true')
 
+    def test_ctr_handling_is_offline_opt_in_and_exportable(self):
+        defaults = pack.defaults()
+        self.assertIs(defaults['CtrHandling/Enabled'], False)
+        self.assertIs(defaults['CtrHandling/ShowStatus'], True)
+        feature = next(f for f in pack.catalog_features() if f['id'] == 'CtrHandling')
+        self.assertTrue(feature['gameplay'])
+        self.assertEqual(sum(p['features'].count('CtrHandling') for p in pack.catalog_packs()), 1)
+        sources = module_packages._source_dependencies([feature])
+        for name in ('CtrHandlingFeature.cs', 'CtrPhysicsFeature.cs', 'CtrFireModel.cs', 'FeatureHook.cs'):
+            self.assertIn('plugins/TK2.Customization/' + name, sources)
+
     def test_controls_survive_config_roundtrip(self):
         from studio import settings
         values = settings.read(pack.initial_config().encode())['settings']

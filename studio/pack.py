@@ -52,6 +52,10 @@ FEATURES = [
 ]
 
 FEATURES.extend([
+    {"id": "CtrHandling", "name": "CTR-inspired Handling", "category": "Driving", "description": "Experimental offline CTR-inspired reserves and fire, with adjusted ground acceleration and friction. Build reserves using manual drift boosts and qualified landings. Handling and pad behavior need in-game validation.", "origin": "New", "gameplay": True, "settings": [
+        ("ShowStatus", "Show fire and reserves", "bool", True, None, None),
+        ("FireSpeedScale", "Fire speed scale", "float", 1, 0, None, "Adjust the fire speed increase. Default 1; the CTR-to-TK2 scale needs in-game tuning."),
+    ]},
     {"id": "MidairDrift", "name": "Mid-air Jump Drift", "category": "Driving", "description": "Hold a fresh jump press and steer as you touch down or leave a ramp: hop into a powerslide immediately. Includes a 0.333-second jump buffer and 0.167-second edge grace. Mini-turbos stay manual; a high enough jump automatically performs the native trick and earns its landing boost. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
         ("ShowStatus", "Show mid-air drift status", "bool", True, None, None),
     ]},
@@ -188,7 +192,7 @@ def defaults():
 
 PACKS = [
     {"id": "garage", "name": "Toolkit Essentials", "description": "Online protection, camera, interface, audio, graphics and race performance controls.", "features": ["OnlineProtection", "UI", "HudOpacity", "DisableVignette", "GamepadOverlay", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
-    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "Antigravity", "AirShift", "MidairDrift", "PracticeRewind", "MineTraps"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
+    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "Antigravity", "AirShift", "MidairDrift", "CtrHandling", "PracticeRewind", "MineTraps"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
 
@@ -247,6 +251,7 @@ def module_sources():
         "Antigravity": ["AntigravityFeature.cs", "AntigravitySurfaceMode.cs", "AntigravitySplineTeleport.cs", "AntigravityPolicy.cs", "AntigravityCamera.cs", "AntigravityCameraMath.cs", "CameraFeature.cs", "FeatureHook.cs", "AirShiftFeature.cs", "AirDashMath.cs", "Plugin.cs"],
         "AirShift": ["FeatureHook.cs", "AirShiftFeature.cs", "AirDashMath.cs", "ShortcutInput.cs", "Plugin.cs"],
         "MidairDrift": ["FeatureHook.cs", "MidairDriftFeature.cs", "MidairDriftState.cs", "AirShiftFeature.cs", "Plugin.cs", "StudioBehaviour.cs"],
+        "CtrHandling": ["FeatureHook.cs", "CtrHandlingFeature.cs", "CtrPhysicsFeature.cs", "CtrFireModel.cs", "AirShiftFeature.cs", "Plugin.cs", "StudioBehaviour.cs"],
         "PracticeRewind": ["FeatureHook.cs", "PracticeRewindFeature.cs", "PracticeHistory.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirDashMath.cs", "FastFallFeature.cs", "ShortcutInput.cs", "StudioBehaviour.cs", "Plugin.cs"],
         "MineTraps": ["FeatureHook.cs", "MineTrapFeature.cs", "ShortcutInput.cs", "AirShiftFeature.cs", "AirDashMath.cs", "Plugin.cs", "StudioBehaviour.cs"],
         "CommunityCommands": ["CommunityMods.cs", "CommunityCommandParser.cs"],
