@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using BepInEx.Configuration;
 using HarmonyLib;
+using UnityEngine;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
 
 namespace TK2.Customization;
 
@@ -12,6 +14,9 @@ namespace TK2.Customization;
 internal static class CtrFireVisualFeature
 {
     private static ConfigEntry<bool> Enabled = null!;
+    private static ConfigEntry<float> Size = null!;
+    private sealed class VisualState { internal float Scale; internal readonly Dictionary<int, (Transform Transform, Vector3 Original)> Transforms = new(); }
+    private static readonly Dictionary<int, VisualState> Scales = new();
     private static readonly Dictionary<int, int> LastTier = new();
     private static MethodInfo? SetParticles;
 
@@ -19,6 +24,7 @@ internal static class CtrFireVisualFeature
     {
         Enabled = p.Config.Bind("CtrHandling", "FireVisuals", true,
             "Use the kart's exhaust variants to show the current CTR fire level.");
+        Size = p.Config.Bind("CtrHandling", "FireSize", 4f, "Maximum exhaust size multiplier at turbo-pad fire; lower fire levels scale proportionally.");
         SetParticles = AccessTools.Method(typeof(Ant_KartParticlesWorker), "SetBoostParticlesActive", new[] { typeof(bool), typeof(int) });
         FeatureHook.Install(p.Harmony, typeof(CtrFireVisualFeature), Hooks());
     }
@@ -38,13 +44,13 @@ internal static class CtrFireVisualFeature
         return Math.Min(tier, count - 1);
     }
 
-    private static bool TryLevel(Ant_KartParticlesWorker worker, out int tier)
+    private static bool TryLevel(Ant_KartParticlesWorker worker, out int tier, out float fire)
     {
-        tier = -1;
+        tier = -1; fire = 0;
         if (Enabled?.Value != true || worker == null || !Plugin.OfflineLabAllowed) return false;
         var synced = worker.visualSyncedParams;
         if (synced == null || synced.parentPlayer == null ||
-            !CtrHandlingFeature.TryGetFire(synced.parentPlayer, out float fire, out _)) return false;
+            !CtrHandlingFeature.TryGetFire(synced.parentPlayer, out fire, out _)) return false;
         tier = Level(worker, fire);
         return tier >= 0;
     }
@@ -53,7 +59,7 @@ internal static class CtrFireVisualFeature
     // instead of blindly using the most recent boost's own tier.
     private static void ParticlesPrefix(Ant_KartParticlesWorker __instance, bool __0, ref int __1)
     {
-        try { if (__0 && TryLevel(__instance, out int tier)) __1 = tier; }
+        try { if (__0 && TryLevel(__instance, out int tier, out _)) __1 = tier; }
         catch (Exception ex) { Stop(ex); }
     }
 
@@ -65,7 +71,8 @@ internal static class CtrFireVisualFeature
         try {
             if (__instance == null || SetParticles == null) return;
             int id = __instance.GetInstanceID();
-            if (TryLevel(__instance, out int tier)) {
+            if (TryLevel(__instance, out int tier, out float fire)) {
+                ApplyScale(__instance, fire);
                 // Native can stop the loop when its own boost timer ends even while
                 // CTR reserves remain. Restart once at that transition.
                 bool stopped = __state && !__instance.isKartBoosting;
@@ -73,7 +80,9 @@ internal static class CtrFireVisualFeature
                     LastTier[id] = tier;
                     SetParticles.Invoke(__instance, new object[] { true, tier });
                 }
-            } else if (LastTier.Remove(id)) {
+            } else {
+                RestoreScale(id);
+                if (!LastTier.Remove(id)) return;
                 // Don't alter other players, replays, or online presentation.
                 if (Plugin.OfflineLabAllowed && __instance.visualSyncedParams?.parentPlayer?.ePlayerType == Ant_Player.EPlayerType.E_HUMAN_LOCAL)
                     SetParticles.Invoke(__instance, new object[] { __instance.isKartBoosting, 0 });
@@ -81,10 +90,53 @@ internal static class CtrFireVisualFeature
         } catch (Exception ex) { Stop(ex); }
     }
 
+    private static void ApplyScale(Ant_KartParticlesWorker worker, float fire)
+    {
+        float max = Size.Value;
+        if (!float.IsFinite(max)) max = 1f;
+        max = Math.Clamp(max, 1f, 10f);
+        float scale = 1f + (max - 1f) * Math.Clamp(fire / 16f, 0f, 1f);
+        int id = worker.GetInstanceID();
+        if (!Scales.TryGetValue(id, out var state)) Scales[id] = state = new VisualState();
+        if (Math.Abs(state.Scale - scale) < .001f && state.Transforms.Count != 0) return;
+        CaptureAndScale(worker.leftExhaustBoostLoopParents, state, scale);
+        CaptureAndScale(worker.rightExhaustBoostLoopParents, state, scale);
+        state.Scale = scale;
+    }
+
+    private static void CaptureAndScale(Il2CppReferenceArray<GameObject> objects, VisualState state, float scale)
+    {
+        if (objects == null) return;
+        foreach (var obj in objects) {
+            if (obj == null || obj.transform == null) continue;
+            Transform transform = obj.transform;
+            int id = transform.GetInstanceID();
+            if (!state.Transforms.TryGetValue(id, out var entry)) {
+                entry = (transform, transform.localScale);
+                state.Transforms[id] = entry;
+            }
+            transform.localScale = entry.Original * scale;
+        }
+    }
+
+    private static void RestoreScale(int id)
+    {
+        if (!Scales.TryGetValue(id, out var state)) return;
+        foreach (var entry in state.Transforms.Values)
+            if (entry.Transform != null) entry.Transform.localScale = entry.Original;
+        Scales.Remove(id);
+    }
+
+    internal static void Reset()
+    {
+        foreach (var id in new List<int>(Scales.Keys)) RestoreScale(id);
+        LastTier.Clear();
+    }
+
     private static void Stop(Exception ex)
     {
         if (Enabled != null) Enabled.Value = false;
-        LastTier.Clear();
+        Reset();
         Plugin.Instance?.Log.LogWarning($"CTR fire visuals stopped after an error: {ex.Message}");
     }
 }

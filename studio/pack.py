@@ -55,6 +55,7 @@ FEATURES.extend([
     {"id": "CtrHandling", "name": "CTR-inspired Handling", "category": "Driving", "description": "Experimental offline CTR-inspired reserves and fire, with adjusted ground acceleration and friction. Build reserves using manual drift boosts and qualified landings. Handling and pad behavior need in-game validation.", "origin": "New", "gameplay": True, "settings": [
         ("ShowStatus", "Show fire and reserves", "bool", True, None, None),
         ("FireVisuals", "Show fire level in exhaust", "bool", True, None, None, "Use the kart’s available exhaust effects for active fire levels."),
+        ("FireSize", "Maximum fire size", "float", 4, 1, 10, "Scale the turbo-pad flame up to 10 times its native size; lower fire levels scale gradually."),
         ("ShowMeasuredSpeed", "Show measured speed", "bool", True, None, None, "Show velocity in game units per second."),
         ("HideNativeSpeedPercent", "Hide native speed percentage", "bool", True, None, None, "Hide the game's reserve-related percentage while this module is active."),
         ("BaseSpeedMultiplier", "Base speed multiplier", "float", .85, .1, 3, "Lower this to slow the overall pace. 1 uses TK2 base speed."),

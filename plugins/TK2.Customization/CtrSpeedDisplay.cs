@@ -28,11 +28,13 @@ internal static class CtrSpeedDisplay
                 Ant_CurrentGameConfiguration.eCurrentRaceState != Ant_CurrentGameConfiguration.ERaceState.E_RACE_RUNNING) {
                 Restore(); return;
             }
-            if (Time.unscaledTime >= nextScan || kart == null) {
-                nextScan = Time.unscaledTime + .5f;
-                kart = null;
-                foreach (var candidate in UnityEngine.Object.FindObjectsOfType<PixelEasyCharMoveKartController>())
-                    if (AirShiftFeature.Running(candidate)) { kart = candidate; break; }
+            if (Time.unscaledTime >= nextScan) {
+                nextScan = Time.unscaledTime + 2f;
+                if (kart == null || !AirShiftFeature.Running(kart)) {
+                    kart = null;
+                    foreach (var candidate in UnityEngine.Object.FindObjectsOfType<PixelEasyCharMoveKartController>())
+                        if (AirShiftFeature.Running(candidate)) { kart = candidate; break; }
+                }
                 if (kart != null && HideNativeSpeedPercent.Value)
                     foreach (var meter in UnityEngine.Object.FindObjectsOfType<VariantUIRightBoostometr>()) {
                         Hide(meter.rightBoostometrSpeedText);

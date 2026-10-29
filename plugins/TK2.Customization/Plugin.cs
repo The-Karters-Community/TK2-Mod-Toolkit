@@ -143,7 +143,7 @@ public sealed partial class Plugin : BasePlugin
         AntigravityFeature.RestoreAll();
         AirShiftFeature.Reset(); PracticeRewindFeature.Reset(); MineTrapFeature.Reset();
         MidairDriftFeature.Reset();
-        CtrHandlingFeature.Reset(); CtrPhysicsFeature.Reset(); CtrSpeedDisplay.Restore();
+        CtrHandlingFeature.Reset(); CtrPhysicsFeature.Reset(); CtrSpeedDisplay.Restore(); CtrFireVisualFeature.Reset();
         CommunityMods.Restore();
         NightmareAI.Restore();
         LegacyMK.Restore();

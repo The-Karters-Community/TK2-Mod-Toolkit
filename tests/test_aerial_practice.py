@@ -45,6 +45,7 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
         self.assertEqual(defaults['CtrHandling/GravityMultiplier'], 1.25)
         self.assertEqual(defaults['CtrHandling/BaseSpeedMultiplier'], .85)
         self.assertIs(defaults['CtrHandling/FireVisuals'], True)
+        self.assertEqual(defaults['CtrHandling/FireSize'], 4)
         self.assertIs(defaults['CtrHandling/HideNativeSpeedPercent'], True)
         self.assertIs(defaults['CtrHandling/BrakeClears'], True)
         feature = next(f for f in pack.catalog_features() if f['id'] == 'CtrHandling')
