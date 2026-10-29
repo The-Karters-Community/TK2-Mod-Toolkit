@@ -7,9 +7,9 @@ namespace TK2.Customization;
 // CTR fixed-point physics cannot be directly converted to TK2 units. Multipliers are experimental.
 internal static class CtrPhysicsFeature
 {
-    private static ConfigEntry<bool> Enabled = null!, Speedghost = null!;
-    private static ConfigEntry<float> Speed = null!, Acceleration = null!, Friction = null!, Gravity = null!, Jump = null!, AirLoss = null!;
-    private struct Scope { internal bool Applied; internal float Speed, Acceleration, Friction, Mass, BeforeHorizontal, SoftCap; internal bool Airborne; }
+    private static ConfigEntry<bool> Enabled = null!, Speedghost = null!, Downhill = null!;
+    private static ConfigEntry<float> Speed = null!, Acceleration = null!, Friction = null!, Gravity = null!, Jump = null!, AirLoss = null!, SlopeAcceleration = null!, SlopeLoss = null!, MaxSpeedRatio = null!;
+    private struct Scope { internal bool Applied; internal float Speed, Acceleration, Friction, Mass, BeforeHorizontal, SoftCap; internal bool Airborne, Grounded; }
     private struct JumpScope { internal bool Applied; internal float Strength; }
 
     internal static void Install(Plugin p)
@@ -22,6 +22,10 @@ internal static class CtrPhysicsFeature
         Jump = p.Config.Bind("CtrHandling", "JumpStrengthMultiplier", .85f, "Multiply jump impulse. 1 restores the native value.");
         Speedghost = p.Config.Bind("CtrHandling", "Speedghost", true, "Preserve above-cap momentum during airborne hops.");
         AirLoss = p.Config.Bind("CtrHandling", "SpeedghostAirLoss", .6f, "Maximum airborne overspeed loss in game speed units per second.");
+        Downhill = p.Config.Bind("CtrHandling", "DownhillSpeedghost", true, "Build above-cap speed while driving downhill.");
+        SlopeAcceleration = p.Config.Bind("CtrHandling", "DownhillAcceleration", 35f, "Downhill acceleration in game speed units per second at full slope.");
+        SlopeLoss = p.Config.Bind("CtrHandling", "DownhillOverspeedLoss", 2f, "Maximum natural overspeed loss per second on a downhill.");
+        MaxSpeedRatio = p.Config.Bind("CtrHandling", "DownhillMaxSpeedRatio", 2f, "Limit additional downhill speed relative to the current soft cap.");
         FeatureHook.Install(p.Harmony, typeof(CtrPhysicsFeature), Hooks());
     }
 
@@ -53,6 +57,7 @@ internal static class CtrPhysicsFeature
             float speed = Value(Speed), acceleration = Value(Acceleration), friction = Value(Friction), gravity = Value(Gravity);
             __state = new Scope { Applied = true, Speed = __instance.max_speed_accel_forward,
                 Acceleration = __instance.acceleration_factor, Friction = __instance.ground_friction_factor, Mass = __instance.fMass };
+            __state.Grounded = __instance.kartController.Motor.GroundingStatus.IsStableOnGround && !__instance.bIsBreakingInput;
             __state.Airborne = Speedghost.Value && !__instance.kartController.IsGrounded_Now() && !__instance.bIsBreakingInput;
             __state.BeforeHorizontal = new Vector2(__0.x, __0.z).magnitude;
             __state.SoftCap = Math.Max(0f, __state.Speed * speed + __instance.boostManager.GetCurrentBoostMaxSpeedIncrease());
@@ -87,6 +92,16 @@ internal static class CtrPhysicsFeature
                 float horizontal = new Vector2(__0.x, __0.z).magnitude;
                 float target = CtrSpeedGhostMath.RetainedSpeed(__state.BeforeHorizontal, horizontal, __state.SoftCap,
                     AirLoss.Value, __1);
+                if (horizontal > .001f && target > horizontal) {
+                    float scale = target / horizontal;
+                    __0.x *= scale; __0.z *= scale;
+                }
+            } else if (__state.Applied && __state.Grounded && Downhill.Value && Allowed(__instance)) {
+                var normal = __instance.kartController.Motor.GroundingStatus.GroundNormal;
+                float horizontal = new Vector2(__0.x, __0.z).magnitude;
+                float factor = CtrSpeedGhostMath.DownhillFactor(normal.x, normal.y, normal.z, __0.x, __0.z);
+                float target = CtrSpeedGhostMath.DownhillSpeed(__state.BeforeHorizontal, horizontal, __state.SoftCap,
+                    factor, SlopeAcceleration.Value, SlopeLoss.Value, MaxSpeedRatio.Value, __1);
                 if (horizontal > .001f && target > horizontal) {
                     float scale = target / horizontal;
                     __0.x *= scale; __0.z *= scale;
