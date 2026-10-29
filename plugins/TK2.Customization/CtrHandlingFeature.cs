@@ -9,8 +9,8 @@ namespace TK2.Customization;
 // approximations are described in docs/CTR-HANDLING-EVIDENCE.md.
 internal static class CtrHandlingFeature
 {
-    private static ConfigEntry<bool> Enabled = null!, ShowStatus = null!;
-    private static ConfigEntry<float> FireSpeedScale = null!;
+    private static ConfigEntry<bool> Enabled = null!, ShowStatus = null!, DriftReserves = null!, PadReserves = null!, LandingReserves = null!, BrakeClears = null!;
+    private static ConfigEntry<float> FireSpeedScale = null!, ReserveGain = null!, ReserveDecay = null!;
     private sealed class Entry
     {
         internal readonly CtrFireModel Fire = new();
@@ -26,6 +26,12 @@ internal static class CtrHandlingFeature
         Enabled = p.Config.Bind("CtrHandling", "Enabled", false, "Offline CTR-inspired reserves and fire speed.");
         ShowStatus = p.Config.Bind("CtrHandling", "ShowStatus", true, "Show fire and reserve status in offline races.");
         FireSpeedScale = p.Config.Bind("CtrHandling", "FireSpeedScale", 1f, "Scale the CTR fire contribution to TK2's speed; 1 uses the CTR Speed-class ratio.");
+        DriftReserves = p.Config.Bind("CtrHandling", "DriftReserves", true, "Add reserves from manual drift boosts.");
+        PadReserves = p.Config.Bind("CtrHandling", "PadReserves", true, "Add reserves from boost pads and boosters.");
+        LandingReserves = p.Config.Bind("CtrHandling", "LandingReserves", true, "Add reserves from qualified jump landings.");
+        BrakeClears = p.Config.Bind("CtrHandling", "BrakeClears", true, "Braking clears fire and reserves.");
+        ReserveGain = p.Config.Bind("CtrHandling", "ReserveGain", 1f, "Multiplier for reserve gained from boosts.");
+        ReserveDecay = p.Config.Bind("CtrHandling", "ReserveDecay", 1f, "Multiplier for reserve consumption over time.");
         FeatureHook.Install(p.Harmony, typeof(CtrHandlingFeature), Hooks());
     }
 
@@ -66,9 +72,9 @@ internal static class CtrHandlingFeature
     private static void SliderPostfix(Ant_BoostManager __instance, int __0, float __state)
     {
         try {
-            if (__state < 0 || !Allowed(__instance)) return;
+            if (__state < 0 || !Allowed(__instance) || !DriftReserves.Value) return;
             var state = State(__instance);
-            state.Fire.Add(__state, 8f + 2f * __0, false);
+            state.Fire.Add(__state * Scale(ReserveGain), 8f + 2f * __0, false);
             Sync(__instance, state);
             Plugin.Instance!.Log.LogInfo($"CTR drift boost {__0 + 1}: +{__state:0.00}s, reserves {state.Fire.Reserves:0.00}s, fire {state.Fire.FireCap:0}");
         } catch (Exception ex) { Fail(ex); }
@@ -77,16 +83,16 @@ internal static class CtrHandlingFeature
     private static void BoostPostfix(Ant_BoostManager __instance, Ant_BoostManager.EBoostType __0, float __3)
     {
         try {
-            if (!Allowed(__instance)) return;
+            if (!Allowed(__instance) || !PadReserves.Value) return;
             // FireSliderBoost and the landing callback own their events. A nested
             // FireBoost must not award their reserves a second time.
             if (__0 != Ant_BoostManager.EBoostType.EBOOST_BOOSTPAD &&
                 __0 != Ant_BoostManager.EBoostType.EBOOST_BOOSTER) return;
             var state = State(__instance);
             if (__0 == Ant_BoostManager.EBoostType.EBOOST_BOOSTPAD)
-                state.Fire.Add(1f, 16f, false, freezePad: true);
+                state.Fire.Add(Scale(ReserveGain), 16f, false, freezePad: true);
             else
-                state.Fire.Add(Math.Max(0f, __3), 12f, false, freezePad: true);
+                state.Fire.Add(Math.Max(0f, __3) * Scale(ReserveGain), 12f, false, freezePad: true);
             Sync(__instance, state);
             Plugin.Instance!.Log.LogInfo($"CTR {__0}: reserves {state.Fire.Reserves:0.00}s, fire {state.Fire.FireCap:0}");
         } catch (Exception ex) { Fail(ex); }
@@ -102,10 +108,10 @@ internal static class CtrHandlingFeature
     private static void LandingPostfix(Ant_BoostManager __instance, float __state)
     {
         try {
-            if (!Allowed(__instance) || __state < 2f / 3f) return;
+            if (!Allowed(__instance) || !LandingReserves.Value || __state < 2f / 3f) return;
             float fire = __state >= 1.5f ? 16f : __state >= 1f ? 12f : 10f;
             var state = State(__instance);
-            state.Fire.Add(1f, fire, false);
+            state.Fire.Add(Scale(ReserveGain), fire, false);
             Sync(__instance, state);
             Plugin.Instance!.Log.LogInfo($"CTR landing: {__state:0.00}s airtime, +1.00s reserves, fire {state.Fire.FireCap:0}");
         } catch (Exception ex) { Fail(ex); }
@@ -118,8 +124,8 @@ internal static class CtrHandlingFeature
             if (!Allowed(__instance)) { if (__instance != null) Drop(__instance.GetInstanceID()); return; }
             var state = State(__instance);
             var physics = __instance.kartController.kartPhysics;
-            if (physics.bIsBreakingInput) state.Fire.Clear();
-            else state.Fire.Tick(Time.fixedDeltaTime, false);
+            if (BrakeClears.Value && physics.bIsBreakingInput) state.Fire.Clear();
+            else state.Fire.Tick(Time.fixedDeltaTime * Scale(ReserveDecay), false);
             Sync(__instance, state);
         } catch (Exception ex) { Fail(ex); }
     }
@@ -140,6 +146,22 @@ internal static class CtrHandlingFeature
             __result = Math.Max(fireSpeed, Math.Max(booster, star));
         } catch (Exception ex) { Fail(ex); }
     }
+
+    internal static bool TryGetFire(Ant_Player player, out float fire, out bool super)
+    {
+        fire = 0; super = false;
+        foreach (var state in States.Values) {
+            var boost = state.Boost;
+            if (boost != null && Allowed(boost) && boost.kartController.parentPlayer == player && state.Fire.Reserves > 0) {
+                fire = state.Fire.FireCap;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static float Scale(ConfigEntry<float> setting) =>
+        float.IsFinite(setting.Value) ? Math.Clamp(setting.Value, 0f, 10f) : 1f;
 
     private static void Sync(Ant_BoostManager boost, Entry state)
     {

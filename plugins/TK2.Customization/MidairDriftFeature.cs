@@ -15,6 +15,11 @@ internal static class MidairDriftFeature
         internal Ant_KartInput? Controls;
         internal Entry(PixelKartPhysics physics) { Physics = physics; }
     }
+    private struct JumpContext
+    {
+        internal bool Eligible;
+        internal bool InjectedRequest;
+    }
     private static readonly Dictionary<int, Entry> States = new();
     private static string Status = "Mid-air jump drift: ready";
 
@@ -70,27 +75,28 @@ internal static class MidairDriftFeature
         } catch (Exception ex) { Fail(ex); }
     }
 
-    private static void JumpPrefix(PixelKartPhysics __instance, out bool __state)
+    private static void JumpPrefix(PixelKartPhysics __instance, out JumpContext __state)
     {
-        __state = false;
+        __state = default;
         try {
             if (!Allowed(__instance) || !States.TryGetValue(Id(__instance), out var state)) return;
             var p = __instance;
             if (p.bIsMovingBackward || !MidairDriftState.CanDrift(p.GetSteerInput(), p.kartController.Motor.Velocity.magnitude, p.fMinSpeedForDrifting) ||
                 !state.Input.CanJump(Time.time, Held(state), p.kartController.IsGrounded_Now(),
                     p.eJumpState == PixelKartPhysics.EJumpState.E_JUMPED_WAITING_FOR_GROUNDED, p.fTimeSinceNotGrounded)) return;
-            __state = !p.bPlayerJumpedWhenGrounedOrJustAfterMissedGround_RunJump;
+            __state.Eligible = true;
+            __state.InjectedRequest = !p.bPlayerJumpedWhenGrounedOrJustAfterMissedGround_RunJump;
             p.bPlayerJumpedWhenGrounedOrJustAfterMissedGround_RunJump = true;
         } catch (Exception ex) { Fail(ex); }
     }
 
-    private static void JumpPostfix(PixelKartPhysics __instance)
+    private static void JumpPostfix(PixelKartPhysics __instance, JumpContext __state)
     {
         try {
             if (!Allowed(__instance) || !__instance.bTriggerJumpInPhysicsStep ||
                 !States.TryGetValue(Id(__instance), out var state)) return;
             var p = __instance;
-            if (p.bIsMovingBackward || !state.Input.Accept(Time.time, Held(state), p.GetSteerInput(), p.kartController.Motor.Velocity.magnitude, p.fMinSpeedForDrifting)) return;
+            if (p.bIsMovingBackward || !state.Input.Accept(__state.Eligible, Time.time, Held(state), p.GetSteerInput(), p.kartController.Motor.Velocity.magnitude, p.fMinSpeedForDrifting)) return;
             // Current native helper sets drift direction, resets its timer and starts drifting; it does not start replay playback.
             float previousForcedDirection = p.fForcedDriftDirection;
             try { p.ForceDriftSteerDirection_Replay_OverrideDriftDir(Math.Sign(p.GetSteerInput()), true); }
@@ -102,10 +108,10 @@ internal static class MidairDriftFeature
         } catch (Exception ex) { Fail(ex); }
     }
 
-    private static Exception? JumpFinalizer(PixelKartPhysics __instance, bool __state, Exception? __exception)
+    private static Exception? JumpFinalizer(PixelKartPhysics __instance, JumpContext __state, Exception? __exception)
     {
         // Never leave an unconsumed request behind when native landing cooldown rejects it.
-        if (__state) __instance.bPlayerJumpedWhenGrounedOrJustAfterMissedGround_RunJump = false;
+        if (__state.InjectedRequest) __instance.bPlayerJumpedWhenGrounedOrJustAfterMissedGround_RunJump = false;
         return __exception;
     }
 

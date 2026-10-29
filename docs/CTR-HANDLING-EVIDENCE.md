@@ -24,3 +24,8 @@ These are static native observations, not runtime validation. CTR-specific unit 
 ## Testable adaptation, 2026-10-28
 
 A default-off offline CTR-inspired Handling module has now been implemented. It is an initial adaptation, not full or calibrated CTR physics. See `docs/CTR-HANDLING.md` for the exact supported and unsupported behavior and first test scenarios. Native exports are static evidence; player-run gameplay validation is still required.
+
+
+## Experimental visual and physics controls
+
+Current native `Ant_KartParticlesWorker.SetBoostParticlesActive` at `0x1809701b0` selects indexed left/right exhaust loop and success effects; `WorkerUpdate` at `0x1809719a0` can stop the native effect. The adapter bounds its tier to the shortest available effect array. Its tier mapping is a TK2 presentation approximation; super pads are not identified. Current `PixelKartPhysics.UpdateVelocity` uses `fMass` in airborne gravity and `TriggerPhysicsJump` uses `fJumpStrength`; their scoped multipliers and speed/acceleration/friction multipliers are player-tunable, not original CTR units. Hook signatures resolve against current interop; visible behavior is unverified.

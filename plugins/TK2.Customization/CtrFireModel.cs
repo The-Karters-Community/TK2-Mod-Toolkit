@@ -10,8 +10,12 @@ internal sealed class CtrFireModel
     internal void Tick(float dt, bool onPad)
     {
         if (!float.IsFinite(dt) || dt <= 0) return;
-        outsideTimer = Math.Max(0, outsideTimer - dt);
-        if (!onPad) Reserves = Math.Max(0, Reserves - dt);
+        // The adapter represents continuous pad refresh as a freeze. Freezing
+        // the outside timer too prevents repeated pad callbacks minting reserves.
+        if (!onPad) {
+            outsideTimer = Math.Max(0, outsideTimer - dt);
+            Reserves = Math.Max(0, Reserves - dt);
+        }
         if (Reserves == 0) FireCap = 0;
     }
     internal void Add(float seconds, float fireCap, bool onSuperPad, bool freezePad = false)

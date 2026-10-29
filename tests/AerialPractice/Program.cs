@@ -52,7 +52,9 @@ Check(midair.CanJump(.1f, true, false, false, MidairDriftState.CoyoteSeconds), "
 Check(!midair.CanJump(.1f, true, false, false, MidairDriftState.CoyoteSeconds + .001f), "no coyote hop after the grace interval");
 Check(!midair.CanJump(.1f, true, false, true, .02f), "a launched jump cannot be jumped again in empty air");
 Check(midair.CanJump(.1f, true, true, true, 0), "buffer survives the previous hop until native landing cooldown allows it");
-Check(midair.Accept(.1f, true, -1, 30, 10) && midair.Active, "accepted buffered hop starts a left drift");
+Check(!midair.Accept(false, .1f, true, -1, 30, 10), "an unrelated airborne jump trigger cannot start a drift");
+Check(midair.Pending(.1f, true), "an ineligible airborne trigger leaves the landing buffer intact");
+Check(midair.Accept(true, .1f, true, -1, 30, 10) && midair.Active, "accepted buffered hop starts a left drift");
 Check(!midair.Pending(.1f, true), "one press starts at most one hop");
 midair.Press(.11f, 1, "Jump", false);
 Check(!midair.Pending(.11f, true), "repeated input callbacks within one frame cannot recreate consumed input");
@@ -61,11 +63,11 @@ Check(!midair.Pending(.12f, true) && midair.Active, "mini-turbo presses during a
 midair.Press(.13f, 3, "Jump", false);
 midair.Land();
 Check(midair.Pending(.14f, true) && !midair.Active, "a released and re-pressed drift button can buffer the next hop across landing");
-Check(midair.Accept(.14f, true, 1, 30, 10), "buffered double hop starts a right drift");
+Check(midair.Accept(true, .14f, true, 1, 30, 10), "buffered double hop starts a right drift");
 int midairFrame = 10;
 foreach (var sample in new[] { (0f, 30f), (.1f, 30f), (1f, 9f), (float.NaN, 30f), (1f, float.NaN) }) {
     midair.Clear(); midair.Press(1, midairFrame++, "Jump", false);
-    Check(midair.Pending(1.01f, true) && !midair.Accept(1.01f, true, sample.Item1, sample.Item2, 10), "neutral input, low speed and non-finite values cannot start drift");
+    Check(midair.Pending(1.01f, true) && !midair.Accept(true, 1.01f, true, sample.Item1, sample.Item2, 10), "neutral input, low speed and non-finite values cannot start drift");
 }
 midair.Clear(); midair.Press(2, 20, "Jump", false); midair.Clear();
 Check(!midair.Active && !midair.Pending(2.01f, true), "disable, pause, rewind and recovery clear pending input");

@@ -4,52 +4,93 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-// Approximation: CTR's fixed-point coefficients have not been calibrated to TK2 units.
+// CTR fixed-point physics cannot be directly converted to TK2 units. Multipliers are experimental.
 internal static class CtrPhysicsFeature
 {
     private static ConfigEntry<bool> Enabled = null!;
-    private struct Scope { internal bool Applied; internal float Acceleration, Friction; }
+    private static ConfigEntry<float> Speed = null!, Acceleration = null!, Friction = null!, Gravity = null!, Jump = null!;
+    private struct Scope { internal bool Applied; internal float Speed, Acceleration, Friction, Mass; }
+    private struct JumpScope { internal bool Applied; internal float Strength; }
 
     internal static void Install(Plugin p)
     {
         Enabled = p.Config.Bind("CtrHandling", "Enabled", false, "Experimental offline CTR-inspired handling.");
+        Speed = p.Config.Bind("CtrHandling", "BaseSpeedMultiplier", .85f, "Multiply native base speed. 1 restores the native value.");
+        Acceleration = p.Config.Bind("CtrHandling", "AccelerationMultiplier", 1f, "Multiply native ground acceleration.");
+        Friction = p.Config.Bind("CtrHandling", "GroundFrictionMultiplier", 1f, "Multiply native ground friction.");
+        Gravity = p.Config.Bind("CtrHandling", "GravityMultiplier", 1.25f, "Multiply gravity while airborne.");
+        Jump = p.Config.Bind("CtrHandling", "JumpStrengthMultiplier", .85f, "Multiply jump impulse. 1 restores the native value.");
         FeatureHook.Install(p.Harmony, typeof(CtrPhysicsFeature), Hooks());
     }
 
     internal static FeatureHook[] Hooks() => new[] {
         new FeatureHook(typeof(PixelKartPhysics), nameof(PixelKartPhysics.UpdateVelocity),
             new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, Prefix: nameof(BeforeVelocity),
-            Postfix: nameof(AfterVelocity), Finalizer: nameof(FinalizeVelocity))
+            Postfix: nameof(AfterVelocity), Finalizer: nameof(FinalizeVelocity)),
+        new FeatureHook(typeof(PixelKartPhysics), "TriggerPhysicsJump",
+            new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, Prefix: nameof(BeforeJump),
+            Postfix: nameof(AfterJump), Finalizer: nameof(FinalizeJump))
     };
+
+    private static bool Allowed(PixelKartPhysics physics) => Enabled?.Value == true &&
+        AirShiftFeature.Running(physics.kartController) &&
+        physics.kartController.parentPlayer.playerRaceLogic?.bPlayerEndRaceEventTriggered == false;
+
+    private static float Value(ConfigEntry<float> setting)
+    {
+        float value = setting.Value;
+        if (!float.IsFinite(value) || value <= 0f) throw new ArgumentException("CTR physics multipliers must be finite and positive.");
+        return value;
+    }
 
     private static void BeforeVelocity(PixelKartPhysics __instance, out Scope __state)
     {
         __state = default;
         try {
-            if (Enabled?.Value != true || !AirShiftFeature.Running(__instance.kartController) ||
-                __instance.kartController.parentPlayer.playerRaceLogic?.bPlayerEndRaceEventTriggered != false) return;
-            __state = new Scope { Applied = true, Acceleration = __instance.acceleration_factor,
-                Friction = __instance.ground_friction_factor };
-            // Preserve native surface, slope, gravity, collisions and over-cap momentum.
-            __instance.acceleration_factor = __state.Acceleration * 1.1f;
-            __instance.ground_friction_factor = __state.Friction * .85f;
+            if (!Allowed(__instance)) return;
+            float speed = Value(Speed), acceleration = Value(Acceleration), friction = Value(Friction), gravity = Value(Gravity);
+            __state = new Scope { Applied = true, Speed = __instance.max_speed_accel_forward,
+                Acceleration = __instance.acceleration_factor, Friction = __instance.ground_friction_factor, Mass = __instance.fMass };
+            __instance.max_speed_accel_forward = __state.Speed * speed;
+            __instance.acceleration_factor = __state.Acceleration * acceleration;
+            __instance.ground_friction_factor = __state.Friction * friction;
+            __instance.fMass = __state.Mass * gravity;
             Plugin.Instance!.SessionModified = true;
-        } catch (Exception ex) {
-            Restore(__instance, ref __state);
-            Enabled.Value = false;
-            Plugin.Instance?.Log.LogError($"CTR physics disabled: {ex.Message}");
-        }
+        } catch (Exception ex) { Restore(__instance, ref __state); Fail(ex); }
     }
 
+    private static void BeforeJump(PixelKartPhysics __instance, out JumpScope __state)
+    {
+        __state = default;
+        try {
+            if (!Allowed(__instance)) return;
+            float jump = Value(Jump);
+            __state = new JumpScope { Applied = true, Strength = __instance.fJumpStrength };
+            __instance.fJumpStrength = __state.Strength * jump;
+            Plugin.Instance!.SessionModified = true;
+        } catch (Exception ex) { RestoreJump(__instance, ref __state); Fail(ex); }
+    }
+    private static void AfterJump(PixelKartPhysics __instance, ref JumpScope __state) => RestoreJump(__instance, ref __state);
+    private static Exception? FinalizeJump(PixelKartPhysics __instance, ref JumpScope __state, Exception? __exception)
+    { RestoreJump(__instance, ref __state); return __exception; }
+    private static void RestoreJump(PixelKartPhysics physics, ref JumpScope state)
+    { if (state.Applied) { physics.fJumpStrength = state.Strength; state.Applied = false; } }
     private static void AfterVelocity(PixelKartPhysics __instance, ref Scope __state) => Restore(__instance, ref __state);
     private static Exception? FinalizeVelocity(PixelKartPhysics __instance, ref Scope __state, Exception? __exception)
     { Restore(__instance, ref __state); return __exception; }
     private static void Restore(PixelKartPhysics physics, ref Scope state)
     {
         if (!state.Applied) return;
+        physics.max_speed_accel_forward = state.Speed;
         physics.acceleration_factor = state.Acceleration;
         physics.ground_friction_factor = state.Friction;
+        physics.fMass = state.Mass;
         state.Applied = false;
+    }
+    private static void Fail(Exception ex)
+    {
+        Enabled.Value = false;
+        Plugin.Instance?.Log.LogError($"CTR physics disabled: {ex.Message}");
     }
     internal static void Reset() { }
 }

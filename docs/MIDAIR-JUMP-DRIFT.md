@@ -10,7 +10,7 @@ modified races cannot upload leaderboard results or enter online rooms.
 - Release and freshly press a native jump shoulder/button, keep holding it, and
   steer left or right. Both native shoulder routes are supported, including
   controller remapping and the separate `Drift_left_right` action.
-- A press up to **10/30 seconds (0.333 s)** before touching down can start the
+- A press up to **10/60 seconds (0.167 s)** before touching down can start the
   next hop and powerslide together. Releasing the button cancels the buffered
   request. A fresh press after leaving drivable ground has **1/6 second
   (0.167 s)** of grace if a previous hop is not still awaiting landing.

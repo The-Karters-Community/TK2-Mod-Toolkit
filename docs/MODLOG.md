@@ -521,3 +521,6 @@
 - Scoped reversible 1.10 acceleration and 0.85 ground-friction multipliers are uncalibrated feel approximations, not a full CTR movement port. Source and limitations: `docs/CTR-HANDLING.md` and `docs/CTR-HANDLING-EVIDENCE.md`. Snapshot restore clears the module's own fire history.
 - 151 Python and 23 UI tests passed; CTR model assertions, 30,032 aerial practice assertions and 275 Antigravity/online-policy assertions passed. Seven current interop hook signatures resolve and plugin build has zero warnings/errors. Browser smoke found the default-off Studio card, status and speed scale.
 - The game was closed. Deployed using the reversible toolkit backup at `local/backups/1793216972253524000`. Installed and built plugin SHA-256 both `319830cefac1cb4c28137660f972c9b3f7918fe1e12eb9736694f750d65d079f`. No game was launched or driven. In-game behavior, feel and tuning remain unverified.
+
+
+- CTR-inspired Handling: add experimental pace, gravity, jump, grip and reserve controls; measured-speed display and fire-level exhaust variants. Restrict Mid-air Jump Drift to a valid ground, edge-grace or landing-buffer hop and use a 10/60-second buffer. In-game validation remains necessary.

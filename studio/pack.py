@@ -54,9 +54,23 @@ FEATURES = [
 FEATURES.extend([
     {"id": "CtrHandling", "name": "CTR-inspired Handling", "category": "Driving", "description": "Experimental offline CTR-inspired reserves and fire, with adjusted ground acceleration and friction. Build reserves using manual drift boosts and qualified landings. Handling and pad behavior need in-game validation.", "origin": "New", "gameplay": True, "settings": [
         ("ShowStatus", "Show fire and reserves", "bool", True, None, None),
+        ("FireVisuals", "Show fire level in exhaust", "bool", True, None, None, "Use the kart’s available exhaust effects for active fire levels."),
+        ("ShowMeasuredSpeed", "Show measured speed", "bool", True, None, None, "Show velocity in game units per second."),
+        ("HideNativeSpeedPercent", "Hide native speed percentage", "bool", True, None, None, "Hide the game's reserve-related percentage while this module is active."),
+        ("BaseSpeedMultiplier", "Base speed multiplier", "float", .85, .1, 3, "Lower this to slow the overall pace. 1 uses TK2 base speed."),
+        ("AccelerationMultiplier", "Acceleration multiplier", "float", 1, .1, 3, "1 uses TK2 acceleration."),
+        ("GroundFrictionMultiplier", "Ground friction multiplier", "float", 1, .1, 3, "1 uses TK2 ground friction."),
+        ("GravityMultiplier", "Gravity multiplier", "float", 1.25, .1, 3, "Higher values can reduce airtime. 1 uses TK2 gravity."),
+        ("JumpStrengthMultiplier", "Jump strength multiplier", "float", .85, .1, 3, "Lower values can reduce jump height. 1 uses TK2 jump strength."),
         ("FireSpeedScale", "Fire speed scale", "float", 1, 0, None, "Adjust the fire speed increase. Default 1; the CTR-to-TK2 scale needs in-game tuning."),
+        ("DriftReserves", "Drift boosts add reserves", "bool", True, None, None),
+        ("PadReserves", "Pads add reserves", "bool", True, None, None),
+        ("LandingReserves", "Landing boosts add reserves", "bool", True, None, None),
+        ("BrakeClears", "Braking clears fire", "bool", True, None, None),
+        ("ReserveGain", "Reserve gain multiplier", "float", 1, 0, 10, "Scale reserves earned from drift boosts, pads and landings."),
+        ("ReserveDecay", "Reserve consumption multiplier", "float", 1, 0, 10, "Scale reserve consumption. Zero preserves existing reserves."),
     ]},
-    {"id": "MidairDrift", "name": "Mid-air Jump Drift", "category": "Driving", "description": "Hold a fresh jump press and steer as you touch down or leave a ramp: hop into a powerslide immediately. Includes a 0.333-second jump buffer and 0.167-second edge grace. Mini-turbos stay manual; a high enough jump automatically performs the native trick and earns its landing boost. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
+    {"id": "MidairDrift", "name": "Mid-air Jump Drift", "category": "Driving", "description": "Hold a fresh jump press and steer as you touch down or leave a ramp: hop into a powerslide immediately. Includes a 0.167-second jump buffer and 0.167-second edge grace. Mini-turbos stay manual; a high enough jump automatically performs the native trick and earns its landing boost. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
         ("ShowStatus", "Show mid-air drift status", "bool", True, None, None),
     ]},
     {"id": "MineTraps", "name": "Mine Traps", "category": "Items", "description": "Use the dormant MINA_09 as a large local trap. Choose a forward physics throw or a surface placement behind the kart; mines can also replace item-box rewards. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
@@ -251,7 +265,7 @@ def module_sources():
         "Antigravity": ["AntigravityFeature.cs", "AntigravitySurfaceMode.cs", "AntigravitySplineTeleport.cs", "AntigravityPolicy.cs", "AntigravityCamera.cs", "AntigravityCameraMath.cs", "CameraFeature.cs", "FeatureHook.cs", "AirShiftFeature.cs", "AirDashMath.cs", "Plugin.cs"],
         "AirShift": ["FeatureHook.cs", "AirShiftFeature.cs", "AirDashMath.cs", "ShortcutInput.cs", "Plugin.cs"],
         "MidairDrift": ["FeatureHook.cs", "MidairDriftFeature.cs", "MidairDriftState.cs", "AirShiftFeature.cs", "Plugin.cs", "StudioBehaviour.cs"],
-        "CtrHandling": ["FeatureHook.cs", "CtrHandlingFeature.cs", "CtrPhysicsFeature.cs", "CtrFireModel.cs", "AirShiftFeature.cs", "Plugin.cs", "StudioBehaviour.cs"],
+        "CtrHandling": ["FeatureHook.cs", "CtrHandlingFeature.cs", "CtrPhysicsFeature.cs", "CtrFireModel.cs", "CtrSpeedDisplay.cs", "CtrFireVisualFeature.cs", "AirShiftFeature.cs", "Plugin.cs", "StudioBehaviour.cs"],
         "PracticeRewind": ["FeatureHook.cs", "PracticeRewindFeature.cs", "PracticeHistory.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirDashMath.cs", "FastFallFeature.cs", "ShortcutInput.cs", "StudioBehaviour.cs", "Plugin.cs"],
         "MineTraps": ["FeatureHook.cs", "MineTrapFeature.cs", "ShortcutInput.cs", "AirShiftFeature.cs", "AirDashMath.cs", "Plugin.cs", "StudioBehaviour.cs"],
         "CommunityCommands": ["CommunityMods.cs", "CommunityCommandParser.cs"],

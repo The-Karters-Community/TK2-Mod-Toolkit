@@ -42,11 +42,16 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
         defaults = pack.defaults()
         self.assertIs(defaults['CtrHandling/Enabled'], False)
         self.assertIs(defaults['CtrHandling/ShowStatus'], True)
+        self.assertEqual(defaults['CtrHandling/GravityMultiplier'], 1.25)
+        self.assertEqual(defaults['CtrHandling/BaseSpeedMultiplier'], .85)
+        self.assertIs(defaults['CtrHandling/FireVisuals'], True)
+        self.assertIs(defaults['CtrHandling/HideNativeSpeedPercent'], True)
+        self.assertIs(defaults['CtrHandling/BrakeClears'], True)
         feature = next(f for f in pack.catalog_features() if f['id'] == 'CtrHandling')
         self.assertTrue(feature['gameplay'])
         self.assertEqual(sum(p['features'].count('CtrHandling') for p in pack.catalog_packs()), 1)
         sources = module_packages._source_dependencies([feature])
-        for name in ('CtrHandlingFeature.cs', 'CtrPhysicsFeature.cs', 'CtrFireModel.cs', 'FeatureHook.cs'):
+        for name in ('CtrHandlingFeature.cs', 'CtrPhysicsFeature.cs', 'CtrFireModel.cs', 'CtrSpeedDisplay.cs', 'CtrFireVisualFeature.cs', 'FeatureHook.cs'):
             self.assertIn('plugins/TK2.Customization/' + name, sources)
 
     def test_controls_survive_config_roundtrip(self):
