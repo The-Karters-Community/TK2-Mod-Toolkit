@@ -207,7 +207,7 @@ internal static class CtrHandlingFeature
     internal static void DrawStatus()
     {
         if (Enabled?.Value == true && ShowStatus.Value && Plugin.OfflineLabAllowed && MenuManager.Instance == null)
-            GUI.Label(new Rect(18, Screen.height - 178, 850, 28), Status);
+            GUI.Label(new Rect(18, Screen.height - 178, 1000, 28), Status + "   |   " + CtrPhysicsFeature.SlopeStatus);
     }
     private static void Fail(Exception ex)
     {

@@ -48,6 +48,7 @@ class AerialPracticeIntegrationTests(unittest.TestCase):
         self.assertEqual(defaults['CtrHandling/FireSize'], 4)
         self.assertIs(defaults['CtrHandling/DownhillSpeedghost'], True)
         self.assertEqual(defaults['CtrHandling/DownhillAcceleration'], 35)
+        self.assertEqual(defaults['CtrHandling/UphillDeceleration'], 20)
         self.assertIs(defaults['CtrHandling/Speedghost'], True)
         self.assertEqual(defaults['CtrHandling/SpeedghostAirLoss'], .6)
         self.assertIs(defaults['CtrHandling/HideNativeSpeedPercent'], True)

@@ -24,10 +24,10 @@ static float Sim(int rate) {
     return speed;
 }
 Check(Math.Abs(Sim(30) - Sim(200)) < .001f);
-float down = CtrSpeedGhostMath.DownhillFactor(.5f, .8660254f, 0, 10, 0);
+float down = CtrSpeedGhostMath.SignedSlope(.5f, .8660254f, 0, 10, 0);
 Check(down > .4f && down < .45f);
-Check(CtrSpeedGhostMath.DownhillFactor(.5f, .8660254f, 0, -10, 0) == 0);
-Check(CtrSpeedGhostMath.DownhillFactor(0, 1, 0, 10, 0) == 0);
+Check(CtrSpeedGhostMath.SignedSlope(.5f, .8660254f, 0, -10, 0) < -.4f);
+Check(CtrSpeedGhostMath.SignedSlope(0, 1, 0, 10, 0) == 0);
 static float SlopeSim(int rate) {
     float speed = 20;
     for (int i = 0; i < rate; i++) speed = CtrSpeedGhostMath.DownhillSpeed(speed, speed, 20, .3f, 20, 2, 2, 1f / rate);

@@ -5,12 +5,12 @@ namespace TK2.Customization;
 // Limit airborne loss above the soft cap, in game speed units per second.
 internal static class CtrSpeedGhostMath
 {
-    internal static float DownhillFactor(float nx, float ny, float nz, float vx, float vz)
+    internal static float SignedSlope(float nx, float ny, float nz, float vx, float vz)
     {
         float n = MathF.Sqrt(nx * nx + ny * ny + nz * nz);
         float v = MathF.Sqrt(vx * vx + vz * vz);
         if (!float.IsFinite(n) || !float.IsFinite(v) || n < .01f || v < 1f || ny / n < .4f) return 0;
-        return Math.Clamp((nx * vx + nz * vz) * ny / (n * n * v), 0f, 1f);
+        return Math.Clamp((nx * vx + nz * vz) * ny / (n * n * v), -1f, 1f);
     }
     internal static float DownhillSpeed(float before, float after, float softCap, float factor,
         float acceleration, float groundLoss, float maximumRatio, float dt)

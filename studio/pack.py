@@ -63,6 +63,7 @@ FEATURES.extend([
         ("GroundFrictionMultiplier", "Ground friction multiplier", "float", 1, .1, 3, "1 uses TK2 ground friction."),
         ("DownhillSpeedghost", "Downhill speedghost", "bool", True, None, None, "Build speed above the fire cap on downhill slopes."),
         ("DownhillAcceleration", "Downhill acceleration", "float", 35, 0, 150, "Increase for stronger downhill speed gain. Scales with slope and elapsed time."),
+        ("UphillDeceleration", "Uphill deceleration", "float", 20, 0, 150, "Increase for stronger speed loss when driving uphill."),
         ("DownhillOverspeedLoss", "Downhill overspeed loss per second", "float", 2, 0, 30, "Controls how quickly existing extra speed is lost while driving downhill."),
         ("DownhillMaxSpeedRatio", "Maximum downhill speed multiplier", "float", 2, 1, 5, "Maximum added downhill speed relative to current fire speed cap."),
         ("Speedghost", "Froggy momentum retention", "bool", True, None, None, "Preserve above-cap horizontal speed during hops. Momentum must first come from a slope or another source."),

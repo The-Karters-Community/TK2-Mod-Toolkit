@@ -8,8 +8,11 @@ namespace TK2.Customization;
 internal static class CtrPhysicsFeature
 {
     private static ConfigEntry<bool> Enabled = null!, Speedghost = null!, Downhill = null!;
-    private static ConfigEntry<float> Speed = null!, Acceleration = null!, Friction = null!, Gravity = null!, Jump = null!, AirLoss = null!, SlopeAcceleration = null!, SlopeLoss = null!, MaxSpeedRatio = null!;
-    private struct Scope { internal bool Applied; internal float Speed, Acceleration, Friction, Mass, BeforeHorizontal, SoftCap; internal bool Airborne, Grounded; }
+    private static ConfigEntry<float> Speed = null!, Acceleration = null!, Friction = null!, Gravity = null!, Jump = null!, AirLoss = null!, SlopeAcceleration = null!, UphillAcceleration = null!, SlopeLoss = null!, MaxSpeedRatio = null!;
+    private struct Scope { internal bool Applied; internal float Speed, Acceleration, Friction, Mass; }
+    private struct Movement { internal bool Applied, Grounded, Airborne; internal float BeforeHorizontal, SoftCap; }
+    internal static string SlopeStatus = "Slope: waiting for driving";
+    private static float NextSlopeLog, NextSlopeStatus;
     private struct JumpScope { internal bool Applied; internal float Strength; }
 
     internal static void Install(Plugin p)
@@ -24,12 +27,15 @@ internal static class CtrPhysicsFeature
         AirLoss = p.Config.Bind("CtrHandling", "SpeedghostAirLoss", .6f, "Maximum airborne overspeed loss in game speed units per second.");
         Downhill = p.Config.Bind("CtrHandling", "DownhillSpeedghost", true, "Build above-cap speed while driving downhill.");
         SlopeAcceleration = p.Config.Bind("CtrHandling", "DownhillAcceleration", 35f, "Downhill acceleration in game speed units per second at full slope.");
+        UphillAcceleration = p.Config.Bind("CtrHandling", "UphillDeceleration", 20f, "Uphill speed loss in game speed units per second at full slope.");
         SlopeLoss = p.Config.Bind("CtrHandling", "DownhillOverspeedLoss", 2f, "Maximum natural overspeed loss per second on a downhill.");
         MaxSpeedRatio = p.Config.Bind("CtrHandling", "DownhillMaxSpeedRatio", 2f, "Limit additional downhill speed relative to the current soft cap.");
         FeatureHook.Install(p.Harmony, typeof(CtrPhysicsFeature), Hooks());
     }
 
     internal static FeatureHook[] Hooks() => new[] {
+        new FeatureHook(typeof(PixelEasyCharMoveKartController), nameof(PixelEasyCharMoveKartController.KinematicCharacterController_ICharacterController_UpdateVelocity),
+            new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, Prefix: nameof(BeforeMovement), Postfix: nameof(AfterMovement)),
         new FeatureHook(typeof(PixelKartPhysics), nameof(PixelKartPhysics.UpdateVelocity),
             new[] { typeof(Vector3).MakeByRefType(), typeof(float) }, Prefix: nameof(BeforeVelocity),
             Postfix: nameof(AfterVelocity), Finalizer: nameof(FinalizeVelocity)),
@@ -49,7 +55,7 @@ internal static class CtrPhysicsFeature
         return value;
     }
 
-    private static void BeforeVelocity(PixelKartPhysics __instance, ref Vector3 __0, out Scope __state)
+    private static void BeforeVelocity(PixelKartPhysics __instance, out Scope __state)
     {
         __state = default;
         try {
@@ -57,10 +63,6 @@ internal static class CtrPhysicsFeature
             float speed = Value(Speed), acceleration = Value(Acceleration), friction = Value(Friction), gravity = Value(Gravity);
             __state = new Scope { Applied = true, Speed = __instance.max_speed_accel_forward,
                 Acceleration = __instance.acceleration_factor, Friction = __instance.ground_friction_factor, Mass = __instance.fMass };
-            __state.Grounded = __instance.kartController.Motor.GroundingStatus.IsStableOnGround && !__instance.bIsBreakingInput;
-            __state.Airborne = Speedghost.Value && !__instance.kartController.IsGrounded_Now() && !__instance.bIsBreakingInput;
-            __state.BeforeHorizontal = new Vector2(__0.x, __0.z).magnitude;
-            __state.SoftCap = Math.Max(0f, __state.Speed * speed + __instance.boostManager.GetCurrentBoostMaxSpeedIncrease());
             __instance.max_speed_accel_forward = __state.Speed * speed;
             __instance.acceleration_factor = __state.Acceleration * acceleration;
             __instance.ground_friction_factor = __state.Friction * friction;
@@ -85,30 +87,53 @@ internal static class CtrPhysicsFeature
     { RestoreJump(__instance, ref __state); return __exception; }
     private static void RestoreJump(PixelKartPhysics physics, ref JumpScope state)
     { if (state.Applied) { physics.fJumpStrength = state.Strength; state.Applied = false; } }
-    private static void AfterVelocity(PixelKartPhysics __instance, ref Vector3 __0, float __1, ref Scope __state)
+    private static void AfterVelocity(PixelKartPhysics __instance, ref Scope __state) => Restore(__instance, ref __state);
+
+    private static void BeforeMovement(PixelEasyCharMoveKartController __instance, ref Vector3 __0, out Movement __state)
+    {
+        __state = default;
+        try {
+            var physics = __instance.kartPhysics;
+            if (!Allowed(physics) || physics.bIsBreakingInput) return;
+            __state.Applied = true;
+            __state.Grounded = __instance.Motor.GroundingStatus.IsStableOnGround;
+            __state.Airborne = !__instance.IsGrounded_Now();
+            __state.BeforeHorizontal = new Vector2(__0.x, __0.z).magnitude;
+            __state.SoftCap = Math.Max(0f, physics.max_speed_accel_forward * Value(Speed) + physics.boostManager.GetCurrentBoostMaxSpeedIncrease());
+        } catch (Exception ex) { Fail(ex); }
+    }
+
+    private static void AfterMovement(PixelEasyCharMoveKartController __instance, ref Vector3 __0, float __1, Movement __state)
     {
         try {
-            if (__state.Applied && __state.Airborne && Speedghost.Value && Allowed(__instance)) {
-                float horizontal = new Vector2(__0.x, __0.z).magnitude;
-                float target = CtrSpeedGhostMath.RetainedSpeed(__state.BeforeHorizontal, horizontal, __state.SoftCap,
-                    AirLoss.Value, __1);
-                if (horizontal > .001f && target > horizontal) {
-                    float scale = target / horizontal;
-                    __0.x *= scale; __0.z *= scale;
-                }
-            } else if (__state.Applied && __state.Grounded && Downhill.Value && Allowed(__instance)) {
-                var normal = __instance.kartController.Motor.GroundingStatus.GroundNormal;
-                float horizontal = new Vector2(__0.x, __0.z).magnitude;
-                float factor = CtrSpeedGhostMath.DownhillFactor(normal.x, normal.y, normal.z, __0.x, __0.z);
-                float target = CtrSpeedGhostMath.DownhillSpeed(__state.BeforeHorizontal, horizontal, __state.SoftCap,
-                    factor, SlopeAcceleration.Value, SlopeLoss.Value, MaxSpeedRatio.Value, __1);
-                if (horizontal > .001f && target > horizontal) {
-                    float scale = target / horizontal;
-                    __0.x *= scale; __0.z *= scale;
-                }
+            if (!__state.Applied || !Allowed(__instance.kartPhysics)) return;
+            float horizontal = new Vector2(__0.x, __0.z).magnitude;
+            float target = horizontal;
+            float slope = 0f;
+            if (__state.Grounded && Downhill.Value) {
+                var normal = __instance.Motor.GroundingStatus.GroundNormal;
+                slope = CtrSpeedGhostMath.SignedSlope(normal.x, normal.y, normal.z, __0.x, __0.z);
+                if (slope > 0)
+                    target = CtrSpeedGhostMath.DownhillSpeed(__state.BeforeHorizontal, horizontal, __state.SoftCap,
+                        slope, SlopeAcceleration.Value, SlopeLoss.Value, MaxSpeedRatio.Value, __1);
+                else if (slope < 0 && float.IsFinite(UphillAcceleration.Value) && UphillAcceleration.Value > 0 && __1 > 0)
+                    target = Math.Max(0f, horizontal + slope * UphillAcceleration.Value * __1);
+            } else if (__state.Airborne && Speedghost.Value) {
+                target = CtrSpeedGhostMath.RetainedSpeed(__state.BeforeHorizontal, horizontal, __state.SoftCap, AirLoss.Value, __1);
+            }
+            if (horizontal > .001f && float.IsFinite(target)) {
+                float scale = target / horizontal;
+                __0.x *= scale; __0.z *= scale;
+            }
+            if (Time.unscaledTime >= NextSlopeStatus) {
+                NextSlopeStatus = Time.unscaledTime + .25f;
+                SlopeStatus = $"Slope {(slope > .01f ? "downhill" : slope < -.01f ? "uphill" : __state.Airborne ? "air" : "flat")} {slope:+0.00;-0.00;0.00} | speed {horizontal:0.0} -> {target:0.0}";
+            }
+            if (Time.unscaledTime >= NextSlopeLog && Math.Abs(slope) > .03f) {
+                NextSlopeLog = Time.unscaledTime + 2f;
+                Plugin.Instance?.Log.LogInfo($"CTR {SlopeStatus}, dt {__1:0.000}, cap {__state.SoftCap:0.0}");
             }
         } catch (Exception ex) { Fail(ex); }
-        finally { Restore(__instance, ref __state); }
     }
     private static Exception? FinalizeVelocity(PixelKartPhysics __instance, ref Scope __state, Exception? __exception)
     { Restore(__instance, ref __state); return __exception; }
@@ -126,5 +151,5 @@ internal static class CtrPhysicsFeature
         Enabled.Value = false;
         Plugin.Instance?.Log.LogError($"CTR physics disabled: {ex.Message}");
     }
-    internal static void Reset() { }
+    internal static void Reset() { SlopeStatus = "Slope: waiting for driving"; NextSlopeLog = 0; NextSlopeStatus = 0; }
 }
