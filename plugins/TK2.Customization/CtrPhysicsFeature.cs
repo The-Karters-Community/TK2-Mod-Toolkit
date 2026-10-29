@@ -7,9 +7,9 @@ namespace TK2.Customization;
 // CTR fixed-point physics cannot be directly converted to TK2 units. Multipliers are experimental.
 internal static class CtrPhysicsFeature
 {
-    private static ConfigEntry<bool> Enabled = null!;
-    private static ConfigEntry<float> Speed = null!, Acceleration = null!, Friction = null!, Gravity = null!, Jump = null!;
-    private struct Scope { internal bool Applied; internal float Speed, Acceleration, Friction, Mass; }
+    private static ConfigEntry<bool> Enabled = null!, Speedghost = null!;
+    private static ConfigEntry<float> Speed = null!, Acceleration = null!, Friction = null!, Gravity = null!, Jump = null!, AirLoss = null!;
+    private struct Scope { internal bool Applied; internal float Speed, Acceleration, Friction, Mass, BeforeHorizontal, SoftCap; internal bool Airborne; }
     private struct JumpScope { internal bool Applied; internal float Strength; }
 
     internal static void Install(Plugin p)
@@ -20,6 +20,8 @@ internal static class CtrPhysicsFeature
         Friction = p.Config.Bind("CtrHandling", "GroundFrictionMultiplier", 1f, "Multiply native ground friction.");
         Gravity = p.Config.Bind("CtrHandling", "GravityMultiplier", 1.25f, "Multiply gravity while airborne.");
         Jump = p.Config.Bind("CtrHandling", "JumpStrengthMultiplier", .85f, "Multiply jump impulse. 1 restores the native value.");
+        Speedghost = p.Config.Bind("CtrHandling", "Speedghost", true, "Preserve above-cap momentum during airborne hops.");
+        AirLoss = p.Config.Bind("CtrHandling", "SpeedghostAirLoss", .6f, "Maximum airborne overspeed loss in game speed units per second.");
         FeatureHook.Install(p.Harmony, typeof(CtrPhysicsFeature), Hooks());
     }
 
@@ -43,7 +45,7 @@ internal static class CtrPhysicsFeature
         return value;
     }
 
-    private static void BeforeVelocity(PixelKartPhysics __instance, out Scope __state)
+    private static void BeforeVelocity(PixelKartPhysics __instance, ref Vector3 __0, out Scope __state)
     {
         __state = default;
         try {
@@ -51,6 +53,9 @@ internal static class CtrPhysicsFeature
             float speed = Value(Speed), acceleration = Value(Acceleration), friction = Value(Friction), gravity = Value(Gravity);
             __state = new Scope { Applied = true, Speed = __instance.max_speed_accel_forward,
                 Acceleration = __instance.acceleration_factor, Friction = __instance.ground_friction_factor, Mass = __instance.fMass };
+            __state.Airborne = Speedghost.Value && !__instance.kartController.IsGrounded_Now() && !__instance.bIsBreakingInput;
+            __state.BeforeHorizontal = new Vector2(__0.x, __0.z).magnitude;
+            __state.SoftCap = Math.Max(0f, __state.Speed * speed + __instance.boostManager.GetCurrentBoostMaxSpeedIncrease());
             __instance.max_speed_accel_forward = __state.Speed * speed;
             __instance.acceleration_factor = __state.Acceleration * acceleration;
             __instance.ground_friction_factor = __state.Friction * friction;
@@ -75,7 +80,21 @@ internal static class CtrPhysicsFeature
     { RestoreJump(__instance, ref __state); return __exception; }
     private static void RestoreJump(PixelKartPhysics physics, ref JumpScope state)
     { if (state.Applied) { physics.fJumpStrength = state.Strength; state.Applied = false; } }
-    private static void AfterVelocity(PixelKartPhysics __instance, ref Scope __state) => Restore(__instance, ref __state);
+    private static void AfterVelocity(PixelKartPhysics __instance, ref Vector3 __0, float __1, ref Scope __state)
+    {
+        try {
+            if (__state.Applied && __state.Airborne && Speedghost.Value && Allowed(__instance)) {
+                float horizontal = new Vector2(__0.x, __0.z).magnitude;
+                float target = CtrSpeedGhostMath.RetainedSpeed(__state.BeforeHorizontal, horizontal, __state.SoftCap,
+                    AirLoss.Value, __1);
+                if (horizontal > .001f && target > horizontal) {
+                    float scale = target / horizontal;
+                    __0.x *= scale; __0.z *= scale;
+                }
+            }
+        } catch (Exception ex) { Fail(ex); }
+        finally { Restore(__instance, ref __state); }
+    }
     private static Exception? FinalizeVelocity(PixelKartPhysics __instance, ref Scope __state, Exception? __exception)
     { Restore(__instance, ref __state); return __exception; }
     private static void Restore(PixelKartPhysics physics, ref Scope state)

@@ -29,3 +29,7 @@ A default-off offline CTR-inspired Handling module has now been implemented. It 
 ## Experimental visual and physics controls
 
 Current native `Ant_KartParticlesWorker.SetBoostParticlesActive` at `0x1809701b0` selects indexed left/right exhaust loop and success effects; `WorkerUpdate` at `0x1809719a0` can stop the native effect. The adapter bounds its tier to the shortest available effect array. Its tier mapping is a TK2 presentation approximation; super pads are not identified. Current `PixelKartPhysics.UpdateVelocity` uses `fMass` in airborne gravity and `TriggerPhysicsJump` uses `fJumpStrength`; their scoped multipliers and speed/acceleration/friction multipliers are player-tunable, not original CTR units. Hook signatures resolve against current interop; visible behavior is unverified.
+
+## Speedghost experiment
+
+CTR `VehPhysGeneral.c` skips grounded acceleration while airborne and applies movement based on `elapsedTimeMS`; the player guide describes using lower airborne friction to retain existing above-soft-cap speed. The TK2 adapter captures and modifies horizontal velocity in the current native `PixelKartPhysics.UpdateVelocity` (`0x180603100`) boundary, using its delta-time argument, while leaving `UpdateSlopeVelocity`, vertical velocity and subsequent motor collision processing native. The airborne loss cap is tunable and not a source-calibrated CTR constant. No runtime behavior is yet verified.
