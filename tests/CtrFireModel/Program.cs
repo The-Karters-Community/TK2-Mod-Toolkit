@@ -35,4 +35,12 @@ static float SlopeSim(int rate) {
 }
 Check(Math.Abs(SlopeSim(30) - SlopeSim(200)) < .001f && SlopeSim(30) > 25.9f);
 Check(CtrSpeedGhostMath.DownhillSpeed(40, 40, 20, .3f, 20, 2, 2, .1f) == 40);
+static float SlopeWithNativeDrag(int rate) {
+    float speed = 80;
+    for (int i = 0; i < rate; i++) speed = CtrSpeedGhostMath.DownhillSpeed(speed, speed - 30f / rate, 128, .4f, 120, .24f, 5, 1f / rate);
+    return speed;
+}
+Check(SlopeWithNativeDrag(30) > 125 && Math.Abs(SlopeWithNativeDrag(30) - SlopeWithNativeDrag(200)) < .01f);
+Check(CtrSpeedGhostMath.UphillSpeed(80, 80.3f, -.2f, 20, .1f) < 79.61f);
+Check(CtrSpeedGhostMath.UphillSpeed(80, 70, -.2f, 20, .1f) < 70);
 Console.WriteLine("CTR fire, speedghost and slope assertions passed");

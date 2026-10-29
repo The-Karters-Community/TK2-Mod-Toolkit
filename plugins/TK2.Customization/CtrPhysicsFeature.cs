@@ -116,8 +116,8 @@ internal static class CtrPhysicsFeature
                 if (slope > 0)
                     target = CtrSpeedGhostMath.DownhillSpeed(__state.BeforeHorizontal, horizontal, __state.SoftCap,
                         slope, SlopeAcceleration.Value, SlopeLoss.Value, MaxSpeedRatio.Value, __1);
-                else if (slope < 0 && float.IsFinite(UphillAcceleration.Value) && UphillAcceleration.Value > 0 && __1 > 0)
-                    target = Math.Max(0f, horizontal + slope * UphillAcceleration.Value * __1);
+                else if (slope < 0)
+                    target = CtrSpeedGhostMath.UphillSpeed(__state.BeforeHorizontal, horizontal, slope, UphillAcceleration.Value, __1);
             } else if (__state.Airborne && Speedghost.Value) {
                 target = CtrSpeedGhostMath.RetainedSpeed(__state.BeforeHorizontal, horizontal, __state.SoftCap, AirLoss.Value, __1);
             }

@@ -17,9 +17,16 @@ internal static class CtrSpeedGhostMath
     {
         if (!float.IsFinite(factor) || !float.IsFinite(acceleration) || !float.IsFinite(maximumRatio) ||
             factor <= 0 || acceleration <= 0 || maximumRatio < 1 || dt <= 0 || !float.IsFinite(dt)) return after;
-        float kept = RetainedSpeed(before, after, softCap, groundLoss, dt);
+        float kept = RetainedSpeed(before, after, 0f, groundLoss, dt);
         float limit = Math.Max(softCap, softCap * maximumRatio);
         return kept + Math.Min(Math.Max(0f, limit - kept), factor * acceleration * dt);
+    }
+    internal static float UphillSpeed(float before, float after, float factor, float deceleration, float dt)
+    {
+        if (!float.IsFinite(before) || !float.IsFinite(after) || !float.IsFinite(factor) ||
+            !float.IsFinite(deceleration) || !float.IsFinite(dt) || factor >= 0 || deceleration <= 0 || dt <= 0)
+            return after;
+        return Math.Max(0f, Math.Min(before, after) + factor * deceleration * dt);
     }
     internal static float RetainedSpeed(float before, float after, float cap, float lossPerSecond, float dt)
     {
