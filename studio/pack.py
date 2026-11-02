@@ -111,6 +111,12 @@ FEATURES.extend([
         ("OncePerJump", "Once per jump", "bool", True, None, None, "Turn off to allow repeated shifts before landing."),
         ("ShowStatus", "Show Air Dash status", "bool", True, None, None),
     ]},
+    {"id": "AirGlide", "name": "Air Glide", "category": "Driving", "description": "Hold jump while airborne after a trick to deploy the parachute and glide with controlled descent; release jump to drop. Works in offline mode only.", "origin": "New", "gameplay": True, "settings": [
+        ("ShowStatus", "Show Air Glide status", "bool", True, None, None),
+        ("DescentRate", "Initial descent rate (m/s)", "float", 6, 0.1, None, "Vertical descent speed when gliding starts."),
+        ("DescentAccel", "Descent acceleration (m/s²)", "float", 4, 0, None, "How much the descent speed increases per second while gliding."),
+        ("MomentumDecay", "Momentum decay per second", "float", 0.02, 0, 1, "Fraction of horizontal speed lost per second while gliding. 0 = full preservation."),
+    ]},
     {"id": "PracticeRewind", "name": "Rewind / Practice Scrubbing", "category": "Training", "description": "Experimental solo training: Backspace rewinds 3 seconds; hold to scrub farther, release to resume. Restores driving, reserves and boost state within the current checkpoint segment. History clears on checkpoints, recovery and teleports. Race clock, items and other racers are not rewound. In-game validation pending.", "origin": "New", "gameplay": True, "settings": [
         ("RewindKey", "Rewind key", "text", "Backspace", None, None),
         ("ControllerAction", "Controller action", "text", "", None, None, "Optional existing Rewired action; blank uses keyboard only."),
@@ -160,7 +166,8 @@ RETIRED_MODULES = frozenset({'MirrorMode', 'RicochetItems'} | {'Recipe.' + name 
     'RepulsorPulse','SlipstreamSling','CosmeticModel','TrackInspector')})
 RETIRED_SETTINGS = frozenset({('AirShift', key) for key in (
     'AllowGroundTesting', 'DashDistance', 'DashDuration', 'LimitHorizontalSpeed', 'SpeedRetention'
-)} | {('MineTraps', key) for key in ('DropDistance', 'OwnerCanTrigger', 'ArmDelay', 'Lifetime', 'ThrowForceMultiplier')})
+)} | {('MineTraps', key) for key in ('DropDistance', 'OwnerCanTrigger', 'ArmDelay', 'Lifetime', 'ThrowForceMultiplier')}
+| {('AirGlide', key) for key in ('ActivateKey', 'MomentumConservation')})
 FORCED_TRUE_SETTINGS = frozenset({
     ("OnlineProtection", "Enabled"),
     ("OnlineProtection", "BlockLeaderboardUploads"),
@@ -214,7 +221,7 @@ def defaults():
 
 PACKS = [
     {"id": "garage", "name": "Toolkit Essentials", "description": "Online protection, camera, interface, audio, graphics and race performance controls.", "features": ["OnlineProtection", "UI", "HudOpacity", "DisableVignette", "GamepadOverlay", "Audio", "Camera", "Rendering", "Performance", "PerformanceDiagnostics", "TrackBoundaries"]},
-    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "Antigravity", "AirShift", "MidairDrift", "CtrHandling", "PracticeRewind", "MineTraps"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
+    {"id": "community", "name": "Community Mods", "description": "Race rules, driving challenges, practice, advanced tuning and community commands.", "features": ["Laps", "SimpleDriving", "AutoBoost", "Tuning", "Physics", "Antigravity", "AirShift", "MidairDrift", "AirGlide", "CtrHandling", "PracticeRewind", "MineTraps"] + [f["id"] for f in _MK] + [f["id"] for f in _COMMUNITY]},
 ]
 
 
@@ -272,6 +279,7 @@ def module_sources():
         "Physics": ["FastFallFeature.cs", "ShortcutInput.cs", "Plugin.cs"],
         "Antigravity": ["AntigravityFeature.cs", "AntigravitySurfaceMode.cs", "AntigravitySplineTeleport.cs", "AntigravityPolicy.cs", "AntigravityCamera.cs", "AntigravityCameraMath.cs", "CameraFeature.cs", "FeatureHook.cs", "AirShiftFeature.cs", "AirDashMath.cs", "Plugin.cs"],
         "AirShift": ["FeatureHook.cs", "AirShiftFeature.cs", "AirDashMath.cs", "ShortcutInput.cs", "Plugin.cs"],
+        "AirGlide": ["FeatureHook.cs", "AirGlideFeature.cs", "Plugin.cs", "StudioBehaviour.cs"],
         "MidairDrift": ["FeatureHook.cs", "MidairDriftFeature.cs", "MidairDriftState.cs", "AirShiftFeature.cs", "Plugin.cs", "StudioBehaviour.cs"],
         "CtrHandling": ["FeatureHook.cs", "CtrHandlingFeature.cs", "CtrPhysicsFeature.cs", "CtrSpeedGhostMath.cs", "CtrFireModel.cs", "CtrSpeedDisplay.cs", "CtrFireVisualFeature.cs", "AirShiftFeature.cs", "Plugin.cs", "StudioBehaviour.cs"],
         "PracticeRewind": ["FeatureHook.cs", "PracticeRewindFeature.cs", "PracticeHistory.cs", "DrivingSnapshot.cs", "AirShiftFeature.cs", "AirDashMath.cs", "FastFallFeature.cs", "ShortcutInput.cs", "StudioBehaviour.cs", "Plugin.cs"],

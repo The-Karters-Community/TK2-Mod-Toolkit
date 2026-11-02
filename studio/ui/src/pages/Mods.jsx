@@ -246,7 +246,7 @@ export default function Mods() {
                     </p>
                   )}
                   <ModuleSettings
-                    key={expansion}
+                    key={module.id}
                     module={module}
                     allOpen={allOpen}
                   />

@@ -67,6 +67,7 @@ public sealed partial class Plugin : BasePlugin
         TryFeature("offline spline-teleport testing", () => AntigravitySplineTeleport.Install(this));
         TryFeature("fast-fall controller input", () => FastFallFeature.Install(this));
         TryFeature("air shift", () => AirShiftFeature.Install(this));
+        TryFeature("air glide", () => AirGlideFeature.Install(this));
         TryFeature("mid-air jump drift", () => MidairDriftFeature.Install(this));
         TryFeature("CTR handling", () => CtrHandlingFeature.Install(this));
         TryFeature("CTR fire visuals", () => CtrFireVisualFeature.Install(this));
@@ -141,7 +142,7 @@ public sealed partial class Plugin : BasePlugin
         RecipeHost.Restore();
         FastFallFeature.Restore();
         AntigravityFeature.RestoreAll();
-        AirShiftFeature.Reset(); PracticeRewindFeature.Reset(); MineTrapFeature.Reset();
+        AirGlideFeature.Reset(); AirShiftFeature.Reset(); PracticeRewindFeature.Reset(); MineTrapFeature.Reset();
         MidairDriftFeature.Reset();
         CtrHandlingFeature.Reset(); CtrPhysicsFeature.Reset(); CtrSpeedDisplay.Restore(); CtrFireVisualFeature.Reset();
         CommunityMods.Restore();

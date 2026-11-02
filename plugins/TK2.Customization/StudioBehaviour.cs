@@ -210,6 +210,7 @@ public sealed class StudioBehaviour : MonoBehaviour
         CtrHandlingFeature.DrawStatus(); CtrSpeedDisplay.Draw();
         AntigravityFeature.DrawStatus();
         MineTrapFeature.DrawStatus();
+        AirGlideFeature.DrawStatus();
     }
 
     public void RestoreAll() { RestoreHud(); RestoreVisualPack(); TrackBoundaries.Restore(); }
