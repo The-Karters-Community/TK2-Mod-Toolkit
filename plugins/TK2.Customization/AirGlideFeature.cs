@@ -5,21 +5,24 @@ using UnityEngine;
 
 namespace TK2.Customization;
 
-// Hold jump while airborne: once a trick has been made, the kart glides until
-// jump is released or the kart lands. Input capture follows the proven Air Dash
-// and Mid-air drift pattern: Ant_KartInput is captured in its own update, and
-// the held state is read live inside the physics velocity step.
+// Hold jump while airborne: once a trick has been made and the kart reaches the
+// top of its arc, it glides with a controlled descent until jump is released or
+// the kart lands. Input capture follows the proven Air Dash and Mid-air drift
+// pattern: Ant_KartInput is captured in its own update and the held Rewired Jump
+// action is read live inside the physics velocity step.
 internal static class AirGlideFeature
 {
     private static ConfigEntry<bool> Enabled = null!, ShowStatus = null!;
-    private static ConfigEntry<float> DescentRate = null!, DescentAccel = null!, MomentumDecay = null!;
+    private static ConfigEntry<float> ApexThreshold = null!, DescentRate = null!, DescentAccel = null!, MomentumDecay = null!;
 
     private sealed class Glide
     {
         internal bool Gliding, TrickSeen, ParachuteOut;
         internal float GlideTime, VerticalSpeed;
         internal Ant_KartInput? Controls;
+        internal PTK_KartParachuteManager? Manager;
         internal GameObject? Parachute;
+        internal bool ManagerWasEnabled;
     }
 
     private static readonly Dictionary<int, Glide> States = new();
@@ -27,8 +30,9 @@ internal static class AirGlideFeature
 
     internal static void Install(Plugin p)
     {
-        Enabled = p.Config.Bind("AirGlide", "Enabled", false, "Offline controlled glide. Hold jump while airborne after a trick to deploy the parachute and glide; release jump to drop. Works in offline mode only.");
+        Enabled = p.Config.Bind("AirGlide", "Enabled", false, "Offline controlled glide. Hold jump while airborne after a trick; the glide starts at the top of the jump and ends when jump is released or the kart lands. Works in offline mode only.");
         ShowStatus = p.Config.Bind("AirGlide", "ShowStatus", true, "Show glide status while testing.");
+        ApexThreshold = p.Config.Bind("AirGlide", "ApexThreshold", 2f, "Upward speed in metres per second at or below which the glide engages. Lower values wait longer toward the true top of the jump; 0 waits for the exact apex.");
         DescentRate = p.Config.Bind("AirGlide", "DescentRate", 6f, "Initial vertical descent speed in metres per second when gliding starts.");
         DescentAccel = p.Config.Bind("AirGlide", "DescentAccel", 4f, "How much the descent speed increases per second while gliding.");
         MomentumDecay = p.Config.Bind("AirGlide", "MomentumDecay", 0.02f, "Fraction of horizontal speed lost per second while gliding. 0 preserves momentum fully.");
@@ -77,7 +81,7 @@ internal static class AirGlideFeature
 
             // Back on the ground: clear everything for the next jump.
             if (__instance.fTimeSinceNotGrounded <= 0f) {
-                if (glide.Gliding) StopGlide(glide, deploy: true);
+                if (glide.Gliding) EndGlide(glide);
                 glide.TrickSeen = false;
                 Status = "Air Glide: airborne, hold jump and do a trick to glide";
                 return;
@@ -85,24 +89,31 @@ internal static class AirGlideFeature
 
             // Releasing jump cancels the glide and lets the kart fall normally.
             if (!JumpHeld(glide)) {
-                if (glide.Gliding) StopGlide(glide, deploy: true);
+                if (glide.Gliding) EndGlide(glide);
                 Status = glide.TrickSeen
                     ? "Air Glide: jump released - normal fall"
                     : "Air Glide: airborne, hold jump and do a trick to glide";
                 return;
             }
 
-            // A completed trick is what arms the glide, so a plain held jump never glides.
+            // A completed trick is what arms the glide, so a held jump alone never glides.
             if (!glide.TrickSeen)
                 glide.TrickSeen = __instance.bAlreadyMadeTrick || __instance.bIsPlayerMadeTrickBeforeLanding;
             if (!glide.TrickSeen) return;
+
+            // Wait for the top of the arc: while the kart still climbs faster than the
+            // threshold, leave the native jump and gravity alone.
+            if (!glide.Gliding && __0.y > ApexThreshold.Value) {
+                Status = $"Air Glide: waiting for the top of the jump (climb {__0.y:0.0} m/s)";
+                return;
+            }
 
             if (!glide.Gliding) {
                 glide.Gliding = true;
                 glide.GlideTime = 0f;
                 glide.VerticalSpeed = 0f;
                 Plugin.Instance!.SessionModified = true;
-                Plugin.Instance.Log.LogInfo("Air Glide: parachute deployed after a trick with jump held.");
+                Plugin.Instance.Log.LogInfo("Air Glide: parachute deployed at the top of the jump.");
             }
 
             glide.GlideTime += __1;
@@ -119,26 +130,38 @@ internal static class AirGlideFeature
         } catch (Exception ex) { Fail(ex); }
     }
 
-    private static void StopGlide(Glide glide, bool deploy)
+    private static void EndGlide(Glide glide)
     {
         glide.Gliding = false;
         glide.GlideTime = 0f;
         glide.VerticalSpeed = 0f;
-        if (deploy && glide.ParachuteOut) {
-            glide.Parachute?.SetActive(false);
-            glide.ParachuteOut = false;
-        }
+        DeployParachute(null, glide, false);
     }
 
-    private static void DeployParachute(PixelKartPhysics physics, Glide glide, bool show)
+    // The native PTK_KartParachuteManager.Update hides the parachute every frame in
+    // ordinary race modes, so it is suspended while gliding and the visual is driven
+    // here. Everything is restored when the glide ends or the race resets.
+    private static void DeployParachute(PixelKartPhysics? physics, Glide glide, bool show)
     {
         try {
-            var visual = physics.kartController.parentPlayer?.kartVisualTransform;
-            if (visual == null) return;
-            if (glide.Parachute == null)
-                glide.Parachute = visual.GetComponentInChildren<PTK_KartParachuteManager>(true)?.parachuteWithScaleOffset;
-            glide.Parachute?.SetActive(show);
-            glide.ParachuteOut = show && glide.Parachute != null;
+            if (show) {
+                var visual = physics?.kartController.parentPlayer?.kartVisualTransform;
+                if (visual == null) return;
+                glide.Manager ??= visual.GetComponentInChildren<PTK_KartParachuteManager>(true);
+                if (glide.Manager == null) return;
+                glide.Parachute ??= glide.Manager.parachuteWithScaleOffset;
+                if (glide.Parachute == null) return;
+
+                glide.ManagerWasEnabled = glide.Manager.enabled;
+                glide.Manager.enabled = false;
+                glide.Parachute.SetActive(true);
+                glide.Parachute.transform.localScale = Vector3.one;
+                glide.ParachuteOut = true;
+            } else {
+                if (glide.Parachute != null) glide.Parachute.SetActive(false);
+                if (glide.Manager != null) glide.Manager.enabled = glide.ManagerWasEnabled;
+                glide.ParachuteOut = false;
+            }
         } catch {
             // The parachute is cosmetic; gliding must work without it.
             glide.ParachuteOut = false;
@@ -149,6 +172,7 @@ internal static class AirGlideFeature
     // established shape for this hook, so it keeps one unambiguous Reset overload.
     internal static void Reset()
     {
+        foreach (var glide in States.Values) DeployParachute(null, glide, false);
         States.Clear();
         Status = "Air Glide: hold jump and do a trick to glide";
     }

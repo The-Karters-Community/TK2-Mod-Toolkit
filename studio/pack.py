@@ -111,8 +111,9 @@ FEATURES.extend([
         ("OncePerJump", "Once per jump", "bool", True, None, None, "Turn off to allow repeated shifts before landing."),
         ("ShowStatus", "Show Air Dash status", "bool", True, None, None),
     ]},
-    {"id": "AirGlide", "name": "Air Glide", "category": "Driving", "description": "Hold jump while airborne after a trick to deploy the parachute and glide with controlled descent; release jump to drop. Works in offline mode only.", "origin": "New", "gameplay": True, "settings": [
+    {"id": "AirGlide", "name": "Air Glide", "category": "Driving", "description": "Hold jump while airborne after a trick: the parachute opens at the top of the jump and the kart glides with a controlled descent until you release jump or land. Works in offline mode only.", "origin": "New", "gameplay": True, "settings": [
         ("ShowStatus", "Show Air Glide status", "bool", True, None, None),
+        ("ApexThreshold", "Glide start upward speed (m/s)", "float", 2, 0, None, "The glide engages once the kart's upward speed drops to this value. Lower waits longer toward the true top of the jump; 0 waits for the exact apex."),
         ("DescentRate", "Initial descent rate (m/s)", "float", 6, 0.1, None, "Vertical descent speed when gliding starts."),
         ("DescentAccel", "Descent acceleration (m/s²)", "float", 4, 0, None, "How much the descent speed increases per second while gliding."),
         ("MomentumDecay", "Momentum decay per second", "float", 0.02, 0, 1, "Fraction of horizontal speed lost per second while gliding. 0 = full preservation."),
